@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Profile — REFORMMED{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div><h1>Profile</h1><p>Update your account details</p></div>
+</div>
+
+<div class="card" style="max-width:480px">
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid var(--border)">
+    <div style="width:60px;height:60px;background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:white;">
+      {{ current_user.username[0].upper() }}
+    </div>
+    <div>
+      <div style="font-size:18px;font-weight:700;">{{ current_user.username }}</div>
+      <div style="font-size:13px;color:var(--text-muted);">{{ current_user.email }}</div>
+      <span class="badge badge-{{ 'admin' if current_user.is_admin else 'info' }}" style="margin-top:4px;display:inline-block;">
+        {{ current_user.role.upper() }}
+      </span>
+    </div>
+  </div>
+
+  <form method="POST">
+    <div class="form-group">
+      <label>Email Address</label>
+      <input type="email" name="email" value="{{ current_user.email }}" placeholder="{{ current_user.email }}">
+    </div>
+    <div class="form-group">
+      <label>New Password <span class="text-muted">(leave blank to keep current)</span></label>
+      <input type="password" name="password" placeholder="••••••••">
+    </div>
+    <button type="submit" class="btn btn-primary">Save Changes</button>
+  </form>
+</div>
+{% endblock %}
