@@ -8,13 +8,29 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
-    :root{--bg:#0d0f14;--bg2:#141720;--bg3:#1c2030;--border:#252a3a;--accent:#00d4ff;--accent2:#7c3aed;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--text:#e2e8f0;--text-muted:#64748b;--sidebar-w:240px;}
+    :root {
+      --bg:#0d0f14; --bg2:#141720; --bg3:#1c2030; --border:#252a3a;
+      --accent:#00d4ff; --accent2:#7c3aed; --green:#22c55e; --red:#ef4444;
+      --yellow:#f59e0b; --text:#e2e8f0; --text-muted:#64748b; --sidebar-w:240px;
+    }
     *{box-sizing:border-box;margin:0;padding:0;}
     body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+
+    /* ── Overlay ── */
     #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:90;}
     #overlay.open{display:block;}
-    #sidebar{width:var(--sidebar-w);min-height:100vh;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:100;transition:transform .25s ease;}
-    @media(max-width:768px){ #sidebar{transform:translateX(-100%);} #sidebar.open{transform:translateX(0);}}
+
+    /* ── Sidebar ── */
+    #sidebar{
+      width:var(--sidebar-w);min-height:100vh;background:var(--bg2);
+      border-right:1px solid var(--border);display:flex;flex-direction:column;
+      position:fixed;top:0;left:0;z-index:100;
+      transition:transform .25s ease;
+    }
+    @media(max-width:768px){
+      #sidebar{transform:translateX(-100%);}
+      #sidebar.open{transform:translateX(0);}
+    }
     .sidebar-logo{padding:20px;border-bottom:1px solid var(--border);}
     .sidebar-logo .brand{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;}
     .sidebar-logo .sub{font-size:11px;color:var(--text-muted);margin-top:2px;}
@@ -32,8 +48,12 @@
     .user-role{font-size:10px;color:var(--text-muted);background:var(--bg2);padding:1px 6px;border-radius:4px;display:inline-block;margin-top:2px;}
     .btn-logout{display:flex;align-items:center;gap:6px;width:100%;padding:8px 12px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-size:13px;cursor:pointer;text-decoration:none;transition:all .15s;font-family:inherit;}
     .btn-logout:hover{border-color:var(--red);color:var(--red);}
+
+    /* ── Main ── */
     #main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;}
-    @media(max-width:768px)
+    @media(max-width:768px){#main{margin-left:0;}}
+
+    /* ── Navbar ── */
     #navbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
     .hamburger{display:none;background:none;border:none;color:var(--text);cursor:pointer;padding:4px;}
     @media(max-width:768px){.hamburger{display:flex;align-items:center;}}
@@ -41,18 +61,26 @@
     .navbar-title{font-weight:600;font-size:15px;}
     .navbar-right{display:flex;align-items:center;gap:12px;}
     .live-badge{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);}
-    .pulse{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite;display:inline-block;}
+    .pulse{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite;}
     @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+    /* ── Content ── */
     #content{padding:20px;flex:1;}
-    @media(max-width:768px)
+    @media(max-width:768px){#content{padding:14px;}}
+
+    /* ── Flash ── */
     .flash-messages{margin-bottom:16px;}
     .flash{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:6px;display:flex;align-items:center;gap:8px;}
     .flash.success{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:var(--green);}
     .flash.danger{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:var(--red);}
     .flash.warning{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:var(--yellow);}
     .flash.info{background:rgba(0,212,255,.10);border:1px solid rgba(0,212,255,.25);color:var(--accent);}
+
+    /* ── Cards ── */
     .card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;}
     .card-title{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;}
+
+    /* ── Stat cards ── */
     .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px;}
     .stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;overflow:hidden;}
     .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
@@ -62,6 +90,8 @@
     .stat-card.warning::before{background:var(--yellow);}
     .stat-value{font-family:'JetBrains Mono',monospace;font-size:34px;font-weight:700;line-height:1;margin-bottom:4px;}
     .stat-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;}
+
+    /* ── Badges ── */
     .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;}
     .status-dot.online{background:var(--green);box-shadow:0 0 6px var(--green);}
     .status-dot.offline{background:var(--red);box-shadow:0 0 6px var(--red);}
@@ -71,6 +101,8 @@
     .badge-warning{background:rgba(245,158,11,.15);color:var(--yellow);}
     .badge-info{background:rgba(0,212,255,.12);color:var(--accent);}
     .badge-admin{background:rgba(124,58,237,.15);color:#a78bfa;}
+
+    /* ── Tables ── */
     .table-wrap{overflow-x:auto;}
     table{width:100%;border-collapse:collapse;font-size:13px;}
     th{text-align:left;padding:9px 14px;font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);}
@@ -79,6 +111,8 @@
     tr:hover td{background:rgba(255,255,255,.02);}
     .machine-link{color:var(--accent);text-decoration:none;font-weight:500;font-family:'JetBrains Mono',monospace;font-size:12px;}
     .machine-link:hover{text-decoration:underline;}
+
+    /* ── Buttons ── */
     .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;text-decoration:none;transition:all .15s;font-family:inherit;}
     .btn-primary{background:var(--accent);color:#0d0f14;}
     .btn-primary:hover{background:#00b8d9;}
@@ -87,38 +121,52 @@
     .btn-ghost{background:transparent;color:var(--text-muted);border:1px solid var(--border);}
     .btn-ghost:hover{color:var(--text);border-color:var(--text-muted);}
     .btn-sm{padding:5px 10px;font-size:12px;}
+
+    /* ── Forms ── */
     .form-group{margin-bottom:14px;}
     label{display:block;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;}
     input[type=text],input[type=email],input[type=password],input[type=number],select,textarea{width:100%;padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border-color .15s;}
     input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,212,255,.08);}
     select option{background:var(--bg3);}
+
+    /* ── Page header ── */
     .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap;}
     .page-header h1{font-size:20px;font-weight:700;}
     .page-header p{font-size:13px;color:var(--text-muted);margin-top:2px;}
+
+    /* ── Modal ── */
     .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;padding:16px;}
     .modal-backdrop.open{display:flex;}
     .modal{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:24px;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;}
     .modal-title{font-size:17px;font-weight:700;margin-bottom:18px;}
     .modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:14px;border-top:1px solid var(--border);}
+
+    /* ── Progress ── */
     .progress-bar{height:6px;background:var(--bg3);border-radius:99px;overflow:hidden;margin-top:4px;}
     .progress-fill{height:100%;border-radius:99px;transition:width .4s ease;}
     .progress-fill.green{background:var(--green);}
     .progress-fill.yellow{background:var(--yellow);}
     .progress-fill.red{background:var(--red);}
     .progress-fill.blue{background:var(--accent);}
+
+    /* ── Misc ── */
     .mono{font-family:'JetBrains Mono',monospace;}
     .text-muted{color:var(--text-muted);}
     .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
     .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
     @media(max-width:600px){.grid-2,.grid-3{grid-template-columns:1fr;}}
-    .mt-1{margin-top:8px;}.mt-2{margin-top:14px;}.mt-3{margin-top:20px;}.mb-2{margin-bottom:14px;}
-    .flex{display:flex;}.items-center{align-items:center;}.gap-2{gap:8px;}
+    .mt-1{margin-top:8px;} .mt-2{margin-top:14px;} .mt-3{margin-top:20px;}
+    .mb-2{margin-bottom:14px;}
+    .flex{display:flex;} .items-center{align-items:center;} .gap-2{gap:8px;}
     hr.divider{border:none;border-top:1px solid var(--border);margin:16px 0;}
   </style>
   {% block extra_css %}{% endblock %}
 </head>
 <body>
+
 <div id="overlay" onclick="closeSidebar()"></div>
+
+<!-- ── Sidebar ── -->
 <nav id="sidebar">
   <div class="sidebar-logo">
     <div class="brand">REFORMMED</div>
@@ -127,18 +175,22 @@
   <div class="sidebar-nav">
     <div class="nav-section">Main</div>
     <a href="{{ url_for('home.index') }}" class="nav-item {% if request.endpoint=='home.index' %}active{% endif %}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Home
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Home
     </a>
     <a href="{{ url_for('servers.index') }}" class="nav-item {% if 'servers' in request.endpoint %}active{% endif %}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>Servers
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+      Servers
     </a>
     <a href="{{ url_for('alerts.index') }}" class="nav-item {% if 'alerts' in request.endpoint %}active{% endif %}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>Alerts
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      Alerts
     </a>
     {% if current_user.is_admin %}
     <div class="nav-section" style="margin-top:6px;">Admin</div>
     <a href="{{ url_for('users.index') }}" class="nav-item {% if 'users' in request.endpoint %}active{% endif %}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Users
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+      Users
     </a>
     {% endif %}
   </div>
@@ -151,10 +203,13 @@
       </div>
     </a>
     <a href="{{ url_for('auth.logout') }}" class="btn-logout">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign out
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign out
     </a>
   </div>
 </nav>
+
+<!-- ── Main ── -->
 <div id="main">
   <header id="navbar">
     <div style="display:flex;align-items:center;gap:12px;">
@@ -167,6 +222,7 @@
       <div class="live-badge"><span class="pulse"></span><span id="live-clock"></span></div>
     </div>
   </header>
+
   <div id="content">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -180,11 +236,22 @@
     {% block content %}{% endblock %}
   </div>
 </div>
+
 <script>
-function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('overlay').classList.toggle('open');}
-function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('overlay').classList.remove('open');}
-function updateClock(){var el=document.getElementById('live-clock');if(el)el.textContent=new Date().toLocaleTimeString();}
-updateClock();setInterval(updateClock,1000);
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('open');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+}
+function updateClock(){
+  const el=document.getElementById('live-clock');
+  if(el) el.textContent=new Date().toLocaleTimeString();
+}
+updateClock();
+setInterval(updateClock,1000);
 </script>
 {% block extra_js %}{% endblock %}
 </body>
