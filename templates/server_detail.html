@@ -220,8 +220,8 @@
     <div class="proc-row">
       <span class="mono" style="font-size:12px">{{ p.name }}</span>
       <span style="font-size:12px;color:var(--text-muted)">
-        CPU {{ '%.1f' % p.cpu_percent }}% &nbsp;
-        RAM {{ '%.1f' % p.memory_percent }}%
+        CPU {{ '%.1f' % (p.get('cpu_percent') or p.get('cpu', 0)) }}% &nbsp;
+        RAM {{ '%.1f' % (p.get('memory_percent') or p.get('memory', 0)) }}%
       </span>
     </div>
     {% else %}

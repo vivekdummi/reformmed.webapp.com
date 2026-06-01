@@ -18,21 +18,20 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ── Metrics ingestion API (FastAPI — used by agents) ──────────────────────
   api:
     build:
-      context: ./server
+      context: ../monitor.reformmed.server/server
     container_name: reformmed_api
     command: python main.py
     environment:
+      POSTGRES_HOST:     reformmed_postgres
       POSTGRES_USER:     ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB:       ${POSTGRES_DB}
-      POSTGRES_HOST:     reformmed_postgres
       POSTGRES_PORT:     5432
       API_SECRET:        ${API_SECRET}
-      API_HOST:          ${API_HOST:-0.0.0.0}
-      API_PORT:          ${API_PORT:-8000}
+      API_HOST:          0.0.0.0
+      API_PORT:          8000
     ports:
       - "8000:8000"
     depends_on:
@@ -40,52 +39,47 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # ── Offline checker + alerter ─────────────────────────────────────────────
-  checker:
-    build:
-      context: ./webapp
-    container_name: reformmed_checker
-    command: python offline_checker.py
-    environment:
-      POSTGRES_USER:          ${POSTGRES_USER}
-      POSTGRES_PASSWORD:      ${POSTGRES_PASSWORD}
-      POSTGRES_DB:            ${POSTGRES_DB}
-      POSTGRES_HOST:          reformmed_postgres
-      POSTGRES_PORT:          5432
-      GMAIL_USER:             ${GMAIL_USER}
-      GMAIL_APP_PASS:         ${GMAIL_APP_PASS}
-      SMTP_HOST:              ${SMTP_HOST:-smtp.gmail.com}
-      SMTP_PORT:              ${SMTP_PORT:-465}
-      ALERT_TO:               ${ALERT_TO}
-      OFFLINE_AFTER_SECS:     ${OFFLINE_AFTER_SECS:-60}
-      CHECK_INTERVAL_SECS:    ${CHECK_INTERVAL_SECS:-15}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-
-  # ── Flask Web Dashboard (replaces Grafana) ─────────────────────────────────
   webapp:
     build:
-      context: ./webapp
+      context: .
     container_name: reformmed_webapp
     command: python app.py
     environment:
+      POSTGRES_HOST:     reformmed_postgres
       POSTGRES_USER:     ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB:       ${POSTGRES_DB}
-      POSTGRES_HOST:     reformmed_postgres
-      POSTGRES_PORT:     5432
-      FLASK_SECRET:      ${FLASK_SECRET:-change-this-secret-key}
-      WEBAPP_HOST:       0.0.0.0
-      WEBAPP_PORT:       5000
-      FLASK_DEBUG:       ${FLASK_DEBUG:-0}
+      FLASK_SECRET:      ${FLASK_SECRET}
+      FLASK_DEBUG:       "0"
       GMAIL_USER:        ${GMAIL_USER}
       GMAIL_APP_PASS:    ${GMAIL_APP_PASS}
-      SMTP_HOST:         ${SMTP_HOST:-smtp.gmail.com}
-      SMTP_PORT:         ${SMTP_PORT:-465}
+      SMTP_HOST:         smtp.gmail.com
+      SMTP_PORT:         "465"
     ports:
       - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+  checker:
+    build:
+      context: .
+    container_name: reformmed_checker
+    command: python offline_checker.py
+    environment:
+      POSTGRES_HOST:       reformmed_postgres
+      POSTGRES_USER:       ${POSTGRES_USER}
+      POSTGRES_PASSWORD:   ${POSTGRES_PASSWORD}
+      POSTGRES_DB:         ${POSTGRES_DB}
+      GMAIL_USER:          ${GMAIL_USER}
+      GMAIL_APP_PASS:      ${GMAIL_APP_PASS}
+      SMTP_HOST:           smtp.gmail.com
+      SMTP_PORT:           "465"
+      OFFLINE_AFTER_SECS:  "60"
+      CHECK_INTERVAL_SECS: "15"
     depends_on:
       postgres:
         condition: service_healthy
