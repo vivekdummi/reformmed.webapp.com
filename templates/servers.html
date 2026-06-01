@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Servers — REFORMMED Monitor{% endblock %}
+{% block page_title %}Servers{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Registered Servers</h1>
+    <p>{{ machines | length }} machine(s) visible to your account</p>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<div class="card" style="padding:16px;margin-bottom:20px">
+  <div style="display:flex;gap:12px;align-items:center">
+    <input type="text" id="search" placeholder="Search by name, hostname, IP…"
+           style="max-width:320px;margin:0">
+    <select id="filter-status" style="max-width:160px;margin:0">
+      <option value="">All statuses</option>
+      <option value="online">Online only</option>
+      <option value="offline">Offline only</option>
+    </select>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table id="machines-table">
+      <thead>
+        <tr>
+          <th>System Name</th>
+          <th>Location</th>
+          <th>Status</th>
+          <th>OS</th>
+          <th>Hostname</th>
+          <th>Public IP</th>
+          <th>Last Seen</th>
+          <th>Registered</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in machines %}
+        <tr class="machine-row" data-name="{{ m.system_name }}" data-status="{{ m.status }}"
+            data-hostname="{{ m.hostname or '' }}" data-ip="{{ m.public_ip or '' }}">
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="status-dot {{ m.status }}"></span>
+              <span class="mono" style="font-weight:600">{{ m.system_name }}</span>
+            </div>
+          </td>
+          <td class="text-muted">{{ m.location }}</td>
+          <td>
+            <span class="badge badge-{{ 'online' if m.status == 'online' else 'offline' }}">
+              {{ m.status.upper() }}
+            </span>
+          </td>
+          <td class="text-muted" style="font-size:13px">{{ m.os_type or '—' }}</td>
+          <td class="mono text-muted" style="font-size:12px">{{ m.hostname or '—' }}</td>
+          <td class="mono text-muted" style="font-size:12px">{{ m.public_ip or '—' }}</td>
+          <td class="text-muted" style="font-size:12px">
+            {{ m.last_seen.strftime('%Y-%m-%d %H:%M:%S') if m.last_seen else '—' }}
+          </td>
+          <td class="text-muted" style="font-size:12px">
+            {{ m.registered_at.strftime('%Y-%m-%d') if m.registered_at else '—' }}
+          </td>
+          <td>
+            <a href="{{ url_for('servers.detail', table_name=m.table_name) }}"
+               class="btn btn-primary btn-sm">Details →</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" style="text-align:center;color:var(--text-muted);padding:48px">
+            No machines registered yet.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const searchInput  = document.getElementById('search');
+  const statusFilter = document.getElementById('filter-status');
+
+  function filterTable() {
+    const q  = searchInput.value.toLowerCase();
+    const st = statusFilter.value;
+    document.querySelectorAll('.machine-row').forEach(row => {
+      const name     = row.dataset.name.toLowerCase();
+      const hostname = row.dataset.hostname.toLowerCase();
+      const ip       = row.dataset.ip.toLowerCase();
+      const status   = row.dataset.status;
+
+      const matchQ  = !q || name.includes(q) || hostname.includes(q) || ip.includes(q);
+      const matchSt = !st || status === st;
+      row.style.display = (matchQ && matchSt) ? '' : 'none';
+    });
+  }
+
+  searchInput.addEventListener('input', filterTable);
+  statusFilter.addEventListener('change', filterTable);
+</script>
+{% endblock %}

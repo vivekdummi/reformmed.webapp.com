@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+{% block title %}{{ machine.system_name }} — REFORMMED Monitor{% endblock %}
+{% block page_title %}{{ machine.system_name }} / {{ machine.location }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.metric-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.metric-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+.metric-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 26px;
+  font-weight: 700;
+}
+.chart-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+.chart-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-muted);
+}
+.disk-item {
+  margin-bottom: 14px;
+}
+.disk-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.proc-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(37,42,58,0.5);
+  font-size: 13px;
+}
+.proc-row:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:12px">
+    <a href="{{ url_for('servers.index') }}" class="btn btn-ghost btn-sm">← Back</a>
+    <div>
+      <h1 class="mono">{{ machine.system_name }}</h1>
+      <p>{{ machine.location }} &bull; {{ machine.os_type or 'Unknown OS' }} &bull;
+        <span id="live-status">
+          <span class="status-dot {{ machine.status }}"></span>
+          <span class="badge badge-{{ 'online' if machine.status == 'online' else 'offline' }}">{{ machine.status }}</span>
+        </span>
+      </p>
+    </div>
+  </div>
+  <div style="font-size:12px;color:var(--text-muted)">
+    Last seen: <span class="mono" id="last-seen">{{ machine.last_seen or '—' }}</span>
+  </div>
+</div>
+
+<!-- Live metric cards -->
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px">
+  <div class="metric-card">
+    <div class="metric-label">CPU</div>
+    <div class="metric-val" id="val-cpu" style="color:var(--accent)">
+      {{ '%.1f' % latest.cpu_percent if latest and latest.cpu_percent else '—' }}%
+    </div>
+    <div class="progress-bar mt-1">
+      <div class="progress-fill {% if latest and latest.cpu_percent %}{% if latest.cpu_percent > 85 %}red{% elif latest.cpu_percent > 60 %}yellow{% else %}green{% endif %}{% endif %}"
+           id="bar-cpu" style="width:{{ latest.cpu_percent if latest and latest.cpu_percent else 0 }}%"></div>
+    </div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">RAM</div>
+    <div class="metric-val" id="val-ram" style="color:var(--accent2)">
+      {{ '%.1f' % latest.ram_percent if latest and latest.ram_percent else '—' }}%
+    </div>
+    <div class="progress-bar mt-1">
+      <div class="progress-fill {% if latest and latest.ram_percent %}{% if latest.ram_percent > 85 %}red{% elif latest.ram_percent > 60 %}yellow{% else %}blue{% endif %}{% endif %}"
+           id="bar-ram" style="width:{{ latest.ram_percent if latest and latest.ram_percent else 0 }}%"></div>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:4px" id="val-ram-detail">
+      {{ '%.1f' % latest.ram_used_gb if latest and latest.ram_used_gb else '' }}
+      / {{ '%.1f' % latest.ram_total_gb if latest and latest.ram_total_gb else '' }} GB
+    </div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">CPU Temp</div>
+    <div class="metric-val" id="val-temp"
+         style="color:{% if latest and latest.cpu_temp and latest.cpu_temp > 80 %}var(--red){% elif latest and latest.cpu_temp and latest.cpu_temp > 60 %}var(--yellow){% else %}var(--green){% endif %}">
+      {{ '%.1f' % latest.cpu_temp if latest and latest.cpu_temp else '—' }}°C
+    </div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">CPU Freq</div>
+    <div class="metric-val" style="color:var(--text)" id="val-freq">
+      {{ '%.0f' % latest.cpu_freq_mhz if latest and latest.cpu_freq_mhz else '—' }} MHz
+    </div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Net ↑ Upload</div>
+    <div class="metric-val" style="color:var(--green);font-size:20px" id="val-net-sent">—</div>
+    <div style="font-size:11px;color:var(--text-muted)">KB/s</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Net ↓ Download</div>
+    <div class="metric-val" style="color:var(--accent);font-size:20px" id="val-net-recv">—</div>
+    <div style="font-size:11px;color:var(--text-muted)">KB/s</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Uptime</div>
+    <div class="metric-val" style="font-size:18px;color:var(--text)" id="val-uptime">
+      {% if latest and latest.uptime_seconds %}
+        {% set u = latest.uptime_seconds | int %}
+        {% set d = u // 86400 %}{% set h = (u % 86400) // 3600 %}{% set m = (u % 3600) // 60 %}
+        {{ d }}d {{ h }}h {{ m }}m
+      {% else %}—{% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Charts row -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
+  <div class="chart-card">
+    <div class="chart-title">CPU & RAM %</div>
+    <canvas id="chart-cpu-ram" height="120"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Network Traffic (KB/s)</div>
+    <canvas id="chart-net" height="120"></canvas>
+  </div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
+  <div class="chart-card">
+    <div class="chart-title">CPU Temperature (°C)</div>
+    <canvas id="chart-temp" height="100"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Swap Usage %</div>
+    <canvas id="chart-swap" height="100"></canvas>
+  </div>
+</div>
+
+<!-- Disks + GPU + Processes -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
+  <!-- Disk partitions -->
+  <div class="card">
+    <div class="card-title">Disk Partitions</div>
+    {% for disk in disks %}
+    <div class="disk-item">
+      <div class="disk-header">
+        <span class="mono" style="font-size:13px">{{ disk.mountpoint }}</span>
+        <span class="badge badge-{% if disk.percent > 85 %}offline{% elif disk.percent > 60 %}warning{% else %}online{% endif %}">
+          {{ '%.1f' % disk.percent }}%
+        </span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill {% if disk.percent > 85 %}red{% elif disk.percent > 60 %}yellow{% else %}green{% endif %}"
+             style="width:{{ disk.percent }}%"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:3px">
+        {{ '%.1f' % (disk.used / 1073741824) if disk.used else '?' }} GB used /
+        {{ '%.1f' % (disk.total / 1073741824) if disk.total else '?' }} GB total
+        &bull; {{ disk.fstype or '' }}
+      </div>
+    </div>
+    {% else %}
+    <p class="text-muted" style="font-size:13px">No disk data available.</p>
+    {% endfor %}
+  </div>
+
+  <!-- GPU -->
+  <div class="card">
+    <div class="card-title">GPU Info</div>
+    {% for gpu in gpus %}
+    <div style="margin-bottom:16px">
+      <div style="font-weight:600;font-size:14px">{{ gpu.name or 'GPU ' ~ loop.index }}</div>
+      {% if gpu.memory_used_mb is defined %}
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">
+        Memory: {{ gpu.memory_used_mb }} / {{ gpu.memory_total_mb }} MB
+      </div>
+      <div class="progress-bar mt-1">
+        <div class="progress-fill blue"
+             style="width:{{ (gpu.memory_used_mb / gpu.memory_total_mb * 100) | int if gpu.memory_total_mb else 0 }}%"></div>
+      </div>
+      {% endif %}
+      {% if gpu.temperature is defined %}
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">
+        Temp: {{ gpu.temperature }}°C &bull; Load: {{ gpu.load_percent or '?' }}%
+      </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="text-muted" style="font-size:13px">No GPU detected.</p>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Top processes + Alert history -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <div class="card">
+    <div class="card-title">Top Processes (by CPU)</div>
+    {% for p in procs %}
+    <div class="proc-row">
+      <span class="mono" style="font-size:12px">{{ p.name }}</span>
+      <span style="font-size:12px;color:var(--text-muted)">
+        CPU {{ '%.1f' % p.cpu_percent }}% &nbsp;
+        RAM {{ '%.1f' % p.memory_percent }}%
+      </span>
+    </div>
+    {% else %}
+    <p class="text-muted" style="font-size:13px">No process data available.</p>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <div class="card-title">Alert History (this machine)</div>
+    {% for a in alert_history %}
+    <div class="proc-row">
+      <div>
+        <span class="badge badge-warning" style="font-size:10px">{{ a.alert_type }}</span>
+        <span style="font-size:12px;margin-left:6px">{{ a.subject }}</span>
+      </div>
+      <span style="font-size:11px;color:var(--text-muted)">
+        {{ a.sent_at.strftime('%m-%d %H:%M') if a.sent_at else '—' }}
+      </span>
+    </div>
+    {% else %}
+    <p class="text-muted" style="font-size:13px">No alerts for this machine.</p>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Machine info -->
+<div class="card mt-3">
+  <div class="card-title">Machine Info</div>
+  <div class="grid-3" style="font-size:13px">
+    <div><span class="text-muted">Hostname:</span> <span class="mono">{{ machine.hostname or '—' }}</span></div>
+    <div><span class="text-muted">Public IP:</span> <span class="mono">{{ machine.public_ip or '—' }}</span></div>
+    <div><span class="text-muted">OS:</span> {{ machine.os_type or '—' }}</div>
+    <div><span class="text-muted">Table:</span> <span class="mono">{{ machine.table_name }}</span></div>
+    <div><span class="text-muted">Registered:</span> {{ machine.registered_at.strftime('%Y-%m-%d %H:%M') if machine.registered_at else '—' }}</div>
+    <div><span class="text-muted">OS Version:</span>
+      {{ latest.os_version if latest and latest.os_version else '—' }}</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const TABLE = "{{ machine.table_name }}";
+const LABELS   = {{ chart_labels | safe }};
+const CPU_DATA = {{ chart_cpu | safe }};
+const RAM_DATA = {{ chart_ram | safe }};
+const SWAP_DATA= {{ chart_swap | safe }};
+const TEMP_DATA= {{ chart_temp | safe }};
+const NET_SENT = {{ chart_net_sent | safe }};
+const NET_RECV = {{ chart_net_recv | safe }};
+
+Chart.defaults.color = '#64748b';
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+
+const chartOpts = (max) => ({
+  responsive: true,
+  animation: false,
+  plugins: { legend: { labels: { boxWidth: 10, font: { size: 11 } } } },
+  scales: {
+    x: { display: false },
+    y: { min: 0, max: max || undefined, grid: { color: 'rgba(37,42,58,0.8)' } }
+  }
+});
+
+const cpuRamChart = new Chart(document.getElementById('chart-cpu-ram'), {
+  type: 'line',
+  data: {
+    labels: LABELS,
+    datasets: [
+      { label: 'CPU %',  data: CPU_DATA, borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.07)', tension: 0.3, fill: true, borderWidth: 2, pointRadius: 0 },
+      { label: 'RAM %',  data: RAM_DATA, borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.07)', tension: 0.3, fill: true, borderWidth: 2, pointRadius: 0 },
+    ]
+  },
+  options: chartOpts(100)
+});
+
+const netChart = new Chart(document.getElementById('chart-net'), {
+  type: 'line',
+  data: {
+    labels: LABELS,
+    datasets: [
+      { label: '↑ Sent KB/s',  data: NET_SENT, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.07)', tension: 0.3, fill: true, borderWidth: 2, pointRadius: 0 },
+      { label: '↓ Recv KB/s',  data: NET_RECV, borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.07)', tension: 0.3, fill: true, borderWidth: 2, pointRadius: 0 },
+    ]
+  },
+  options: chartOpts()
+});
+
+const tempChart = new Chart(document.getElementById('chart-temp'), {
+  type: 'line',
+  data: {
+    labels: LABELS,
+    datasets: [
+      { label: '°C', data: TEMP_DATA, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)', tension: 0.3, fill: true, borderWidth: 2, pointRadius: 0 }
+    ]
+  },
+  options: chartOpts()
+});
+
+const swapChart = new Chart(document.getElementById('chart-swap'), {
+  type: 'bar',
+  data: {
+    labels: LABELS,
+    datasets: [
+      { label: 'Swap %', data: SWAP_DATA, backgroundColor: 'rgba(124,58,237,0.4)', borderRadius: 2 }
+    ]
+  },
+  options: chartOpts(100)
+});
+
+// ── Live polling every 10 seconds ──────────────────────────────────────────
+function updateChart(chart, newVal) {
+  chart.data.labels.push('');
+  chart.data.labels.shift();
+  chart.data.datasets.forEach((ds, i) => {
+    ds.data.push(newVal[i]);
+    ds.data.shift();
+  });
+  chart.update('none');
+}
+
+function setColor(el, val, warn, danger) {
+  if (val >= danger)      el.style.color = 'var(--red)';
+  else if (val >= warn)   el.style.color = 'var(--yellow)';
+  else                    el.style.color = 'var(--green)';
+}
+
+function setBar(id, pct) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.width = Math.min(pct, 100) + '%';
+  el.className = 'progress-fill ' + (pct > 85 ? 'red' : pct > 60 ? 'yellow' : 'green');
+}
+
+async function pollLive() {
+  try {
+    const r = await fetch(`/servers/${TABLE}/live`);
+    if (!r.ok) return;
+    const d = await r.json();
+
+    const cpu = d.cpu_percent || 0;
+    const ram = d.ram_percent || 0;
+
+    document.getElementById('val-cpu').textContent   = cpu.toFixed(1) + '%';
+    document.getElementById('val-ram').textContent   = ram.toFixed(1) + '%';
+    document.getElementById('val-temp').textContent  = d.cpu_temp ? d.cpu_temp.toFixed(1) + '°C' : '—';
+    document.getElementById('val-freq').textContent  = d.cpu_freq_mhz ? Math.round(d.cpu_freq_mhz) + ' MHz' : '—';
+    document.getElementById('val-net-sent').textContent = d.net_sent_kbs;
+    document.getElementById('val-net-recv').textContent = d.net_recv_kbs;
+
+    if (d.uptime_seconds) {
+      const u = Math.round(d.uptime_seconds);
+      const days = Math.floor(u/86400), hrs = Math.floor((u%86400)/3600), mins = Math.floor((u%3600)/60);
+      document.getElementById('val-uptime').textContent = `${days}d ${hrs}h ${mins}m`;
+    }
+
+    setBar('bar-cpu', cpu);
+    setBar('bar-ram', ram);
+
+    document.getElementById('last-seen').textContent = d.last_seen || '—';
+
+    const statusEl = document.getElementById('live-status');
+    statusEl.innerHTML = `<span class="status-dot ${d.status}"></span>
+      <span class="badge badge-${d.status === 'online' ? 'online' : 'offline'}">${d.status}</span>`;
+
+    // Update charts
+    updateChart(cpuRamChart, [cpu, ram]);
+    updateChart(netChart, [d.net_sent_kbs, d.net_recv_kbs]);
+    updateChart(tempChart, [d.cpu_temp || 0]);
+    updateChart(swapChart, [d.swap_percent || 0]);
+
+  } catch (e) { console.error(e); }
+}
+
+setInterval(pollLive, 10000);
+</script>
+{% endblock %}

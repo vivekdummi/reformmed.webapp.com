@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Alerts — REFORMMED Monitor{% endblock %}
+{% block page_title %}Alerts{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Alert Configuration</h1>
+    <p>Control email notifications for offline events and threshold breaches</p>
+  </div>
+</div>
+
+<!-- Config table -->
+<div class="card mb-2">
+  <div class="card-title">Alert Rules</div>
+  {% if current_user.is_admin %}
+  <form method="POST" action="{{ url_for('alerts.update_config') }}">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Enabled</th>
+            <th>Threshold</th>
+            <th>Cooldown (min)</th>
+            <th>Notify Emails</th>
+            <th>Last Updated</th>
+            <th>Test</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in configs %}
+          <tr>
+            <td>
+              <span style="font-size:20px">
+                {% if c.alert_type == 'offline' %}🔴
+                {% elif c.alert_type == 'online' %}🟢
+                {% elif c.alert_type == 'cpu' %}🔥
+                {% elif c.alert_type == 'ram' %}🧠
+                {% elif c.alert_type == 'disk' %}💿
+                {% elif c.alert_type == 'temp' %}🌡️
+                {% else %}🔔{% endif %}
+              </span>
+              <span class="mono" style="font-size:13px">{{ c.alert_type }}</span>
+            </td>
+            <td>
+              <select name="enabled_{{ c.id }}" style="width:auto;padding:6px 10px">
+                <option value="1" {% if c.enabled %}selected{% endif %}>Yes</option>
+                <option value="0" {% if not c.enabled %}selected{% endif %}>No</option>
+              </select>
+            </td>
+            <td>
+              {% if c.threshold is not none %}
+              <input type="number" name="threshold_{{ c.id }}" value="{{ c.threshold }}"
+                     step="0.5" min="0" max="100" style="width:90px">
+              <span class="text-muted" style="font-size:12px">
+                {% if c.alert_type == 'temp' %}°C{% else %}%{% endif %}
+              </span>
+              {% else %}
+              <span class="text-muted">N/A</span>
+              <input type="hidden" name="threshold_{{ c.id }}" value="">
+              {% endif %}
+            </td>
+            <td>
+              <input type="number" name="cooldown_{{ c.id }}" value="{{ c.cooldown_minutes }}"
+                     min="1" max="1440" style="width:80px">
+            </td>
+            <td>
+              <input type="text" name="emails_{{ c.id }}" value="{{ c.notify_emails }}"
+                     placeholder="email1@x.com, email2@x.com"
+                     style="min-width:280px">
+            </td>
+            <td class="text-muted" style="font-size:12px">
+              {{ c.updated_at.strftime('%Y-%m-%d %H:%M') if c.updated_at else '—' }}
+            </td>
+            <td>
+              <form method="POST" action="{{ url_for('alerts.test_alert', alert_type=c.alert_type) }}"
+                    style="display:inline">
+                <button type="submit" class="btn btn-ghost btn-sm">Test</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:16px">
+      <button type="submit" class="btn btn-primary">Save Configuration</button>
+    </div>
+  </form>
+  {% else %}
+  <!-- Read-only view for non-admins -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Type</th><th>Enabled</th><th>Threshold</th><th>Cooldown</th></tr>
+      </thead>
+      <tbody>
+        {% for c in configs %}
+        <tr>
+          <td class="mono">{{ c.alert_type }}</td>
+          <td>
+            <span class="badge badge-{{ 'online' if c.enabled else 'offline' }}">
+              {{ 'ON' if c.enabled else 'OFF' }}
+            </span>
+          </td>
+          <td>{{ c.threshold ~ ('°C' if c.alert_type == 'temp' else '%') if c.threshold else '—' }}</td>
+          <td>{{ c.cooldown_minutes }} min</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Alert log -->
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div class="card-title" style="margin:0">Alert Log</div>
+    {% if current_user.is_admin %}
+    <form method="POST" action="{{ url_for('alerts.clear_log') }}"
+          onsubmit="return confirm('Clear all alert logs?')">
+      <button type="submit" class="btn btn-danger btn-sm">Clear Log</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Time</th><th>Type</th><th>Machine</th><th>Subject</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td class="text-muted" style="font-size:12px;white-space:nowrap">
+            {{ log.sent_at.strftime('%Y-%m-%d %H:%M:%S') if log.sent_at else '—' }}
+          </td>
+          <td><span class="badge badge-warning">{{ log.alert_type }}</span></td>
+          <td class="mono" style="font-size:12px">{{ log.machine_key }}</td>
+          <td style="font-size:13px">{{ log.subject }}</td>
+          <td>
+            {% if log.success %}
+              <span class="badge badge-online">sent</span>
+            {% else %}
+              <span class="badge badge-offline">failed</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px">
+            No alerts logged yet.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Home — REFORMMED Monitor{% endblock %}
+{% block page_title %}Overview{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Infrastructure Overview</h1>
+    <p>Real-time status of all registered machines</p>
+  </div>
+</div>
+
+<!-- Stat cards -->
+<div class="stat-grid">
+  <div class="stat-card total">
+    <div class="stat-value" style="color:var(--accent)">{{ total }}</div>
+    <div class="stat-label">Total Machines</div>
+    <div class="stat-icon">🖥️</div>
+  </div>
+  <div class="stat-card online">
+    <div class="stat-value" style="color:var(--green)">{{ online }}</div>
+    <div class="stat-label">Online</div>
+    <div class="stat-icon">🟢</div>
+  </div>
+  <div class="stat-card offline">
+    <div class="stat-value" style="color:var(--red)">{{ offline }}</div>
+    <div class="stat-label">Offline</div>
+    <div class="stat-icon">🔴</div>
+  </div>
+  <div class="stat-card warning">
+    <div class="stat-value" style="color:var(--yellow)" id="alert-count">—</div>
+    <div class="stat-label">Alerts Today</div>
+    <div class="stat-icon">🔔</div>
+  </div>
+</div>
+
+<!-- Recent machines -->
+<div class="card mb-2">
+  <div class="card-title">Recently Active Machines</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Machine</th>
+          <th>Location</th>
+          <th>Status</th>
+          <th>Hostname</th>
+          <th>IP</th>
+          <th>Last Seen</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in recent %}
+        <tr>
+          <td><span class="mono">{{ m.system_name }}</span></td>
+          <td class="text-muted">{{ m.location }}</td>
+          <td>
+            <span class="status-dot {{ m.status }}"></span>
+            <span class="badge badge-{{ 'online' if m.status == 'online' else 'offline' }}">
+              {{ m.status }}
+            </span>
+          </td>
+          <td class="mono text-muted" style="font-size:12px">{{ m.hostname or '—' }}</td>
+          <td class="mono text-muted" style="font-size:12px">{{ m.public_ip or '—' }}</td>
+          <td class="text-muted" style="font-size:12px">
+            {{ m.last_seen.strftime('%Y-%m-%d %H:%M:%S') if m.last_seen else '—' }}
+          </td>
+          <td>
+            <a href="{{ url_for('servers.detail', table_name=m.table_name) }}"
+               class="btn btn-ghost btn-sm">View →</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">
+          No machines registered yet.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Recent alerts -->
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div class="card-title" style="margin:0">Recent Alerts</div>
+    <a href="{{ url_for('alerts.index') }}" class="btn btn-ghost btn-sm">View All</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Type</th><th>Machine</th><th>Subject</th><th>Time</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for a in alerts %}
+        <tr>
+          <td>
+            <span class="badge badge-warning">{{ a.alert_type }}</span>
+          </td>
+          <td class="mono" style="font-size:12px">{{ a.machine_key }}</td>
+          <td style="font-size:13px">{{ a.subject }}</td>
+          <td class="text-muted" style="font-size:12px">
+            {{ a.sent_at.strftime('%m-%d %H:%M') if a.sent_at else '—' }}
+          </td>
+          <td>
+            {% if a.success %}
+              <span class="badge badge-online">sent</span>
+            {% else %}
+              <span class="badge badge-offline">failed</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">
+          No alerts yet.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Count today's alerts from table rows
+  const alertRows = document.querySelectorAll('tbody tr td .badge-warning, tbody tr td .badge-offline');
+  document.getElementById('alert-count').textContent = {{ alerts | length }};
+</script>
+{% endblock %}
