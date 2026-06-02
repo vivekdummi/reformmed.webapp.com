@@ -4,29 +4,90 @@
 
 {% block extra_css %}
 <style>
-.metric-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
-.metric-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;overflow:hidden;}
-.metric-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--accent);opacity:.3;}
-.metric-label{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
-.metric-val{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;line-height:1;}
-.metric-sub{font-size:11px;color:var(--text-muted);margin-top:4px;}
-.chart-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px;}
-.chart-title{font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
-.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
-@media(max-width:700px){.chart-grid{grid-template-columns:1fr;}}
-.disk-item{margin-bottom:12px;}
-.disk-header{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;}
+/* ── Layout ── */
+.server-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px;}
+.server-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.server-meta{font-size:12px;color:var(--text-muted);margin-top:3px;}
+
+/* ── Metric Row Card ── */
+.metric-row{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:0;margin-bottom:14px;overflow:hidden;display:grid;grid-template-columns:220px 1fr;min-height:94px;}
+@media(max-width:700px){.metric-row{grid-template-columns:1fr;}}
+.metric-row-left{padding:16px 20px;display:flex;flex-direction:column;justify-content:center;border-right:1px solid var(--border);position:relative;overflow:hidden;}
+.metric-row-left::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;opacity:.6;}
+.mrl-cpu::after{background:#00d4ff;}
+.mrl-ram::after{background:#7c3aed;}
+.mrl-temp::after{background:#f59e0b;}
+.mrl-swap::after{background:#a855f7;}
+.mrl-net-up::after{background:#22c55e;}
+.mrl-net-down::after{background:#00d4ff;}
+.mrl-gpu::after{background:#e879f9;}
+
+.metric-label{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;display:flex;align-items:center;gap:5px;}
+.metric-val{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;line-height:1;margin-bottom:5px;}
+.metric-sub{font-size:11px;color:var(--text-muted);}
+
+.progress-bar{height:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:6px;}
+.progress-fill{height:100%;border-radius:2px;transition:width .4s ease;}
+.progress-fill.green{background:#22c55e;}
+.progress-fill.blue{background:#7c3aed;}
+.progress-fill.yellow{background:#f59e0b;}
+.progress-fill.orange{background:#f97316;}
+.progress-fill.red{background:#ef4444;}
+.progress-fill.cyan{background:#00d4ff;}
+.progress-fill.pink{background:#e879f9;}
+
+.metric-row-right{padding:10px 14px;display:flex;flex-direction:column;justify-content:center;}
+.chart-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
+
+/* ── Disk Section ── */
+.disk-section{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px;}
+.disk-section-title{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:14px;display:flex;align-items:center;gap:6px;}
+.disk-items-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
+.disk-item{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.disk-item-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.disk-mount{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;}
+.disk-pct-badge{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;}
+.disk-pct-green{background:rgba(34,197,94,.15);color:#22c55e;}
+.disk-pct-yellow{background:rgba(245,158,11,.15);color:#f59e0b;}
+.disk-pct-red{background:rgba(239,68,68,.15);color:#ef4444;}
+.storage-bar-wrap{margin:6px 0 8px;}
+.storage-bar{height:8px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden;display:flex;}
+.storage-bar-used{height:100%;border-radius:4px 0 0 4px;transition:width .4s ease;}
+.storage-legend{display:flex;gap:12px;margin-top:5px;}
+.storage-legend-item{font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:4px;}
+.storage-legend-dot{width:6px;height:6px;border-radius:50%;}
+.disk-fstype{font-size:10px;color:var(--text-muted);margin-top:2px;}
+
+/* ── Processes ── */
+.procs-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px;}
 .proc-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(37,42,58,.5);font-size:12px;}
 .proc-row:last-child{border-bottom:none;}
-.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;font-size:13px;}
-.info-item .lbl{font-size:11px;color:var(--text-muted);margin-bottom:2px;}
+
+/* ── GPU unavailable ── */
+.gpu-unavail{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;display:flex;align-items:center;gap:12px;opacity:.6;}
+.gpu-unavail-icon{font-size:20px;}
+.gpu-unavail-text{font-size:12px;color:var(--text-muted);}
+.gpu-unavail-text strong{color:var(--text);font-size:13px;display:block;margin-bottom:2px;}
+
+/* ── Info + Alerts ── */
+.info-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px;}
+.card-section-title{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:14px;}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;}
+.info-item .lbl{font-size:10px;color:var(--text-muted);margin-bottom:2px;}
 .info-item .val{font-family:'JetBrains Mono',monospace;font-size:12px;}
+.bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:700px){.bottom-grid{grid-template-columns:1fr;}}
+.pair-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+@media(max-width:700px){.pair-row{grid-template-columns:1fr;}}
+.mini-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 20px;}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+
+<!-- ── Header ── -->
+<div class="server-header">
+  <div class="server-title">
     <a href="{{ url_for('servers.index') }}" class="btn btn-ghost btn-sm">← Back</a>
     <div>
       <div style="display:flex;align-items:center;gap:8px;">
@@ -36,55 +97,277 @@
           <span class="badge badge-{{ 'online' if machine.status=='online' else 'offline' }}">{{ machine.status }}</span>
         </span>
       </div>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
+      <div class="server-meta">
         {{ machine.location }} &bull; {{ machine.os_type or 'Unknown OS' }} &bull;
         Last seen: <span class="mono" id="last-seen">{{ machine.last_seen or '—' }}</span>
       </div>
     </div>
   </div>
-  <div style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;">
+  <div style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:5px;">
     <span class="pulse"></span> Live · 2s refresh
   </div>
 </div>
 
-<!-- ── Live metric cards ── -->
-<div class="metric-grid">
-  <div class="metric-card">
-    <div class="metric-label">CPU Usage</div>
-    <div class="metric-val" id="val-cpu" style="color:var(--accent)">{{ '%.1f'%latest.cpu_percent if latest and latest.cpu_percent else '—' }}%</div>
-    <div class="progress-bar mt-1"><div class="progress-fill green" id="bar-cpu" style="width:{{ latest.cpu_percent or 0 }}%"></div></div>
+<!-- ═══ CPU ═══ -->
+<div class="metric-row">
+  <div class="metric-row-left mrl-cpu">
+    <div class="metric-label">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="2" x2="9" y2="4"/><line x1="15" y1="2" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="22"/><line x1="15" y1="20" x2="15" y2="22"/><line x1="2" y1="9" x2="4" y2="9"/><line x1="2" y1="15" x2="4" y2="15"/><line x1="20" y1="9" x2="22" y2="9"/><line x1="20" y1="15" x2="22" y2="15"/></svg>
+      CPU Usage
+    </div>
+    <div class="metric-val" id="val-cpu" style="color:#00d4ff">{{ '%.1f'%latest.cpu_percent if latest and latest.cpu_percent else '—' }}%</div>
+    <div class="progress-bar"><div class="progress-fill cyan" id="bar-cpu" style="width:{{ latest.cpu_percent or 0 }}%"></div></div>
     <div class="metric-sub" id="val-freq">{{ '%.0f'%latest.cpu_freq_mhz if latest and latest.cpu_freq_mhz else '' }} MHz</div>
   </div>
-  <div class="metric-card">
-    <div class="metric-label">RAM</div>
+  <div class="metric-row-right">
+    <div class="chart-label">CPU % — last 60 readings</div>
+    <canvas id="chart-cpu" height="60"></canvas>
+  </div>
+</div>
+
+<!-- ═══ RAM ═══ -->
+<div class="metric-row">
+  <div class="metric-row-left mrl-ram">
+    <div class="metric-label">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="7" width="20" height="10" rx="1"/><line x1="6" y1="7" x2="6" y2="17"/><line x1="10" y1="7" x2="10" y2="17"/><line x1="14" y1="7" x2="14" y2="17"/><line x1="18" y1="7" x2="18" y2="17"/></svg>
+      RAM
+    </div>
     <div class="metric-val" id="val-ram" style="color:#a78bfa">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '—' }}%</div>
-    <div class="progress-bar mt-1"><div class="progress-fill blue" id="bar-ram" style="width:{{ latest.ram_percent or 0 }}%"></div></div>
+    <div class="progress-bar"><div class="progress-fill blue" id="bar-ram" style="width:{{ latest.ram_percent or 0 }}%"></div></div>
     <div class="metric-sub" id="val-ram-detail">{{ '%.1f'%latest.ram_used_gb if latest and latest.ram_used_gb else '' }} / {{ '%.1f'%latest.ram_total_gb if latest and latest.ram_total_gb else '' }} GB</div>
   </div>
-  <div class="metric-card">
-    <div class="metric-label">CPU Temp</div>
-    <div class="metric-val" id="val-temp" style="color:var(--green)">{{ '%.0f'%latest.cpu_temp if latest and latest.cpu_temp else '—' }}{% if latest and latest.cpu_temp %}°C{% endif %}</div>
-    <div class="metric-sub">Temperature</div>
+  <div class="metric-row-right">
+    <div class="chart-label">RAM % — last 60 readings</div>
+    <canvas id="chart-ram" height="60"></canvas>
   </div>
-  <div class="metric-card">
-    <div class="metric-label">Swap</div>
-    <div class="metric-val" id="val-swap" style="color:var(--yellow)">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</div>
-    <div class="progress-bar mt-1"><div class="progress-fill yellow" id="bar-swap" style="width:{{ latest.swap_percent or 0 }}%"></div></div>
-    <div class="metric-sub" id="val-swap-detail">{{ '%.1f'%latest.swap_used_gb if latest and latest.swap_used_gb else '0' }} / {{ '%.1f'%latest.swap_total_gb if latest and latest.swap_total_gb else '0' }} GB</div>
+</div>
+
+<!-- ═══ CPU TEMP ═══ -->
+<div class="metric-row">
+  <div class="metric-row-left mrl-temp">
+    <div class="metric-label">🌡️ CPU Temperature</div>
+    <div class="metric-val" id="val-temp" style="color:#f59e0b">
+      {% if latest and latest.cpu_temp %}{{ '%.0f'%latest.cpu_temp }}°C{% else %}—{% endif %}
+    </div>
+    <div class="metric-sub">Thermal sensor</div>
   </div>
-  <div class="metric-card">
-    <div class="metric-label">Net ↑ Upload</div>
-    <div class="metric-val" id="val-net-sent" style="color:var(--green)">—</div>
-    <div class="metric-sub">KB/s</div>
+  <div class="metric-row-right">
+    <div class="chart-label">Temperature °C — last 60 readings</div>
+    <canvas id="chart-temp" height="60"></canvas>
   </div>
-  <div class="metric-card">
-    <div class="metric-label">Net ↓ Download</div>
-    <div class="metric-val" id="val-net-recv" style="color:var(--accent)">—</div>
-    <div class="metric-sub">KB/s</div>
+</div>
+
+<!-- ═══ SWAP ═══ -->
+<div class="metric-row">
+  <div class="metric-row-left mrl-swap">
+    <div class="metric-label">💾 Swap</div>
+    <div class="metric-val" id="val-swap" style="color:#c084fc">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</div>
+    <div class="progress-bar"><div class="progress-fill yellow" id="bar-swap" style="width:{{ latest.swap_percent or 0 }}%"></div></div>
+    <div class="metric-sub" id="val-swap-detail">
+      {{ '%.1f'%latest.swap_used_gb if latest and latest.swap_used_gb else '0' }} /
+      {{ '%.1f'%latest.swap_total_gb if latest and latest.swap_total_gb else '0' }} GB
+    </div>
   </div>
-  <div class="metric-card">
-    <div class="metric-label">Uptime</div>
-    <div class="metric-val" id="val-uptime" style="font-size:16px;color:var(--text)">
+  <div class="metric-row-right">
+    <div class="chart-label">Swap % — last 60 readings</div>
+    <canvas id="chart-swap" height="60"></canvas>
+  </div>
+</div>
+
+<!-- ═══ NET UPLOAD ═══ -->
+<div class="metric-row">
+  <div class="metric-row-left mrl-net-up">
+    <div class="metric-label">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+      Net Upload
+    </div>
+    <div class="metric-val" id="val-net-sent" style="color:#22c55e">—</div>
+    <div class="metric-sub">KB/s  <span id="val-net-sent-total" style="font-size:10px;"></span></div>
+  </div>
+  <div class="metric-row-right">
+    <div class="chart-label">Upload KB/s — last 60 readings</div>
+    <canvas id="chart-net-up" height="60"></canvas>
+  </div>
+</div>
+
+<!-- ═══ NET DOWNLOAD ═══ -->
+<div class="metric-row">
+  <div class="metric-row-left mrl-net-down">
+    <div class="metric-label">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+      Net Download
+    </div>
+    <div class="metric-val" id="val-net-recv" style="color:#00d4ff">—</div>
+    <div class="metric-sub">KB/s  <span id="val-net-recv-total" style="font-size:10px;"></span></div>
+  </div>
+  <div class="metric-row-right">
+    <div class="chart-label">Download KB/s — last 60 readings</div>
+    <canvas id="chart-net-down" height="60"></canvas>
+  </div>
+</div>
+
+<!-- ═══ GPU SECTION — supports Intel, Nvidia, multiple GPUs ═══ -->
+{% if gpus %}
+  {% for gpu in gpus %}
+  {% set gi = loop.index %}
+  {% set gtype = gpu.type | default('unknown') | lower %}
+
+  {# ── resolve initial values, handle both naming conventions ── #}
+  {% if gtype == 'intel' %}
+    {% set g_load    = gpu.gpu_percent       | default(0) | float %}
+    {% set g_compute = gpu.compute_percent   | default(0) | float %}
+    {% set g_render  = gpu.render_3d_percent | default(0) | float %}
+    {% set g_video   = gpu.video_percent     | default(0) | float %}
+    {% set g_freq    = gpu.freq_actual_mhz   | default(0) | float %}
+    {% set g_pwrgpu  = gpu.power_gpu_w       | default(0) | float %}
+    {% set g_pwrpkg  = gpu.power_package_w   | default(0) | float %}
+    {% set g_rc6     = gpu.rc6_idle_percent  | default(0) | float %}
+    {% set g_temp    = gpu.temp_c            | default(0) | float %}
+    {% set g_vmem_used  = gpu.mem_used_mb    | default(0) | float %}
+    {% set g_vmem_total = gpu.mem_total_mb   | default(0) | float %}
+  {% else %}
+    {# Nvidia: support both mem_used_mb and memory_used_mb naming #}
+    {% set g_load       = gpu.load_percent     | default(gpu.gpu_percent     | default(0)) | float %}
+    {% set g_temp       = gpu.temperature      | default(gpu.temp_c          | default(0)) | float %}
+    {% set g_vmem_used  = gpu.memory_used_mb   | default(gpu.mem_used_mb     | default(0)) | float %}
+    {% set g_vmem_total = gpu.memory_total_mb  | default(gpu.mem_total_mb    | default(0)) | float %}
+    {% set g_mem_pct    = gpu.mem_percent      | default(0) | float %}
+  {% endif %}
+
+  {% set g_name_short = gpu.name.split('\n')[0] if gpu.name else 'GPU ' ~ gi %}
+
+  {# VRAM display: GB when >= 1024 MB #}
+  {% if g_vmem_total > 0 %}
+    {% set vram_pct     = (g_vmem_used / g_vmem_total * 100) | round(1) %}
+    {% set vram_used_s  = ('%.1f'%(g_vmem_used/1024) + ' GB')  if g_vmem_used  >= 1024 else ('%.0f'%g_vmem_used  + ' MB') %}
+    {% set vram_tot_s   = ('%.1f'%(g_vmem_total/1024) + ' GB') if g_vmem_total >= 1024 else ('%.0f'%g_vmem_total + ' MB') %}
+  {% else %}
+    {% set vram_pct = 0 %} {% set vram_used_s = '—' %} {% set vram_tot_s = '—' %}
+  {% endif %}
+
+  {# row height: Intel is taller due to extra stats grid #}
+  <div class="metric-row" id="gpu-row-{{ gi }}"
+       style="min-height:{% if gtype == 'intel' %}180px{% else %}130px{% endif %};">
+
+    <div class="metric-row-left mrl-gpu"
+         style="justify-content:flex-start;padding-top:14px;padding-bottom:14px;">
+
+      <!-- Vendor badge + index -->
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+        <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
+                     padding:2px 6px;border-radius:4px;
+                     {% if gtype=='intel' %}background:rgba(0,112,243,.2);color:#60a5fa;
+                     {% elif gtype=='nvidia' %}background:rgba(118,185,0,.2);color:#86efac;
+                     {% else %}background:rgba(100,116,139,.2);color:#94a3b8;{% endif %}">
+          {{ gtype | upper }}
+        </span>
+        <span class="metric-label" style="margin-bottom:0;">GPU {{ gi }}</span>
+      </div>
+
+      <!-- GPU name -->
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;line-height:1.3;word-break:break-word;">
+        {{ g_name_short }}
+      </div>
+
+      <!-- Load value -->
+      <div class="metric-val" id="val-gpu-load-{{ gi }}" style="color:#e879f9">
+        {{ '%.0f'|format(g_load) }}%
+      </div>
+      <div class="metric-sub" style="margin-bottom:6px;">
+        {% if gtype == 'intel' %}Overall GPU load{% else %}GPU Load{% endif %}
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill pink" id="bar-gpu-load-{{ gi }}"
+             style="width:{{ [g_load,100]|min }}%"></div>
+      </div>
+
+      {% if gtype == 'intel' %}
+      <!-- Intel extra stats -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-top:10px;">
+        <div class="metric-sub">🔵 Compute
+          <span style="color:var(--text);font-weight:600;" id="val-gpu-compute-{{ gi }}">{{ '%.0f'|format(g_compute) }}%</span>
+        </div>
+        <div class="metric-sub">🎨 Render
+          <span style="color:var(--text);font-weight:600;" id="val-gpu-render-{{ gi }}">{{ '%.0f'|format(g_render) }}%</span>
+        </div>
+        <div class="metric-sub">🎬 Video
+          <span style="color:var(--text);font-weight:600;" id="val-gpu-video-{{ gi }}">{{ '%.0f'|format(g_video) }}%</span>
+        </div>
+        <div class="metric-sub">😴 RC6 Idle
+          <span style="color:var(--text);font-weight:600;" id="val-gpu-rc6-{{ gi }}">{{ '%.0f'|format(g_rc6) }}%</span>
+        </div>
+        <div class="metric-sub">⚡ GPU Pwr
+          <span style="color:#f59e0b;font-weight:600;" id="val-gpu-pwrgpu-{{ gi }}">{{ '%.1f'|format(g_pwrgpu) }}W</span>
+        </div>
+        <div class="metric-sub">📦 Pkg Pwr
+          <span style="color:#f59e0b;font-weight:600;" id="val-gpu-pwrpkg-{{ gi }}">{{ '%.1f'|format(g_pwrpkg) }}W</span>
+        </div>
+        <div class="metric-sub" style="grid-column:1/-1;">🔄 Freq
+          <span style="color:#00d4ff;font-weight:600;" id="val-gpu-freq-{{ gi }}">{{ '%.0f'|format(g_freq) }} MHz</span>
+        </div>
+      </div>
+
+      {% else %}
+      <!-- Nvidia VRAM -->
+      {% if g_vmem_total > 0 %}
+      <div style="margin-top:8px;">
+        <div class="metric-sub" style="margin-bottom:3px;">
+          🗂 VRAM · <span id="val-gpu-vrampct-{{ gi }}">{{ '%.0f'%vram_pct }}%</span>
+        </div>
+        <div class="progress-bar" style="height:6px;">
+          <div class="progress-fill {% if vram_pct>85 %}red{% elif vram_pct>60 %}yellow{% else %}pink{% endif %}"
+               id="bar-gpu-vram-{{ gi }}" style="width:{{ [vram_pct,100]|min }}%"></div>
+        </div>
+        <div class="metric-sub" id="val-gpu-vram-{{ gi }}" style="margin-top:3px;">
+          {{ vram_used_s }} / {{ vram_tot_s }}
+        </div>
+      </div>
+      {% endif %}
+      <!-- Nvidia temp -->
+      {% if g_temp > 0 %}
+      <div class="metric-sub" id="val-gpu-temp-{{ gi }}" style="margin-top:6px;">
+        🌡️ {{ '%.0f'|format(g_temp) }}°C
+      </div>
+      {% endif %}
+      {% endif %}
+
+    </div><!-- /left -->
+
+    <!-- Chart panel -->
+    <div class="metric-row-right" style="display:flex;flex-direction:column;gap:0;">
+      {% if gtype == 'intel' %}
+        <div class="chart-label">GPU Load % (overall)</div>
+        <canvas id="chart-gpu-load-{{ gi }}" height="55"></canvas>
+        <div class="chart-label" style="margin-top:8px;">Package Power (W)</div>
+        <canvas id="chart-gpu-pwr-{{ gi }}" height="45"></canvas>
+      {% else %}
+        <div class="chart-label">GPU Load % — last 60 readings</div>
+        <canvas id="chart-gpu-load-{{ gi }}" height="45"></canvas>
+        {% if g_vmem_total > 0 %}
+        <div class="chart-label" style="margin-top:6px;">VRAM Usage % — last 60 readings</div>
+        <canvas id="chart-gpu-vram-{{ gi }}" height="35"></canvas>
+        {% endif %}
+      {% endif %}
+    </div>
+
+  </div>
+  {% endfor %}
+
+{% else %}
+<div class="gpu-unavail">
+  <div class="gpu-unavail-icon">🎮</div>
+  <div class="gpu-unavail-text">
+    <strong>GPU — Not Monitored</strong>
+    No GPU metrics collected. Install <span class="mono">gputil</span> or <span class="mono">pynvml</span> on the agent and restart it.
+  </div>
+</div>
+{% endif %}
+
+<!-- ═══ Uptime + Hostname ═══ -->
+<div class="pair-row">
+  <div class="mini-card">
+    <div class="metric-label">⏱ Uptime</div>
+    <div class="metric-val" id="val-uptime" style="font-size:20px;color:var(--text)">
       {% if latest and latest.uptime_seconds %}
         {% set u=latest.uptime_seconds|int %}
         {{ u//86400 }}d {{ (u%86400)//3600 }}h {{ (u%3600)//60 }}m
@@ -92,273 +375,450 @@
     </div>
     <div class="metric-sub">System uptime</div>
   </div>
-  <div class="metric-card">
-    <div class="metric-label">Hostname</div>
-    <div class="mono" style="font-size:12px;font-weight:600;margin-top:4px;">{{ machine.hostname or '—' }}</div>
-    <div class="metric-sub">{{ machine.public_ip or '' }}</div>
+  <div class="mini-card">
+    <div class="metric-label">🖥 Hostname</div>
+    <div class="mono" style="font-size:13px;font-weight:600;margin-top:4px;">{{ machine.hostname or '—' }}</div>
+    <div class="metric-sub" style="margin-top:4px;">{{ machine.public_ip or '' }}</div>
   </div>
 </div>
 
-<!-- ── Charts ── -->
-<div class="chart-grid">
-  <div class="chart-card">
-    <div class="chart-title">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      CPU & RAM %
-    </div>
-    <canvas id="chart-cpu-ram" height="130"></canvas>
+<!-- ═══ DISK PARTITIONS ═══ -->
+<div class="disk-section">
+  <div class="disk-section-title">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+    Disk Partitions
+    <span style="font-size:10px;color:var(--text-muted);font-weight:400;margin-left:4px;">(squashfs / snap loops hidden)</span>
   </div>
-  <div class="chart-card">
-    <div class="chart-title">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      Network KB/s
-    </div>
-    <canvas id="chart-net" height="130"></canvas>
-  </div>
-</div>
-<div class="chart-grid">
-  <div class="chart-card">
-    <div class="chart-title">🌡️ CPU Temperature °C</div>
-    <canvas id="chart-temp" height="110"></canvas>
-  </div>
-  <div class="chart-card">
-    <div class="chart-title">💾 Swap Usage %</div>
-    <canvas id="chart-swap" height="110"></canvas>
-  </div>
-</div>
-
-<!-- ── Disks + Processes ── -->
-<div class="chart-grid">
-  <div class="card">
-    <div class="card-title">Disk Partitions</div>
-    {% for disk in disks %}
+  <div class="disk-items-grid">
+    {% set real_disks = disks | selectattr('fstype', 'ne', 'squashfs') | list %}
+    {% for disk in real_disks %}
+    {% set pct   = disk.percent  | float %}
+    {% set used  = disk.used_gb  if disk.used_gb  is defined else 0 %}
+    {% set total = disk.total_gb if disk.total_gb is defined else 0 %}
+    {% set free  = disk.free_gb  if disk.free_gb  is defined else (total - used) %}
     <div class="disk-item">
-      <div class="disk-header">
-        <span class="mono">{{ disk.mountpoint }}</span>
-        <span class="badge badge-{% if disk.percent>85 %}offline{% elif disk.percent>60 %}warning{% else %}online{% endif %}">
-          {{ '%.1f'%disk.percent }}%
+      <div class="disk-item-header">
+        <div>
+          <div class="disk-mount">{{ disk.mountpoint }}</div>
+          <div class="disk-fstype">{{ disk.device or '' }} &bull; {{ disk.fstype or '' }}</div>
+        </div>
+        <span class="disk-pct-badge {% if pct>85 %}disk-pct-red{% elif pct>60 %}disk-pct-yellow{% else %}disk-pct-green{% endif %}">
+          {{ '%.1f'%pct }}%
         </span>
       </div>
-      <div class="progress-bar">
-        <div class="progress-fill {% if disk.percent>85 %}red{% elif disk.percent>60 %}yellow{% else %}green{% endif %}"
-             style="width:{{ [disk.percent,100]|min }}%"></div>
-      </div>
-      <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">
-        {{ '%.1f'%(disk.used_gb) if disk.used_gb is defined else '?' }} GB used /
-        {{ '%.1f'%(disk.total_gb) if disk.total_gb is defined else '?' }} GB &bull; {{ disk.fstype or '' }}
+      <div class="storage-bar-wrap">
+        <div class="storage-bar">
+          <div class="storage-bar-used {% if pct>85 %}progress-fill red{% elif pct>60 %}progress-fill yellow{% else %}progress-fill green{% endif %}"
+               style="width:{{ [pct,100]|min }}%"></div>
+        </div>
+        <div class="storage-legend">
+          <div class="storage-legend-item">
+            <div class="storage-legend-dot" style="background:{% if pct>85 %}#ef4444{% elif pct>60 %}#f59e0b{% else %}#22c55e{% endif %}"></div>
+            Used {{ '%.1f'%used }} GB
+          </div>
+          <div class="storage-legend-item">
+            <div class="storage-legend-dot" style="background:rgba(255,255,255,.2)"></div>
+            Free {{ '%.1f'%free }} GB
+          </div>
+          {% if total > 0 %}
+          <div class="storage-legend-item" style="margin-left:auto;">Total {{ '%.1f'%total }} GB</div>
+          {% endif %}
+        </div>
       </div>
     </div>
-    {% else %}<p class="text-muted" style="font-size:13px">No disk data.</p>{% endfor %}
-  </div>
-
-  <div class="card">
-    <div class="card-title">Top Processes</div>
-    {% for p in procs %}
-    <div class="proc-row">
-      <span class="mono" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-        {{ p.get('name') or p.get('pid') or '?' }}
-      </span>
-      <span style="color:var(--text-muted);">
-        CPU {{ '%.1f'%(p.get('cpu_percent') or p.get('cpu') or 0) }}%
-        &nbsp; RAM {{ '%.1f'%(p.get('memory_percent') or p.get('mem') or p.get('memory') or 0) }}%
-      </span>
-    </div>
-    {% else %}<p class="text-muted" style="font-size:13px">No process data.</p>{% endfor %}
-  </div>
-</div>
-
-<!-- ── GPU ── -->
-{% if gpus %}
-<div class="card mt-2">
-  <div class="card-title">GPU</div>
-  <div class="grid-2">
-    {% for gpu in gpus %}
-    <div>
-      <div style="font-weight:600;font-size:14px;">{{ gpu.name or 'GPU '~loop.index }}</div>
-      {% if gpu.memory_used_mb is defined and gpu.memory_total_mb %}
-      <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">
-        VRAM: {{ gpu.memory_used_mb }} / {{ gpu.memory_total_mb }} MB
-      </div>
-      <div class="progress-bar mt-1">
-        <div class="progress-fill blue" style="width:{{ (gpu.memory_used_mb/gpu.memory_total_mb*100)|int }}%"></div>
-      </div>
-      {% endif %}
-      {% if gpu.temperature is defined %}
-      <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">
-        Temp: {{ gpu.temperature }}°C &bull; Load: {{ gpu.load_percent or '?' }}%
-      </div>
-      {% endif %}
-    </div>
+    {% else %}
+    <p style="font-size:13px;color:var(--text-muted)">No disk data.</p>
     {% endfor %}
   </div>
 </div>
-{% endif %}
 
-<!-- ── Machine info ── -->
-<div class="card mt-2">
-  <div class="card-title">Machine Info</div>
-  <div class="info-grid">
-    <div class="info-item"><div class="lbl">System Name</div><div class="val">{{ machine.system_name }}</div></div>
-    <div class="info-item"><div class="lbl">Location</div><div class="val">{{ machine.location }}</div></div>
-    <div class="info-item"><div class="lbl">Hostname</div><div class="val">{{ machine.hostname or '—' }}</div></div>
-    <div class="info-item"><div class="lbl">Public IP</div><div class="val">{{ machine.public_ip or '—' }}</div></div>
-    <div class="info-item"><div class="lbl">OS Type</div><div class="val">{{ machine.os_type or '—' }}</div></div>
-    <div class="info-item"><div class="lbl">OS Version</div><div class="val" style="font-size:11px;">{{ latest.os_version if latest and latest.os_version else '—' }}</div></div>
-    <div class="info-item"><div class="lbl">Table</div><div class="val">{{ machine.table_name }}</div></div>
-    <div class="info-item"><div class="lbl">Registered</div><div class="val">{{ machine.registered_at.strftime('%Y-%m-%d') if machine.registered_at else '—' }}</div></div>
+<!-- ═══ TOP PROCESSES ═══ -->
+<div class="procs-card">
+  <div class="card-section-title">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline;vertical-align:middle;margin-right:4px;"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+    Top Processes
   </div>
-</div>
-
-<!-- ── Alert history ── -->
-<div class="card mt-2">
-  <div class="card-title">Alert History</div>
-  {% for a in alert_history %}
+  {% for p in procs %}
   <div class="proc-row">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span class="badge badge-warning">{{ a.alert_type }}</span>
-      <span style="font-size:12px;">{{ a.subject }}</span>
-    </div>
-    <span style="font-size:11px;color:var(--text-muted);">{{ a.sent_at.strftime('%m-%d %H:%M') if a.sent_at else '—' }}</span>
+    <span class="mono" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+      {{ p.get('name') or p.get('pid') or '?' }}
+    </span>
+    <span style="color:var(--text-muted);">
+      CPU {{ '%.1f'%(p.get('cpu_percent') or p.get('cpu') or 0) }}%
+      &nbsp; RAM {{ '%.1f'%(p.get('memory_percent') or p.get('mem') or p.get('memory') or 0) }}%
+    </span>
   </div>
-  {% else %}<p class="text-muted" style="font-size:13px">No alerts for this machine.</p>{% endfor %}
+  {% else %}<p style="font-size:13px;color:var(--text-muted)">No process data.</p>{% endfor %}
 </div>
+
+<!-- ═══ MACHINE INFO + ALERTS ═══ -->
+<div class="bottom-grid">
+  <div class="info-card">
+    <div class="card-section-title">Machine Info</div>
+    <div class="info-grid">
+      <div class="info-item"><div class="lbl">System Name</div><div class="val">{{ machine.system_name }}</div></div>
+      <div class="info-item"><div class="lbl">Location</div><div class="val">{{ machine.location }}</div></div>
+      <div class="info-item"><div class="lbl">Hostname</div><div class="val">{{ machine.hostname or '—' }}</div></div>
+      <div class="info-item"><div class="lbl">Public IP</div><div class="val">{{ machine.public_ip or '—' }}</div></div>
+      <div class="info-item"><div class="lbl">OS Type</div><div class="val">{{ machine.os_type or '—' }}</div></div>
+      <div class="info-item"><div class="lbl">OS Version</div><div class="val" style="font-size:10px;">{{ latest.os_version if latest and latest.os_version else '—' }}</div></div>
+      <div class="info-item"><div class="lbl">Table</div><div class="val">{{ machine.table_name }}</div></div>
+      <div class="info-item"><div class="lbl">Registered</div><div class="val">{{ machine.registered_at.strftime('%Y-%m-%d') if machine.registered_at else '—' }}</div></div>
+    </div>
+  </div>
+  <div class="info-card">
+    <div class="card-section-title">Alert History</div>
+    {% for a in alert_history %}
+    <div class="proc-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-warning">{{ a.alert_type }}</span>
+        <span style="font-size:12px;">{{ a.subject }}</span>
+      </div>
+      <span style="font-size:11px;color:var(--text-muted);">{{ a.sent_at.strftime('%m-%d %H:%M') if a.sent_at else '—' }}</span>
+    </div>
+    {% else %}<p style="font-size:13px;color:var(--text-muted)">No alerts for this machine.</p>{% endfor %}
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
-const TABLE = "{{ machine.table_name }}";
+// ─────────────────────────────────────────────
+//  REFORMMED · Server Detail · Live Charts
+// ─────────────────────────────────────────────
+const TABLE      = "{{ machine.table_name }}";
 const MAX_POINTS = 60;
 
-// Seed data from server
-let labels   = {{ chart_labels|safe }};
-let cpuData  = {{ chart_cpu|safe }};
-let ramData  = {{ chart_ram|safe }};
-let swapData = {{ chart_swap|safe }};
-let tempData = {{ chart_temp|safe }};
-let sentData = {{ chart_net_sent|safe }};
-let recvData = {{ chart_net_recv|safe }};
+// ── Base metric history (seeded from Flask context) ──
+let labels   = {{ chart_labels   | safe }};
+let cpuData  = {{ chart_cpu      | safe }};
+let ramData  = {{ chart_ram      | safe }};
+let swapData = {{ chart_swap     | safe }};
+let tempData = {{ chart_temp     | safe }};
+let sentData = {{ chart_net_sent | safe }};
+let recvData = {{ chart_net_recv | safe }};
 
 // Pad to MAX_POINTS
-while(labels.length < MAX_POINTS){ labels.unshift(''); cpuData.unshift(0); ramData.unshift(0); swapData.unshift(0); tempData.unshift(0); sentData.unshift(0); recvData.unshift(0); }
+function padArr(arr, val) {
+  while (arr.length < MAX_POINTS) arr.unshift(val !== undefined ? val : 0);
+  return arr;
+}
+labels   = padArr(labels, '');
+cpuData  = padArr(cpuData);  ramData  = padArr(ramData);
+swapData = padArr(swapData); tempData = padArr(tempData);
+sentData = padArr(sentData); recvData = padArr(recvData);
 
-Chart.defaults.color='#64748b';
-Chart.defaults.font.family="'JetBrains Mono',monospace";
-Chart.defaults.font.size=10;
+// ── GPU metadata from Jinja (type, initial load, has-vram flag) ──
+// gpuMeta[idx] = { type, initLoad, initPwr, hasVram, initVramPct }
+const gpuMeta = {};
+{% if gpus %}
+  {% for gpu in gpus %}
+  {% set gi    = loop.index %}
+  {% set gtype = gpu.type | default('unknown') | lower %}
+  {% if gtype == 'intel' %}
+    {% set init_load = gpu.gpu_percent     | default(0) | float %}
+    {% set init_pwr  = gpu.power_package_w | default(0) | float %}
+    gpuMeta[{{ gi }}] = {
+      type: 'intel',
+      initLoad: {{ init_load }},
+      initPwr:  {{ init_pwr }},
+      hasVram:  false,
+      initVramPct: 0
+    };
+  {% else %}
+    {% set init_load  = gpu.load_percent   | default(gpu.gpu_percent    | default(0)) | float %}
+    {% set vmem_used  = gpu.memory_used_mb | default(gpu.mem_used_mb    | default(0)) | float %}
+    {% set vmem_total = gpu.memory_total_mb| default(gpu.mem_total_mb   | default(0)) | float %}
+    {% set init_vpct  = (vmem_used / vmem_total * 100) if vmem_total > 0 else 0 %}
+    gpuMeta[{{ gi }}] = {
+      type: 'nvidia',
+      initLoad: {{ init_load }},
+      initPwr:  0,
+      hasVram:  {{ 'true' if vmem_total > 0 else 'false' }},
+      initVramPct: {{ init_vpct | round(1) }}
+    };
+  {% endif %}
+  {% endfor %}
+{% endif %}
 
-const baseOpts = (yMax) => ({
-  responsive:true, animation:false,
-  plugins:{legend:{labels:{boxWidth:8,font:{size:10}}}},
-  scales:{
-    x:{display:false},
-    y:{min:0, max:yMax||undefined, grid:{color:'rgba(37,42,58,.8)'},ticks:{font:{size:9}}}
+// ── Build pre-seeded GPU history arrays (flat at initial value) ──
+// Each array has MAX_POINTS entries, all equal to the first real reading.
+// This makes the graph show a flat historical line at the correct level
+// instead of a spike from 0.
+const gpuLoadHist = {};   // load % for all GPUs
+const gpuPwrHist  = {};   // pkg power for Intel
+const gpuVramHist = {};   // vram % for Nvidia
+
+Object.keys(gpuMeta).forEach(function(idx) {
+  var m = gpuMeta[idx];
+  gpuLoadHist[idx] = Array(MAX_POINTS).fill(m.initLoad);
+  gpuPwrHist[idx]  = Array(MAX_POINTS).fill(m.initPwr);
+  gpuVramHist[idx] = Array(MAX_POINTS).fill(m.initVramPct);
+});
+
+// ── Chart.js globals ──
+Chart.defaults.color = '#64748b';
+Chart.defaults.font.family = "'JetBrains Mono',monospace";
+Chart.defaults.font.size   = 9;
+
+function hexFill(hex, alpha) {
+  var r = parseInt(hex.slice(1,3),16),
+      g = parseInt(hex.slice(3,5),16),
+      b = parseInt(hex.slice(5,7),16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+
+function makeChart(canvasId, dataArr, color, yMax) {
+  var el = document.getElementById(canvasId);
+  if (!el) return null;
+  var fill = color.charAt(0) === '#' ? hexFill(color, 0.08) : color;
+  return new Chart(el, {
+    type: 'line',
+    data: {
+      labels: labels.slice(),   // copy so base labels array isn't shared
+      datasets: [{
+        data: dataArr.slice(),
+        borderColor: color,
+        backgroundColor: fill,
+        tension: 0.35,
+        fill: true,
+        borderWidth: 1.5,
+        pointRadius: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { display: false },
+        y: {
+          min: 0,
+          max: yMax || undefined,
+          grid: { color: 'rgba(37,42,58,.8)' },
+          ticks: { font: { size: 8 }, maxTicksLimit: 4 }
+        }
+      }
+    }
+  });
+}
+
+// ── Init base metric charts ──
+var charts = {
+  cpu:     makeChart('chart-cpu',      cpuData,  '#00d4ff', 100),
+  ram:     makeChart('chart-ram',      ramData,  '#7c3aed', 100),
+  temp:    makeChart('chart-temp',     tempData, '#f59e0b'),
+  swap:    makeChart('chart-swap',     swapData, '#a855f7', 100),
+  netUp:   makeChart('chart-net-up',   sentData, '#22c55e'),
+  netDown: makeChart('chart-net-down', recvData, '#00d4ff')
+};
+
+// ── Init GPU charts — canvas IDs now use 'chart-gpu-load-N' ──
+var gpuLoadChart = {};   // chart objects, keyed by GPU index
+var gpuPwrChart  = {};
+var gpuVramChart = {};
+
+Object.keys(gpuMeta).forEach(function(idx) {
+  var m = gpuMeta[idx];
+
+  // Load chart — every GPU type has this
+  gpuLoadChart[idx] = makeChart(
+    'chart-gpu-load-' + idx,
+    gpuLoadHist[idx],
+    '#e879f9',
+    100
+  );
+
+  if (m.type === 'intel') {
+    // Intel gets a package-power chart
+    gpuPwrChart[idx] = makeChart(
+      'chart-gpu-pwr-' + idx,
+      gpuPwrHist[idx],
+      '#f59e0b'
+    );
+  } else if (m.hasVram) {
+    // Nvidia gets a VRAM % chart
+    gpuVramChart[idx] = makeChart(
+      'chart-gpu-vram-' + idx,
+      gpuVramHist[idx],
+      '#7c3aed',
+      100
+    );
   }
 });
 
-const cpuRamChart = new Chart(document.getElementById('chart-cpu-ram'),{
-  type:'line',
-  data:{labels:[...labels],datasets:[
-    {label:'CPU %', data:[...cpuData], borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.07)',tension:.3,fill:true,borderWidth:2,pointRadius:0},
-    {label:'RAM %', data:[...ramData], borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.07)',tension:.3,fill:true,borderWidth:2,pointRadius:0},
-  ]},
-  options:baseOpts(100)
-});
-
-const netChart = new Chart(document.getElementById('chart-net'),{
-  type:'line',
-  data:{labels:[...labels],datasets:[
-    {label:'↑ Sent',data:[...sentData],borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.07)',tension:.3,fill:true,borderWidth:2,pointRadius:0},
-    {label:'↓ Recv',data:[...recvData],borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.07)',tension:.3,fill:true,borderWidth:2,pointRadius:0},
-  ]},
-  options:baseOpts()
-});
-
-const tempChart = new Chart(document.getElementById('chart-temp'),{
-  type:'line',
-  data:{labels:[...labels],datasets:[
-    {label:'°C',data:[...tempData],borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.08)',tension:.3,fill:true,borderWidth:2,pointRadius:0}
-  ]},
-  options:baseOpts()
-});
-
-const swapChart = new Chart(document.getElementById('chart-swap'),{
-  type:'bar',
-  data:{labels:[...labels],datasets:[
-    {label:'Swap %',data:[...swapData],backgroundColor:'rgba(124,58,237,.4)',borderRadius:2}
-  ]},
-  options:baseOpts(100)
-});
-
-function pushPoint(chart, newVals, newLabel){
-  chart.data.labels.push(newLabel||'');
+// ── Helpers ──
+function pushPoint(chart, val, label) {
+  if (!chart) return;
+  chart.data.labels.push(label || '');
   chart.data.labels.shift();
-  newVals.forEach((v,i)=>{ chart.data.datasets[i].data.push(v); chart.data.datasets[i].data.shift(); });
+  chart.data.datasets[0].data.push(val);
+  chart.data.datasets[0].data.shift();
   chart.update('none');
 }
 
-function colorByPct(pct){ return pct>85?'var(--red)':pct>60?'var(--yellow)':'var(--green)'; }
-
-function setBar(id, pct){
-  const el=document.getElementById(id);
-  if(!el) return;
-  el.style.width=Math.min(pct,100)+'%';
-  el.className='progress-fill '+(pct>85?'red':pct>60?'yellow':'green');
+function colorByPct(pct) {
+  return pct > 85 ? 'var(--red)' : pct > 60 ? '#f59e0b' : '#22c55e';
 }
 
-async function pollLive(){
-  try{
-    const r=await fetch(`/servers/${TABLE}/live`);
-    if(!r.ok) return;
-    const d=await r.json();
+function setBar(id, pct) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.style.width = Math.min(pct, 100) + '%';
+  el.className = 'progress-fill ' + (pct > 85 ? 'red' : pct > 60 ? 'yellow' : 'green');
+}
 
-    const cpu  = d.cpu_percent||0;
-    const ram  = d.ram_percent||0;
-    const swap = d.swap_percent||0;
-    const temp = d.cpu_temp||0;
-    const sent = d.net_sent_kbs||0;
-    const recv = d.net_recv_kbs||0;
-    const now  = new Date().toLocaleTimeString();
+function setText(id, val) {
+  var el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
 
-    // Update metric cards
-    document.getElementById('val-cpu').textContent  = cpu.toFixed(1)+'%';
-    document.getElementById('val-ram').textContent  = ram.toFixed(1)+'%';
-    document.getElementById('val-swap').textContent = swap.toFixed(1)+'%';
-    document.getElementById('val-temp').textContent = temp ? temp.toFixed(0)+'°C' : '—';
-    document.getElementById('val-net-sent').textContent = sent;
-    document.getElementById('val-net-recv').textContent = recv;
+function setWidth(id, pct) {
+  var el = document.getElementById(id);
+  if (el) el.style.width = Math.min(pct, 100).toFixed(1) + '%';
+}
+
+function fmtBytes(bytes) {
+  if (bytes >= 1e12) return (bytes / 1e12).toFixed(2) + ' TB';
+  if (bytes >= 1e9)  return (bytes / 1e9).toFixed(2)  + ' GB';
+  if (bytes >= 1e6)  return (bytes / 1e6).toFixed(1)  + ' MB';
+  return (bytes / 1e3).toFixed(0) + ' KB';
+}
+
+// MB → "X.X GB" or "X MB"
+function fmtVram(mb) {
+  if (mb >= 1024) return (mb / 1024).toFixed(1) + ' GB';
+  return Math.round(mb) + ' MB';
+}
+
+// ── Main poll ──
+async function pollLive() {
+  try {
+    var r = await fetch('/servers/' + TABLE + '/live');
+    if (!r.ok) return;
+    var d = await r.json();
+
+    var cpu  = d.cpu_percent  || 0;
+    var ram  = d.ram_percent  || 0;
+    var swap = d.swap_percent || 0;
+    var temp = d.cpu_temp     || 0;
+    var sent = d.net_sent_kbs || 0;
+    var recv = d.net_recv_kbs || 0;
+    var now  = new Date().toLocaleTimeString();
+
+    // Scalars
+    setText('val-cpu',      cpu.toFixed(1) + '%');
+    setText('val-ram',      ram.toFixed(1) + '%');
+    setText('val-swap',     swap.toFixed(1) + '%');
+    setText('val-temp',     temp ? temp.toFixed(0) + '°C' : '—');
+    setText('val-net-sent', sent);
+    setText('val-net-recv', recv);
 
     document.getElementById('val-cpu').style.color  = colorByPct(cpu);
     document.getElementById('val-ram').style.color  = colorByPct(ram);
-    document.getElementById('val-temp').style.color = temp>80?'var(--red)':temp>60?'var(--yellow)':'var(--green)';
+    document.getElementById('val-temp').style.color =
+      temp > 80 ? 'var(--red)' : temp > 60 ? '#f59e0b' : '#22c55e';
 
-    if(d.cpu_freq_mhz) document.getElementById('val-freq').textContent = Math.round(d.cpu_freq_mhz)+' MHz';
-    if(d.ram_used_gb && d.ram_total_gb)
-      document.getElementById('val-ram-detail').textContent = d.ram_used_gb.toFixed(1)+' / '+d.ram_total_gb.toFixed(1)+' GB';
-
-    if(d.uptime_seconds){
-      const u=Math.round(d.uptime_seconds);
-      document.getElementById('val-uptime').textContent =
-        `${Math.floor(u/86400)}d ${Math.floor((u%86400)/3600)}h ${Math.floor((u%3600)/60)}m`;
+    if (d.cpu_freq_mhz)
+      setText('val-freq', Math.round(d.cpu_freq_mhz) + ' MHz');
+    if (d.ram_used_gb && d.ram_total_gb)
+      setText('val-ram-detail', d.ram_used_gb.toFixed(1) + ' / ' + d.ram_total_gb.toFixed(1) + ' GB');
+    if (d.net_bytes_sent)
+      setText('val-net-sent-total', '(total ' + fmtBytes(d.net_bytes_sent) + ')');
+    if (d.net_bytes_recv)
+      setText('val-net-recv-total', '(total ' + fmtBytes(d.net_bytes_recv) + ')');
+    if (d.uptime_seconds) {
+      var u = Math.round(d.uptime_seconds);
+      setText('val-uptime',
+        Math.floor(u/86400) + 'd ' +
+        Math.floor((u%86400)/3600) + 'h ' +
+        Math.floor((u%3600)/60) + 'm');
     }
+    if (d.swap_used_gb !== undefined && d.swap_total_gb !== undefined)
+      setText('val-swap-detail',
+        d.swap_used_gb.toFixed(1) + ' / ' + d.swap_total_gb.toFixed(1) + ' GB');
 
-    setBar('bar-cpu', cpu);
-    setBar('bar-ram', ram);
+    setBar('bar-cpu',  cpu);
+    setBar('bar-ram',  ram);
     setBar('bar-swap', swap);
 
-    document.getElementById('last-seen').textContent = d.last_seen||'—';
+    setText('last-seen', d.last_seen || '—');
     document.getElementById('live-status').innerHTML =
-      `<span class="status-dot ${d.status}"></span>
-       <span class="badge badge-${d.status==='online'?'online':'offline'}">${d.status}</span>`;
+      '<span class="status-dot ' + d.status + '"></span>' +
+      '<span class="badge badge-' + (d.status === 'online' ? 'online' : 'offline') + '">' + d.status + '</span>';
 
-    // Push to charts
-    pushPoint(cpuRamChart, [cpu, ram], now);
-    pushPoint(netChart,    [sent, recv], now);
-    pushPoint(tempChart,   [temp], now);
-    pushPoint(swapChart,   [swap], now);
+    // Base chart push
+    pushPoint(charts.cpu,     cpu,  now);
+    pushPoint(charts.ram,     ram,  now);
+    pushPoint(charts.temp,    temp, now);
+    pushPoint(charts.swap,    swap, now);
+    pushPoint(charts.netUp,   sent, now);
+    pushPoint(charts.netDown, recv, now);
 
-  }catch(e){ console.error(e); }
+    // ── GPU live update ──
+    // /live must return: d.gpus = list from gpu_info jsonb column
+    if (d.gpus && Array.isArray(d.gpus)) {
+      d.gpus.forEach(function(gpu, i) {
+        var idx   = i + 1;                            // 1-based, matches Jinja gi
+        var gtype = (gpu.type || '').toLowerCase();
+
+        if (gtype === 'intel') {
+          // ── Intel ──
+          var load    = parseFloat(gpu.gpu_percent       || 0);
+          var compute = parseFloat(gpu.compute_percent   || 0);
+          var render  = parseFloat(gpu.render_3d_percent || 0);
+          var video   = parseFloat(gpu.video_percent     || 0);
+          var rc6     = parseFloat(gpu.rc6_idle_percent  || 0);
+          var freq    = parseFloat(gpu.freq_actual_mhz   || 0);
+          var pwrGpu  = parseFloat(gpu.power_gpu_w       || 0);
+          var pwrPkg  = parseFloat(gpu.power_package_w   || 0);
+
+          setText('val-gpu-load-'    + idx, load.toFixed(0)    + '%');
+          setText('val-gpu-compute-' + idx, compute.toFixed(0) + '%');
+          setText('val-gpu-render-'  + idx, render.toFixed(0)  + '%');
+          setText('val-gpu-video-'   + idx, video.toFixed(0)   + '%');
+          setText('val-gpu-rc6-'     + idx, rc6.toFixed(0)     + '%');
+          setText('val-gpu-freq-'    + idx, freq.toFixed(0)    + ' MHz');
+          setText('val-gpu-pwrgpu-'  + idx, pwrGpu.toFixed(1)  + 'W');
+          setText('val-gpu-pwrpkg-'  + idx, pwrPkg.toFixed(1)  + 'W');
+          setWidth('bar-gpu-load-'   + idx, load);
+
+          pushPoint(gpuLoadChart[idx], load,   now);
+          pushPoint(gpuPwrChart[idx],  pwrPkg, now);
+
+        } else {
+          // ── Nvidia (handles both old & new field names) ──
+          var load   = parseFloat(gpu.load_percent    || gpu.gpu_percent  || 0);
+          var vUsed  = parseFloat(gpu.memory_used_mb  || gpu.mem_used_mb  || 0);
+          var vTotal = parseFloat(gpu.memory_total_mb || gpu.mem_total_mb || 0);
+          var temp_g = parseFloat(gpu.temperature     || gpu.temp_c       || 0);
+
+          setText('val-gpu-load-' + idx, load.toFixed(0) + '%');
+          setWidth('bar-gpu-load-' + idx, load);
+
+          if (vTotal > 0) {
+            var vPct = (vUsed / vTotal) * 100;
+            setWidth('bar-gpu-vram-'    + idx, vPct);
+            setText('val-gpu-vrampct-'  + idx, vPct.toFixed(0) + '%');
+            setText('val-gpu-vram-'     + idx,
+              fmtVram(vUsed) + ' / ' + fmtVram(vTotal));
+            pushPoint(gpuVramChart[idx], vPct, now);
+          }
+
+          if (temp_g > 0)
+            setText('val-gpu-temp-' + idx, '🌡️ ' + temp_g.toFixed(0) + '°C');
+
+          pushPoint(gpuLoadChart[idx], load, now);
+        }
+      });
+    }
+
+  } catch(e) {
+    console.error('pollLive error:', e);
+  }
 }
 
-// 2 second refresh
 setInterval(pollLive, 2000);
 </script>
 {% endblock %}
