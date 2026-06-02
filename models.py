@@ -122,19 +122,3 @@ class User(UserMixin):
             cur.execute("SELECT * FROM webapp_users WHERE email=%s", (email,))
             row = cur.fetchone()
         return User(row) if row else None
-
-    @staticmethod
-    def get_by_email(email):
-        with get_db() as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT * FROM webapp_users WHERE email=%s", (email,))
-            row = cur.fetchone()
-        return User(row) if row else None
-
-    @staticmethod
-    def get_by_email(email):
-        with get_db() as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT * FROM webapp_users WHERE email=%s", (email,))
-            row = cur.fetchone()
-        return User(row) if row else None

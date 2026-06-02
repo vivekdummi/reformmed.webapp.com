@@ -1,364 +1,191 @@
 {% extends "base.html" %}
 {% block title %}{{ machine.system_name }} — REFORMMED{% endblock %}
 {% block page_title %}{{ machine.system_name }}{% endblock %}
-
 {% block extra_css %}
 <style>
-.metric-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
-.metric-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;overflow:hidden;}
-.metric-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--accent);opacity:.3;}
-.metric-label{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
-.metric-val{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;line-height:1;}
-.metric-sub{font-size:11px;color:var(--text-muted);margin-top:4px;}
-.chart-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px;}
-.chart-title{font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
-.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
-@media(max-width:700px){.chart-grid{grid-template-columns:1fr;}}
-.disk-item{margin-bottom:12px;}
-.disk-header{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;}
-.proc-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(37,42,58,.5);font-size:12px;}
-.proc-row:last-child{border-bottom:none;}
-.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;font-size:13px;}
-.info-item .lbl{font-size:11px;color:var(--text-muted);margin-bottom:2px;}
-.info-item .val{font-family:'JetBrains Mono',monospace;font-size:12px;}
+.mg{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:11px;margin-bottom:18px;}
+.mc{background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:14px;position:relative;}
+.ml{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.mv{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;line-height:1;}
+.ms{font-size:11px;color:var(--muted);margin-top:3px;}
+.cg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+@media(max-width:700px){.cg{grid-template-columns:1fr;}}
+.cc{background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:14px;}
+.ct{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;}
+.di{margin-bottom:11px;}
+.dh{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;}
+.pr{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(37,42,58,.5);font-size:12px;}
+.pr:last-child{border-bottom:none;}
+.ig{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:9px;font-size:13px;}
+.ii .lbl{font-size:10px;color:var(--muted);margin-bottom:2px;}
+.ii .val{font-family:'JetBrains Mono',monospace;font-size:12px;}
 </style>
 {% endblock %}
-
 {% block content %}
-<div class="page-header">
-  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-    <a href="{{ url_for('servers.index') }}" class="btn btn-ghost btn-sm">← Back</a>
+<div class="ph">
+  <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">
+    <a href="{{ url_for('servers.index') }}" class="btn btn-g btn-sm">← Back</a>
     <div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span class="mono" style="font-size:18px;font-weight:700;">{{ machine.system_name }}</span>
+      <div style="display:flex;align-items:center;gap:7px;">
+        <span class="mono" style="font-size:17px;font-weight:700;">{{ machine.system_name }}</span>
         <span id="live-status">
-          <span class="status-dot {{ machine.status }}"></span>
-          <span class="badge badge-{{ 'online' if machine.status=='online' else 'offline' }}">{{ machine.status }}</span>
+          <span class="dot {{ machine.status }}"></span>
+          <span class="badge b-{{ 'on' if machine.status=='online' else 'off' }}">{{ machine.status }}</span>
         </span>
       </div>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
-        {{ machine.location }} &bull; {{ machine.os_type or 'Unknown OS' }} &bull;
-        Last seen: <span class="mono" id="last-seen">{{ machine.last_seen or '—' }}</span>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px;">
+        {{ machine.location }} &bull; {{ machine.os_type or 'Unknown OS' }} &bull; Last seen: <span class="mono" id="last-seen">{{ machine.last_seen or '—' }}</span>
       </div>
     </div>
   </div>
-  <div style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;">
-    <span class="pulse"></span> Live · 2s refresh
-  </div>
+  <div class="live-b"><span class="pulse"></span> Live 2s</div>
 </div>
 
-<!-- ── Live metric cards ── -->
-<div class="metric-grid">
-  <div class="metric-card">
-    <div class="metric-label">CPU Usage</div>
-    <div class="metric-val" id="val-cpu" style="color:var(--accent)">{{ '%.1f'%latest.cpu_percent if latest and latest.cpu_percent else '—' }}%</div>
-    <div class="progress-bar mt-1"><div class="progress-fill green" id="bar-cpu" style="width:{{ latest.cpu_percent or 0 }}%"></div></div>
-    <div class="metric-sub" id="val-freq">{{ '%.0f'%latest.cpu_freq_mhz if latest and latest.cpu_freq_mhz else '' }} MHz</div>
+<div class="mg">
+  <div class="mc">
+    <div class="ml">CPU</div>
+    <div class="mv" id="v-cpu" style="color:var(--accent)">{{ '%.1f'%latest.cpu_percent if latest and latest.cpu_percent else '—' }}%</div>
+    <div class="pb mt1"><div class="pf g" id="b-cpu" style="width:{{ latest.cpu_percent or 0 }}%"></div></div>
+    <div class="ms" id="v-freq">{{ '%.0f'%latest.cpu_freq_mhz if latest and latest.cpu_freq_mhz else '' }} MHz</div>
   </div>
-  <div class="metric-card">
-    <div class="metric-label">RAM</div>
-    <div class="metric-val" id="val-ram" style="color:#a78bfa">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '—' }}%</div>
-    <div class="progress-bar mt-1"><div class="progress-fill blue" id="bar-ram" style="width:{{ latest.ram_percent or 0 }}%"></div></div>
-    <div class="metric-sub" id="val-ram-detail">{{ '%.1f'%latest.ram_used_gb if latest and latest.ram_used_gb else '' }} / {{ '%.1f'%latest.ram_total_gb if latest and latest.ram_total_gb else '' }} GB</div>
+  <div class="mc">
+    <div class="ml">RAM</div>
+    <div class="mv" id="v-ram" style="color:#a78bfa">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '—' }}%</div>
+    <div class="pb mt1"><div class="pf b" id="b-ram" style="width:{{ latest.ram_percent or 0 }}%"></div></div>
+    <div class="ms" id="v-ram-d">{{ '%.1f'%latest.ram_used_gb if latest and latest.ram_used_gb else '' }} / {{ '%.1f'%latest.ram_total_gb if latest and latest.ram_total_gb else '' }} GB</div>
   </div>
-  <div class="metric-card">
-    <div class="metric-label">CPU Temp</div>
-    <div class="metric-val" id="val-temp" style="color:var(--green)">{{ '%.0f'%latest.cpu_temp if latest and latest.cpu_temp else '—' }}{% if latest and latest.cpu_temp %}°C{% endif %}</div>
-    <div class="metric-sub">Temperature</div>
+  <div class="mc">
+    <div class="ml">Temp</div>
+    <div class="mv" id="v-temp" style="color:var(--green)">{{ '%.0f'%latest.cpu_temp if latest and latest.cpu_temp else '—' }}{% if latest and latest.cpu_temp %}°C{% endif %}</div>
+    <div class="ms">CPU Temperature</div>
   </div>
-  <div class="metric-card">
-    <div class="metric-label">Swap</div>
-    <div class="metric-val" id="val-swap" style="color:var(--yellow)">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</div>
-    <div class="progress-bar mt-1"><div class="progress-fill yellow" id="bar-swap" style="width:{{ latest.swap_percent or 0 }}%"></div></div>
-    <div class="metric-sub" id="val-swap-detail">{{ '%.1f'%latest.swap_used_gb if latest and latest.swap_used_gb else '0' }} / {{ '%.1f'%latest.swap_total_gb if latest and latest.swap_total_gb else '0' }} GB</div>
+  <div class="mc">
+    <div class="ml">Swap</div>
+    <div class="mv" id="v-swap" style="color:var(--yellow)">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</div>
+    <div class="pb mt1"><div class="pf y" id="b-swap" style="width:{{ latest.swap_percent or 0 }}%"></div></div>
   </div>
-  <div class="metric-card">
-    <div class="metric-label">Net ↑ Upload</div>
-    <div class="metric-val" id="val-net-sent" style="color:var(--green)">—</div>
-    <div class="metric-sub">KB/s</div>
+  <div class="mc">
+    <div class="ml">Upload</div>
+    <div class="mv" id="v-sent" style="color:var(--green)">—</div>
+    <div class="ms">KB/s</div>
   </div>
-  <div class="metric-card">
-    <div class="metric-label">Net ↓ Download</div>
-    <div class="metric-val" id="val-net-recv" style="color:var(--accent)">—</div>
-    <div class="metric-sub">KB/s</div>
+  <div class="mc">
+    <div class="ml">Download</div>
+    <div class="mv" id="v-recv" style="color:var(--accent)">—</div>
+    <div class="ms">KB/s</div>
   </div>
-  <div class="metric-card">
-    <div class="metric-label">Uptime</div>
-    <div class="metric-val" id="val-uptime" style="font-size:16px;color:var(--text)">
-      {% if latest and latest.uptime_seconds %}
-        {% set u=latest.uptime_seconds|int %}
-        {{ u//86400 }}d {{ (u%86400)//3600 }}h {{ (u%3600)//60 }}m
-      {% else %}—{% endif %}
+  <div class="mc">
+    <div class="ml">Uptime</div>
+    <div class="mv" id="v-up" style="font-size:15px;color:var(--text);">
+      {% if latest and latest.uptime_seconds %}{% set u=latest.uptime_seconds|int %}{{ u//86400 }}d {{ (u%86400)//3600 }}h {{ (u%3600)//60 }}m{% else %}—{% endif %}
     </div>
-    <div class="metric-sub">System uptime</div>
+    <div class="ms">System uptime</div>
   </div>
-  <div class="metric-card">
-    <div class="metric-label">Hostname</div>
+  <div class="mc">
+    <div class="ml">Host</div>
     <div class="mono" style="font-size:12px;font-weight:600;margin-top:4px;">{{ machine.hostname or '—' }}</div>
-    <div class="metric-sub">{{ machine.public_ip or '' }}</div>
+    <div class="ms">{{ machine.public_ip or '' }}</div>
   </div>
 </div>
 
-<!-- ── Charts ── -->
-<div class="chart-grid">
-  <div class="chart-card">
-    <div class="chart-title">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      CPU & RAM %
-    </div>
-    <canvas id="chart-cpu-ram" height="130"></canvas>
-  </div>
-  <div class="chart-card">
-    <div class="chart-title">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      Network KB/s
-    </div>
-    <canvas id="chart-net" height="130"></canvas>
-  </div>
+<div class="cg">
+  <div class="cc"><div class="ct">CPU &amp; RAM %</div><canvas id="ch-cr" height="130"></canvas></div>
+  <div class="cc"><div class="ct">Network KB/s</div><canvas id="ch-net" height="130"></canvas></div>
 </div>
-<div class="chart-grid">
-  <div class="chart-card">
-    <div class="chart-title">🌡️ CPU Temperature °C</div>
-    <canvas id="chart-temp" height="110"></canvas>
-  </div>
-  <div class="chart-card">
-    <div class="chart-title">💾 Swap Usage %</div>
-    <canvas id="chart-swap" height="110"></canvas>
-  </div>
+<div class="cg">
+  <div class="cc"><div class="ct">Temperature °C</div><canvas id="ch-tmp" height="110"></canvas></div>
+  <div class="cc"><div class="ct">Swap %</div><canvas id="ch-swp" height="110"></canvas></div>
 </div>
 
-<!-- ── Disks + Processes ── -->
-<div class="chart-grid">
+<div class="cg">
   <div class="card">
-    <div class="card-title">Disk Partitions</div>
-    {% for disk in disks %}
-    <div class="disk-item">
-      <div class="disk-header">
-        <span class="mono">{{ disk.mountpoint }}</span>
-        <span class="badge badge-{% if disk.percent>85 %}offline{% elif disk.percent>60 %}warning{% else %}online{% endif %}">
-          {{ '%.1f'%disk.percent }}%
-        </span>
+    <div class="card-t">Disk Partitions</div>
+    {% for d in disks %}
+    <div class="di">
+      <div class="dh">
+        <span class="mono" style="font-size:11px;">{{ d.mountpoint }}</span>
+        <span class="badge b-{{ 'off' if d.percent>85 else ('warn' if d.percent>60 else 'on') }}">{{ '%.1f'%d.percent }}%</span>
       </div>
-      <div class="progress-bar">
-        <div class="progress-fill {% if disk.percent>85 %}red{% elif disk.percent>60 %}yellow{% else %}green{% endif %}"
-             style="width:{{ [disk.percent,100]|min }}%"></div>
-      </div>
-      <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">
-        {{ '%.1f'%(disk.used_gb) if disk.used_gb is defined else '?' }} GB used /
-        {{ '%.1f'%(disk.total_gb) if disk.total_gb is defined else '?' }} GB &bull; {{ disk.fstype or '' }}
+      <div class="pb"><div class="pf {{ 'r' if d.percent>85 else ('y' if d.percent>60 else 'g') }}" style="width:{{ [d.percent,100]|min }}%"></div></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px;">
+        {{ '%.1f'%d.used_gb if d.used_gb is defined else '?' }} / {{ '%.1f'%d.total_gb if d.total_gb is defined else '?' }} GB &bull; {{ d.fstype or '' }}
       </div>
     </div>
-    {% else %}<p class="text-muted" style="font-size:13px">No disk data.</p>{% endfor %}
+    {% else %}<p class="muted" style="font-size:13px">No disk data.</p>{% endfor %}
   </div>
-
   <div class="card">
-    <div class="card-title">Top Processes</div>
+    <div class="card-t">Top Processes</div>
     {% for p in procs %}
-    <div class="proc-row">
-      <span class="mono" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-        {{ p.get('name') or p.get('pid') or '?' }}
-      </span>
-      <span style="color:var(--text-muted);">
-        CPU {{ '%.1f'%(p.get('cpu_percent') or p.get('cpu') or 0) }}%
-        &nbsp; RAM {{ '%.1f'%(p.get('memory_percent') or p.get('mem') or p.get('memory') or 0) }}%
-      </span>
+    <div class="pr">
+      <span class="mono" style="max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ p.get('name') or p.get('pid') or '?' }}</span>
+      <span class="muted">CPU {{ '%.1f'%(p.get('cpu_percent') or p.get('cpu') or 0) }}% RAM {{ '%.1f'%(p.get('memory_percent') or p.get('mem') or p.get('memory') or 0) }}%</span>
     </div>
-    {% else %}<p class="text-muted" style="font-size:13px">No process data.</p>{% endfor %}
+    {% else %}<p class="muted" style="font-size:13px">No process data.</p>{% endfor %}
   </div>
 </div>
 
-<!-- ── GPU ── -->
-{% if gpus %}
-<div class="card mt-2">
-  <div class="card-title">GPU</div>
-  <div class="grid-2">
-    {% for gpu in gpus %}
-    <div>
-      <div style="font-weight:600;font-size:14px;">{{ gpu.name or 'GPU '~loop.index }}</div>
-      {% if gpu.memory_used_mb is defined and gpu.memory_total_mb %}
-      <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">
-        VRAM: {{ gpu.memory_used_mb }} / {{ gpu.memory_total_mb }} MB
-      </div>
-      <div class="progress-bar mt-1">
-        <div class="progress-fill blue" style="width:{{ (gpu.memory_used_mb/gpu.memory_total_mb*100)|int }}%"></div>
-      </div>
-      {% endif %}
-      {% if gpu.temperature is defined %}
-      <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">
-        Temp: {{ gpu.temperature }}°C &bull; Load: {{ gpu.load_percent or '?' }}%
-      </div>
-      {% endif %}
-    </div>
-    {% endfor %}
-  </div>
-</div>
-{% endif %}
-
-<!-- ── Machine info ── -->
-<div class="card mt-2">
-  <div class="card-title">Machine Info</div>
-  <div class="info-grid">
-    <div class="info-item"><div class="lbl">System Name</div><div class="val">{{ machine.system_name }}</div></div>
-    <div class="info-item"><div class="lbl">Location</div><div class="val">{{ machine.location }}</div></div>
-    <div class="info-item"><div class="lbl">Hostname</div><div class="val">{{ machine.hostname or '—' }}</div></div>
-    <div class="info-item"><div class="lbl">Public IP</div><div class="val">{{ machine.public_ip or '—' }}</div></div>
-    <div class="info-item"><div class="lbl">OS Type</div><div class="val">{{ machine.os_type or '—' }}</div></div>
-    <div class="info-item"><div class="lbl">OS Version</div><div class="val" style="font-size:11px;">{{ latest.os_version if latest and latest.os_version else '—' }}</div></div>
-    <div class="info-item"><div class="lbl">Table</div><div class="val">{{ machine.table_name }}</div></div>
-    <div class="info-item"><div class="lbl">Registered</div><div class="val">{{ machine.registered_at.strftime('%Y-%m-%d') if machine.registered_at else '—' }}</div></div>
+<div class="card mt2">
+  <div class="card-t">Machine Info</div>
+  <div class="ig">
+    <div class="ii"><div class="lbl">System Name</div><div class="val">{{ machine.system_name }}</div></div>
+    <div class="ii"><div class="lbl">Location</div><div class="val">{{ machine.location }}</div></div>
+    <div class="ii"><div class="lbl">Hostname</div><div class="val">{{ machine.hostname or '—' }}</div></div>
+    <div class="ii"><div class="lbl">Public IP</div><div class="val">{{ machine.public_ip or '—' }}</div></div>
+    <div class="ii"><div class="lbl">OS</div><div class="val">{{ machine.os_type or '—' }}</div></div>
+    <div class="ii"><div class="lbl">OS Version</div><div class="val" style="font-size:11px;">{{ latest.os_version if latest and latest.os_version else '—' }}</div></div>
+    <div class="ii"><div class="lbl">Table</div><div class="val">{{ machine.table_name }}</div></div>
+    <div class="ii"><div class="lbl">Registered</div><div class="val">{{ machine.registered_at.strftime('%Y-%m-%d') if machine.registered_at else '—' }}</div></div>
   </div>
 </div>
 
-<!-- ── Alert history ── -->
-<div class="card mt-2">
-  <div class="card-title">Alert History</div>
+<div class="card mt2">
+  <div class="card-t">Alert History</div>
   {% for a in alert_history %}
-  <div class="proc-row">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span class="badge badge-warning">{{ a.alert_type }}</span>
-      <span style="font-size:12px;">{{ a.subject }}</span>
-    </div>
-    <span style="font-size:11px;color:var(--text-muted);">{{ a.sent_at.strftime('%m-%d %H:%M') if a.sent_at else '—' }}</span>
+  <div class="pr">
+    <div style="display:flex;align-items:center;gap:7px;"><span class="badge b-warn">{{ a.alert_type }}</span><span style="font-size:12px;">{{ a.subject }}</span></div>
+    <span style="font-size:11px;color:var(--muted);">{{ a.sent_at.strftime('%m-%d %H:%M') if a.sent_at else '—' }}</span>
   </div>
-  {% else %}<p class="text-muted" style="font-size:13px">No alerts for this machine.</p>{% endfor %}
+  {% else %}<p class="muted" style="font-size:13px">No alerts for this machine.</p>{% endfor %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-const TABLE = "{{ machine.table_name }}";
-const MAX_POINTS = 60;
-
-// Seed data from server
-let labels   = {{ chart_labels|safe }};
-let cpuData  = {{ chart_cpu|safe }};
-let ramData  = {{ chart_ram|safe }};
-let swapData = {{ chart_swap|safe }};
-let tempData = {{ chart_temp|safe }};
-let sentData = {{ chart_net_sent|safe }};
-let recvData = {{ chart_net_recv|safe }};
-
-// Pad to MAX_POINTS
-while(labels.length < MAX_POINTS){ labels.unshift(''); cpuData.unshift(0); ramData.unshift(0); swapData.unshift(0); tempData.unshift(0); sentData.unshift(0); recvData.unshift(0); }
-
-Chart.defaults.color='#64748b';
-Chart.defaults.font.family="'JetBrains Mono',monospace";
-Chart.defaults.font.size=10;
-
-const baseOpts = (yMax) => ({
-  responsive:true, animation:false,
-  plugins:{legend:{labels:{boxWidth:8,font:{size:10}}}},
-  scales:{
-    x:{display:false},
-    y:{min:0, max:yMax||undefined, grid:{color:'rgba(37,42,58,.8)'},ticks:{font:{size:9}}}
-  }
-});
-
-const cpuRamChart = new Chart(document.getElementById('chart-cpu-ram'),{
-  type:'line',
-  data:{labels:[...labels],datasets:[
-    {label:'CPU %', data:[...cpuData], borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.07)',tension:.3,fill:true,borderWidth:2,pointRadius:0},
-    {label:'RAM %', data:[...ramData], borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.07)',tension:.3,fill:true,borderWidth:2,pointRadius:0},
-  ]},
-  options:baseOpts(100)
-});
-
-const netChart = new Chart(document.getElementById('chart-net'),{
-  type:'line',
-  data:{labels:[...labels],datasets:[
-    {label:'↑ Sent',data:[...sentData],borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.07)',tension:.3,fill:true,borderWidth:2,pointRadius:0},
-    {label:'↓ Recv',data:[...recvData],borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.07)',tension:.3,fill:true,borderWidth:2,pointRadius:0},
-  ]},
-  options:baseOpts()
-});
-
-const tempChart = new Chart(document.getElementById('chart-temp'),{
-  type:'line',
-  data:{labels:[...labels],datasets:[
-    {label:'°C',data:[...tempData],borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.08)',tension:.3,fill:true,borderWidth:2,pointRadius:0}
-  ]},
-  options:baseOpts()
-});
-
-const swapChart = new Chart(document.getElementById('chart-swap'),{
-  type:'bar',
-  data:{labels:[...labels],datasets:[
-    {label:'Swap %',data:[...swapData],backgroundColor:'rgba(124,58,237,.4)',borderRadius:2}
-  ]},
-  options:baseOpts(100)
-});
-
-function pushPoint(chart, newVals, newLabel){
-  chart.data.labels.push(newLabel||'');
-  chart.data.labels.shift();
-  newVals.forEach((v,i)=>{ chart.data.datasets[i].data.push(v); chart.data.datasets[i].data.shift(); });
-  chart.update('none');
-}
-
-function colorByPct(pct){ return pct>85?'var(--red)':pct>60?'var(--yellow)':'var(--green)'; }
-
-function setBar(id, pct){
-  const el=document.getElementById(id);
-  if(!el) return;
-  el.style.width=Math.min(pct,100)+'%';
-  el.className='progress-fill '+(pct>85?'red':pct>60?'yellow':'green');
-}
-
-async function pollLive(){
+const TABLE="{{machine.table_name}}",MAX=60;
+let L={{chart_labels|safe}},CPU={{chart_cpu|safe}},RAM={{chart_ram|safe}},SWP={{chart_swap|safe}},TMP={{chart_temp|safe}},SNT={{chart_net_sent|safe}},RCV={{chart_net_recv|safe}};
+while(L.length<MAX){L.unshift('');CPU.unshift(0);RAM.unshift(0);SWP.unshift(0);TMP.unshift(0);SNT.unshift(0);RCV.unshift(0);}
+Chart.defaults.color='#64748b';Chart.defaults.font.size=10;
+const bo=(mx)=>({responsive:true,animation:false,plugins:{legend:{labels:{boxWidth:8,font:{size:10}}}},scales:{x:{display:false},y:{min:0,max:mx||undefined,grid:{color:'rgba(37,42,58,.8)'}}}});
+const cr=new Chart(document.getElementById('ch-cr'),{type:'line',data:{labels:[...L],datasets:[{label:'CPU%',data:[...CPU],borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.07)',tension:.3,fill:true,borderWidth:2,pointRadius:0},{label:'RAM%',data:[...RAM],borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.07)',tension:.3,fill:true,borderWidth:2,pointRadius:0}]},options:bo(100)});
+const cn=new Chart(document.getElementById('ch-net'),{type:'line',data:{labels:[...L],datasets:[{label:'Up',data:[...SNT],borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.07)',tension:.3,fill:true,borderWidth:2,pointRadius:0},{label:'Dn',data:[...RCV],borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.07)',tension:.3,fill:true,borderWidth:2,pointRadius:0}]},options:bo()});
+const ct=new Chart(document.getElementById('ch-tmp'),{type:'line',data:{labels:[...L],datasets:[{label:'°C',data:[...TMP],borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.08)',tension:.3,fill:true,borderWidth:2,pointRadius:0}]},options:bo()});
+const cs=new Chart(document.getElementById('ch-swp'),{type:'bar',data:{labels:[...L],datasets:[{label:'Swap%',data:[...SWP],backgroundColor:'rgba(124,58,237,.4)',borderRadius:2}]},options:bo(100)});
+function push(ch,vals,lbl){ch.data.labels.push(lbl||new Date().toLocaleTimeString());ch.data.labels.shift();vals.forEach((v,i)=>{ch.data.datasets[i].data.push(v);ch.data.datasets[i].data.shift();});ch.update('none');}
+function clr(pct){return pct>85?'var(--red)':pct>60?'var(--yellow)':'var(--green)';}
+function bar(id,pct){var e=document.getElementById(id);if(!e)return;e.style.width=Math.min(pct,100)+'%';e.className='pf '+(pct>85?'r':pct>60?'y':'g');}
+async function poll(){
   try{
-    const r=await fetch(`/servers/${TABLE}/live`);
-    if(!r.ok) return;
+    const r=await fetch('/servers/'+TABLE+'/live');if(!r.ok)return;
     const d=await r.json();
-
-    const cpu  = d.cpu_percent||0;
-    const ram  = d.ram_percent||0;
-    const swap = d.swap_percent||0;
-    const temp = d.cpu_temp||0;
-    const sent = d.net_sent_kbs||0;
-    const recv = d.net_recv_kbs||0;
-    const now  = new Date().toLocaleTimeString();
-
-    // Update metric cards
-    document.getElementById('val-cpu').textContent  = cpu.toFixed(1)+'%';
-    document.getElementById('val-ram').textContent  = ram.toFixed(1)+'%';
-    document.getElementById('val-swap').textContent = swap.toFixed(1)+'%';
-    document.getElementById('val-temp').textContent = temp ? temp.toFixed(0)+'°C' : '—';
-    document.getElementById('val-net-sent').textContent = sent;
-    document.getElementById('val-net-recv').textContent = recv;
-
-    document.getElementById('val-cpu').style.color  = colorByPct(cpu);
-    document.getElementById('val-ram').style.color  = colorByPct(ram);
-    document.getElementById('val-temp').style.color = temp>80?'var(--red)':temp>60?'var(--yellow)':'var(--green)';
-
-    if(d.cpu_freq_mhz) document.getElementById('val-freq').textContent = Math.round(d.cpu_freq_mhz)+' MHz';
-    if(d.ram_used_gb && d.ram_total_gb)
-      document.getElementById('val-ram-detail').textContent = d.ram_used_gb.toFixed(1)+' / '+d.ram_total_gb.toFixed(1)+' GB';
-
-    if(d.uptime_seconds){
-      const u=Math.round(d.uptime_seconds);
-      document.getElementById('val-uptime').textContent =
-        `${Math.floor(u/86400)}d ${Math.floor((u%86400)/3600)}h ${Math.floor((u%3600)/60)}m`;
-    }
-
-    setBar('bar-cpu', cpu);
-    setBar('bar-ram', ram);
-    setBar('bar-swap', swap);
-
-    document.getElementById('last-seen').textContent = d.last_seen||'—';
-    document.getElementById('live-status').innerHTML =
-      `<span class="status-dot ${d.status}"></span>
-       <span class="badge badge-${d.status==='online'?'online':'offline'}">${d.status}</span>`;
-
-    // Push to charts
-    pushPoint(cpuRamChart, [cpu, ram], now);
-    pushPoint(netChart,    [sent, recv], now);
-    pushPoint(tempChart,   [temp], now);
-    pushPoint(swapChart,   [swap], now);
-
-  }catch(e){ console.error(e); }
+    const cpu=d.cpu_percent||0,ram=d.ram_percent||0,swp=d.swap_percent||0,tmp=d.cpu_temp||0,snt=d.net_sent_kbs||0,rcv=d.net_recv_kbs||0;
+    document.getElementById('v-cpu').textContent=cpu.toFixed(1)+'%';
+    document.getElementById('v-cpu').style.color=clr(cpu);
+    document.getElementById('v-ram').textContent=ram.toFixed(1)+'%';
+    document.getElementById('v-swap').textContent=swp.toFixed(1)+'%';
+    document.getElementById('v-temp').textContent=tmp?tmp.toFixed(0)+'°C':'—';
+    document.getElementById('v-temp').style.color=tmp>80?'var(--red)':tmp>60?'var(--yellow)':'var(--green)';
+    document.getElementById('v-sent').textContent=snt;
+    document.getElementById('v-recv').textContent=rcv;
+    if(d.cpu_freq_mhz)document.getElementById('v-freq').textContent=Math.round(d.cpu_freq_mhz)+' MHz';
+    if(d.ram_used_gb&&d.ram_total_gb)document.getElementById('v-ram-d').textContent=d.ram_used_gb.toFixed(1)+' / '+d.ram_total_gb.toFixed(1)+' GB';
+    if(d.uptime_seconds){var u=Math.round(d.uptime_seconds);document.getElementById('v-up').textContent=Math.floor(u/86400)+'d '+Math.floor((u%86400)/3600)+'h '+Math.floor((u%3600)/60)+'m';}
+    bar('b-cpu',cpu);bar('b-ram',ram);bar('b-swap',swp);
+    document.getElementById('last-seen').textContent=d.last_seen||'—';
+    document.getElementById('live-status').innerHTML='<span class="dot '+d.status+'"></span> <span class="badge b-'+(d.status==='online'?'on':'off')+'>'+d.status+'</span>';
+    const t=new Date().toLocaleTimeString();
+    push(cr,[cpu,ram],t);push(cn,[snt,rcv],t);push(ct,[tmp],t);push(cs,[swp],t);
+  }catch(e){console.error(e);}
 }
-
-// 2 second refresh
-setInterval(pollLive, 2000);
+setInterval(poll,2000);
 </script>
 {% endblock %}
