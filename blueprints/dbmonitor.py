@@ -86,13 +86,50 @@ def _ext_conn(row):
     )
 
 
-def _detect_time_col(columns):
-    candidates = ["observation_time", "created_at", "ts", "timestamp", "time", "updated_at"]
-    for c in candidates:
-        match = next((col for col in columns if col.lower() == c.lower()), None)
+def _detect_time_col_by_type(cur, schema, table):
+    """
+    Query information_schema for actual timestamp/timestamptz/date columns.
+    Priority: preferred names first, then any timestamp col, then any date col.
+    Returns (column_name, data_type) or (None, None).
+    """
+    cur.execute("""
+        SELECT column_name, data_type
+        FROM information_schema.columns
+        WHERE table_schema = %s
+          AND table_name   = %s
+          AND data_type IN (
+              'timestamp with time zone',
+              'timestamp without time zone',
+              'date',
+              'time with time zone',
+              'time without time zone'
+          )
+        ORDER BY ordinal_position
+    """, (schema, table))
+    rows = cur.fetchall()
+    if not rows:
+        return None, None
+
+    # Preferred name order — case-insensitive
+    preferred = [
+        "observation_time", "created_at", "inserted_at", "recorded_at",
+        "ts", "timestamp", "time", "updated_at", "date", "event_time",
+        "log_time", "report_time"
+    ]
+    col_map = {r["column_name"].lower(): r for r in rows}
+    for p in preferred:
+        if p in col_map:
+            r = col_map[p]
+            return r["column_name"], r["data_type"]
+
+    # Fall back to first timestamp col, then first date col
+    for dtype in ("timestamp with time zone", "timestamp without time zone",
+                  "date", "time with time zone", "time without time zone"):
+        match = next((r for r in rows if r["data_type"] == dtype), None)
         if match:
-            return match
-    return None
+            return match["column_name"], match["data_type"]
+
+    return None, None
 
 
 def _send_alert(watch_row, subject, body):
@@ -283,7 +320,7 @@ def watch_status(watch_id):
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute("""
-            SELECT w.*, c.host, c.port, c.dbname, c.username, c.password
+            SELECT w.*, c.host, c.port, c.dbname, c.username, c.password, c.name as conn_name
             FROM dbmon_watches w
             JOIN dbmon_connections c ON c.id = w.conn_id
             WHERE w.id=%s
@@ -302,37 +339,58 @@ def watch_status(watch_id):
         schema = watch["schema_name"]
         table  = watch["table_name"]
 
-        # Get columns
+        # Detect timestamp column by querying information_schema data types
+        # This handles mixed-case names like "Observation_Time" correctly
+        time_col, _ = _detect_time_col_by_type(cur2, schema, table)
+
+        if not time_col:
+            # Verify table exists at all
+            cur2.execute("""
+                SELECT COUNT(*) as cnt FROM information_schema.columns
+                WHERE table_schema=%s AND table_name=%s
+            """, (schema, table))
+            if cur2.fetchone()["cnt"] == 0:
+                c.close()
+                return jsonify({"error": f"Table {schema}.{table} not found"})
+
+        # Fast estimated total row count via pg_class (avoids COUNT(*) on millions of rows)
         cur2.execute("""
-            SELECT column_name FROM information_schema.columns
-            WHERE table_schema=%s AND table_name=%s
-            ORDER BY ordinal_position
+            SELECT reltuples::BIGINT as est
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = %s AND c.relname = %s
         """, (schema, table))
-        columns = [r["column_name"] for r in cur2.fetchall()]
+        est_row = cur2.fetchone()
+        total_rows = int(est_row["est"]) if est_row and est_row["est"] >= 0 else None
 
-        if not columns:
-            c.close()
-            return jsonify({"error": f"Table {schema}.{table} not found"})
-
-        time_col = _detect_time_col(columns)
-
-        # Total row count
-        cur2.execute(f'SELECT COUNT(*) as cnt FROM "{schema}"."{table}"')
-        total_rows = cur2.fetchone()["cnt"]
-
-        # Last row time + rows in last 5 min
-        last_row_time = None
+        # Last row time + rows in last 5 min + rows in last 1 min
+        last_row_time  = None
         rows_last_5min = 0
-        if time_col:
-            cur2.execute(f'SELECT MAX("{time_col}") as last_t FROM "{schema}"."{table}"')
-            r = cur2.fetchone()
-            last_row_time = r["last_t"].isoformat() if r and r["last_t"] else None
+        rows_last_1min = 0
 
-            cur2.execute(f"""
-                SELECT COUNT(*) as cnt FROM "{schema}"."{table}"
-                WHERE "{time_col}" > NOW() - INTERVAL '{DEAD_THRESHOLD_MINUTES} minutes'
-            """)
+        if time_col:
+            # Use MAX on the time column — fast with an index, OK without
+            cur2.execute(
+                f'SELECT MAX("{time_col}") as last_t FROM "{schema}"."{table}"'
+            )
+            r = cur2.fetchone()
+            if r and r["last_t"]:
+                last_row_time = r["last_t"].isoformat()
+
+            # Count rows in last 5 minutes (dead threshold)
+            cur2.execute(
+                f'SELECT COUNT(*) as cnt FROM "{schema}"."{table}" '
+                f'WHERE "{time_col}" > NOW() - INTERVAL \'{DEAD_THRESHOLD_MINUTES} minutes\''
+            )
             rows_last_5min = cur2.fetchone()["cnt"]
+
+            # Count rows in last 1 minute (rows/min rate)
+            cur2.execute(
+                f'SELECT COUNT(*) as cnt FROM "{schema}"."{table}" '
+                f'WHERE "{time_col}" > NOW() - INTERVAL \'1 minute\''
+            )
+            rows_last_1min = cur2.fetchone()["cnt"]
+
         c.close()
 
         # Determine live/dead
@@ -387,12 +445,13 @@ def watch_status(watch_id):
                         )
 
         return jsonify({
-            "monitoring":     True,
-            "is_dead":        is_dead,
-            "total_rows":     total_rows,
-            "last_row_time":  last_row_time,
-            "rows_last_5min": rows_last_5min,
-            "time_col":       time_col,
+            "monitoring":      True,
+            "is_dead":         is_dead,
+            "total_rows":      total_rows,
+            "last_row_time":   last_row_time,
+            "rows_last_5min":  rows_last_5min,
+            "rows_last_1min":  rows_last_1min,
+            "time_col":        time_col,
         })
 
     except Exception as e:
