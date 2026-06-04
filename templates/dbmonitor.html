@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+{% block title %}DB Monitor — REFORMMED{% endblock %}
+{% block page_title %}DB Monitor{% endblock %}
+{% block extra_css %}
+<style>
+.conn-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;}
+.watch-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden;}
+.watch-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);gap:10px;flex-wrap:wrap;}
+.watch-body{padding:0;}
+.watch-table{width:100%;border-collapse:collapse;font-size:12px;}
+.watch-table th{padding:8px 12px;font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);background:var(--bg3);white-space:nowrap;}
+.watch-table td{padding:8px 12px;border-bottom:1px solid rgba(37,42,58,.4);vertical-align:top;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.watch-table tr:last-child td{border-bottom:none;}
+.watch-table tr:hover td{background:rgba(255,255,255,.02);}
+.status-live{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--green);}
+.status-paused{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--yellow);}
+.status-error{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--red);}
+.row-count{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:var(--accent);}
+.tab-btn{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text-muted);transition:all .15s;font-family:inherit;}
+.tab-btn.active{background:var(--accent);color:#0d0f14;border-color:var(--accent);}
+.loading-row td{text-align:center;padding:20px;color:var(--text-muted);}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>DB Monitor</h1>
+    <p>Watch incoming data from external PostgreSQL schemas in real time</p>
+  </div>
+  {% if current_user.is_admin %}
+  <div style="display:flex;gap:8px;">
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-conn').classList.add('open')">+ Add Connection</button>
+    <button class="btn btn-primary btn-sm" onclick="document.getElementById('modal-watch').classList.add('open')">+ Watch Table</button>
+  </div>
+  {% endif %}
+</div>
+
+{% if not watches %}
+<div class="card" style="text-align:center;padding:48px">
+  <div style="font-size:32px;margin-bottom:12px;">📊</div>
+  <div style="font-weight:600;margin-bottom:6px;">No tables being watched</div>
+  <div class="text-muted" style="font-size:13px;margin-bottom:20px;">Add a connection and select a schema.table to monitor</div>
+  {% if current_user.is_admin %}
+  <button class="btn btn-primary" onclick="document.getElementById('modal-conn').classList.add('open')">Add Connection</button>
+  {% endif %}
+</div>
+{% else %}
+
+<!-- Summary bar -->
+<div class="stat-grid" style="margin-bottom:20px;">
+  <div class="sc total"><div class="sv" style="color:var(--accent)">{{ watches|length }}</div><div class="sl">Watching</div></div>
+  <div class="sc online"><div class="sv" style="color:var(--green)" id="live-count">—</div><div class="sl">Live Tables</div></div>
+  <div class="sc offline"><div class="sv" style="color:var(--yellow)" id="paused-count">{{ watches|selectattr("paused")|list|length }}</div><div class="sl">Paused</div></div>
+  <div class="sc warn"><div class="sv" style="color:var(--accent)" id="total-recent">—</div><div class="sl">Rows / min</div></div>
+</div>
+
+<!-- Watch cards -->
+{% for w in watches %}
+<div class="watch-card" id="wcard-{{ w.id }}">
+  <div class="watch-header">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div>
+        <div style="font-weight:600;font-size:14px;">{{ w.display_name or (w.schema_name ~ "." ~ w.table_name) }}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:1px;">
+          <span class="mono">{{ w.schema_name }}.{{ w.table_name }}</span>
+          &bull; {{ w.conn_name }}
+        </div>
+      </div>
+      <div id="status-{{ w.id }}">
+        {% if w.paused %}
+        <span class="status-paused"><span class="badge badge-warning">PAUSED</span></span>
+        {% else %}
+        <span class="status-live"><span class="pulse"></span> <span class="badge badge-online">LIVE</span></span>
+        {% endif %}
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);">
+        <span id="recent-{{ w.id }}" style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent);">—</span> rows/min
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+      {% if current_user.is_admin %}
+      <form method="POST" action="{{ url_for('dbmonitor.toggle_watch', watch_id=w.id) }}" style="display:inline;">
+        <button type="submit" class="btn btn-ghost btn-sm">
+          {{ '▶ Resume' if w.paused else '⏸ Pause' }}
+        </button>
+      </form>
+      <form method="POST" action="{{ url_for('dbmonitor.delete_watch', watch_id=w.id) }}" style="display:inline;"
+            onsubmit="return confirm('Remove this watch?')">
+        <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="watch-body">
+    <div id="table-{{ w.id }}" style="overflow-x:auto;">
+      <table class="watch-table">
+        <thead><tr><td colspan="20" class="loading-row" style="padding:16px;text-align:center;color:var(--text-muted);">Loading...</td></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Connections list (admin) -->
+{% if current_user.is_admin and connections %}
+<div class="card mt-2">
+  <div class="card-title">DB Connections</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Name</th><th>Host</th><th>DB</th><th>User</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for c in connections %}
+        <tr>
+          <td class="mono" style="font-weight:600;">{{ c.name }}</td>
+          <td class="mono text-muted" style="font-size:12px;">{{ c.host }}:{{ c.port }}</td>
+          <td class="mono text-muted" style="font-size:12px;">{{ c.dbname }}</td>
+          <td class="mono text-muted" style="font-size:12px;">{{ c.username }}</td>
+          <td><span id="conn-status-{{ c.id }}" class="badge badge-info">—</span></td>
+          <td style="display:flex;gap:6px;">
+            <button class="btn btn-ghost btn-sm" onclick="testConn({{ c.id }})">Test</button>
+            <form method="POST" action="{{ url_for('dbmonitor.delete_connection', conn_id=c.id) }}"
+                  onsubmit="return confirm('Delete this connection? All watches will be removed.')">
+              <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Add Connection Modal -->
+<div class="modal-backdrop" id="modal-conn">
+  <div class="modal">
+    <div class="modal-title">Add DB Connection</div>
+    <form method="POST" action="{{ url_for('dbmonitor.add_connection') }}">
+      <div class="form-group"><label>Name (label)</label><input type="text" name="name" placeholder="Production DB" required></div>
+      <div class="grid-2">
+        <div class="form-group"><label>Host / IP</label><input type="text" name="host" placeholder="db.example.com" required></div>
+        <div class="form-group"><label>Port</label><input type="number" name="port" value="5432"></div>
+      </div>
+      <div class="form-group"><label>Database Name</label><input type="text" name="dbname" placeholder="reformmed_prod_db" required></div>
+      <div class="grid-2">
+        <div class="form-group"><label>Username</label><input type="text" name="username" placeholder="edge_admin" required></div>
+        <div class="form-group"><label>Password</label><input type="password" name="password" required></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-conn').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Connection</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Watch Modal -->
+<div class="modal-backdrop" id="modal-watch">
+  <div class="modal">
+    <div class="modal-title">Watch a Table</div>
+    <form method="POST" action="{{ url_for('dbmonitor.add_watch') }}">
+      <div class="form-group">
+        <label>Connection</label>
+        <select name="conn_id" required>
+          <option value="">Select connection...</option>
+          {% for c in connections %}
+          <option value="{{ c.id }}">{{ c.name }} ({{ c.dbname }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label>Schema Name</label><input type="text" name="schema_name" placeholder="kangaroo_care" required></div>
+        <div class="form-group"><label>Table Name</label><input type="text" name="table_name" placeholder="kangaroo_care_hospital_data" required></div>
+      </div>
+      <div class="form-group"><label>Display Name (optional)</label><input type="text" name="display_name" placeholder="Kangaroo Care"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-watch').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Start Watching</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const WATCHES = {{ watches | map(attribute='id') | list | tojson }};
+const PAUSED  = {{ watches | selectattr('paused') | map(attribute='id') | list | tojson }};
+
+function fmtVal(v) {
+  if (v === null || v === undefined) return '<span style="color:var(--text-muted)">—</span>';
+  const s = String(v);
+  if (s.length > 30) return '<span title="' + s.replace(/"/g,'&quot;') + '">' + s.slice(0,30) + '…</span>';
+  return s;
+}
+
+async function loadWatch(id) {
+  if (PAUSED.includes(id)) return;
+  try {
+    const r = await fetch('/dbmonitor/watch/' + id + '/data');
+    const d = await r.json();
+
+    const recentEl = document.getElementById('recent-' + id);
+    if (d.paused) {
+      document.getElementById('status-' + id).innerHTML = '<span class="status-paused"><span class="badge badge-warning">PAUSED</span></span>';
+      return;
+    }
+    if (d.error) {
+      document.getElementById('status-' + id).innerHTML = '<span class="status-error"><span class="badge badge-offline">ERROR: ' + d.error.slice(0,40) + '</span></span>';
+      return;
+    }
+
+    if (recentEl) recentEl.textContent = d.count_recent || 0;
+
+    const container = document.getElementById('table-' + id);
+    if (!d.columns || !d.columns.length) {
+      container.innerHTML = '<p style="padding:16px;color:var(--text-muted);font-size:13px;">No data yet.</p>';
+      return;
+    }
+
+    let html = '<div style="overflow-x:auto;"><table class="watch-table"><thead><tr>';
+    d.columns.forEach(col => { html += '<th>' + col + '</th>'; });
+    html += '</tr></thead><tbody>';
+
+    if (!d.rows.length) {
+      html += '<tr><td colspan="' + d.columns.length + '" style="padding:16px;text-align:center;color:var(--text-muted);">No rows yet.</td></tr>';
+    } else {
+      d.rows.forEach(row => {
+        html += '<tr>';
+        d.columns.forEach(col => { html += '<td>' + fmtVal(row[col]) + '</td>'; });
+        html += '</tr>';
+      });
+    }
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+
+    document.getElementById('status-' + id).innerHTML =
+      '<span class="status-live"><span class="pulse"></span> <span class="badge badge-online">LIVE</span></span>';
+  } catch(e) {
+    console.error('Watch ' + id + ':', e);
+  }
+}
+
+async function testConn(id) {
+  const el = document.getElementById('conn-status-' + id);
+  el.textContent = 'Testing...';
+  el.className = 'badge badge-info';
+  const r = await fetch('/dbmonitor/connection/' + id + '/test');
+  const d = await r.json();
+  if (d.ok) {
+    el.textContent = 'Connected';
+    el.className = 'badge badge-online';
+  } else {
+    el.textContent = 'Failed: ' + (d.error || '?').slice(0,30);
+    el.className = 'badge badge-offline';
+  }
+}
+
+function updateSummary() {
+  let liveCount = 0, totalRecent = 0;
+  WATCHES.forEach(id => {
+    const el = document.getElementById('recent-' + id);
+    if (el && el.textContent !== '—') {
+      const v = parseInt(el.textContent) || 0;
+      if (v > 0) liveCount++;
+      totalRecent += v;
+    }
+  });
+  const lc = document.getElementById('live-count');
+  const tr = document.getElementById('total-recent');
+  if (lc) lc.textContent = liveCount;
+  if (tr) tr.textContent = totalRecent;
+}
+
+// Initial load + refresh every 5 seconds
+async function refreshAll() {
+  await Promise.all(WATCHES.map(id => loadWatch(id)));
+  updateSummary();
+}
+
+if (WATCHES.length) {
+  refreshAll();
+  setInterval(refreshAll, 5000);
+}
+
+// Close modals on backdrop click
+['modal-conn','modal-watch'].forEach(id => {
+  document.getElementById(id).addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('open');
+  });
+});
+</script>
+{% endblock %}
