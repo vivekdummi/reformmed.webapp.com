@@ -3,22 +3,173 @@
 {% block page_title %}DB Monitor{% endblock %}
 {% block extra_css %}
 <style>
-.conn-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;}
-.watch-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden;}
-.watch-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);gap:10px;flex-wrap:wrap;}
-.watch-body{padding:0;}
-.watch-table{width:100%;border-collapse:collapse;font-size:12px;}
-.watch-table th{padding:8px 12px;font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);background:var(--bg3);white-space:nowrap;}
-.watch-table td{padding:8px 12px;border-bottom:1px solid rgba(37,42,58,.4);vertical-align:top;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.watch-table tr:last-child td{border-bottom:none;}
-.watch-table tr:hover td{background:rgba(255,255,255,.02);}
-.status-live{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--green);}
-.status-paused{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--yellow);}
-.status-error{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--red);}
-.row-count{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:var(--accent);}
-.tab-btn{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text-muted);transition:all .15s;font-family:inherit;}
-.tab-btn.active{background:var(--accent);color:#0d0f14;border-color:var(--accent);}
-.loading-row td{text-align:center;padding:20px;color:var(--text-muted);}
+/* ── Watch card ── */
+.wcard {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.wcard.dead  { border-color: var(--red); }
+.wcard.live  { border-color: rgba(34,197,94,.35); }
+
+.wcard-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  flex-wrap: wrap;
+}
+
+/* Big status pill */
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  flex-shrink: 0;
+  min-width: 90px;
+  justify-content: center;
+}
+.status-pill.live    { background: rgba(34,197,94,.12); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+.status-pill.dead    { background: rgba(239,68,68,.12);  color: var(--red);   border: 1px solid rgba(239,68,68,.3); }
+.status-pill.paused  { background: rgba(245,158,11,.1);  color: var(--yellow);border: 1px solid rgba(245,158,11,.3);}
+.status-pill.loading { background: var(--bg3); color: var(--text-muted); border: 1px solid var(--border); }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.status-pill.live  .status-dot { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+.status-pill.dead  .status-dot { background: var(--red); }
+.status-pill.paused .status-dot { background: var(--yellow); }
+
+/* Info block */
+.wcard-info { flex: 1; min-width: 160px; }
+.wcard-name { font-weight: 600; font-size: 14px; }
+.wcard-sub  { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+
+/* Stats strip */
+.wcard-stats {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.wstat { text-align: center; }
+.wstat-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+.wstat-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; margin-top: 2px; }
+
+/* Dead time */
+.dead-since {
+  font-size: 12px;
+  color: var(--red);
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+}
+
+/* Toggle switches */
+.toggles {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.toggle-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.toggle-lbl { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; }
+.toggle-form { display: inline; }
+
+/* pill toggle button */
+.tog {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text-muted);
+  font-family: inherit;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.tog.on-monitor { background: rgba(0,212,255,.1); color: var(--accent); border-color: rgba(0,212,255,.3); }
+.tog.on-alert   { background: rgba(124,58,237,.1); color: #a78bfa;      border-color: rgba(124,58,237,.3); }
+.tog:hover { opacity: .8; }
+
+/* Remove button */
+.btn-remove {
+  background: transparent;
+  border: 1px solid rgba(239,68,68,.25);
+  color: var(--red);
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s;
+}
+.btn-remove:hover { background: rgba(239,68,68,.1); }
+
+/* Email row */
+.wcard-emails {
+  border-top: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--bg3);
+}
+.wcard-emails label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; white-space: nowrap; }
+.wcard-emails input { flex: 1; min-width: 180px; padding: 5px 10px; font-size: 12px; }
+.wcard-emails .btn-save {
+  padding: 5px 12px; font-size: 12px; font-weight: 600;
+  background: var(--accent); color: #0d0f14; border: none;
+  border-radius: 7px; cursor: pointer; font-family: inherit; transition: opacity .15s;
+}
+.wcard-emails .btn-save:hover { opacity: .85; }
+
+/* Summary bar */
+.sum-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.sum-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 18px;
+  flex: 1;
+  min-width: 120px;
+}
+.sum-val { font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700; line-height: 1; }
+.sum-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; margin-top: 2px; }
+
+/* conn table */
+.conn-row td { font-size: 12px; }
 </style>
 {% endblock %}
 
@@ -26,103 +177,149 @@
 <div class="page-header">
   <div>
     <h1>DB Monitor</h1>
-    <p>Watch incoming data from external PostgreSQL schemas in real time</p>
+    <p>Live data flow status for external PostgreSQL tables</p>
   </div>
   {% if current_user.is_admin %}
-  <div style="display:flex;gap:8px;">
-    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-conn').classList.add('open')">+ Add Connection</button>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-conn').classList.add('open')">+ Connection</button>
     <button class="btn btn-primary btn-sm" onclick="document.getElementById('modal-watch').classList.add('open')">+ Watch Table</button>
   </div>
   {% endif %}
 </div>
 
+<!-- Summary bar -->
+<div class="sum-bar">
+  <div class="sum-chip">
+    <div><div class="sum-val" style="color:var(--accent)" id="sum-total">{{ watches|length }}</div><div class="sum-lbl">Watching</div></div>
+  </div>
+  <div class="sum-chip">
+    <div><div class="sum-val" style="color:var(--green)" id="sum-live">—</div><div class="sum-lbl">Live</div></div>
+  </div>
+  <div class="sum-chip">
+    <div><div class="sum-val" style="color:var(--red)" id="sum-dead">—</div><div class="sum-lbl">Dead</div></div>
+  </div>
+  <div class="sum-chip">
+    <div><div class="sum-val" style="color:var(--yellow)" id="sum-off">{{ watches|rejectattr("monitoring")|list|length }}</div><div class="sum-lbl">Monitoring Off</div></div>
+  </div>
+</div>
+
 {% if not watches %}
-<div class="card" style="text-align:center;padding:48px">
-  <div style="font-size:32px;margin-bottom:12px;">📊</div>
+<div class="card" style="text-align:center;padding:48px;">
+  <div style="font-size:36px;margin-bottom:12px;">📡</div>
   <div style="font-weight:600;margin-bottom:6px;">No tables being watched</div>
-  <div class="text-muted" style="font-size:13px;margin-bottom:20px;">Add a connection and select a schema.table to monitor</div>
+  <div class="text-muted" style="font-size:13px;margin-bottom:20px;">Add a connection then watch a table to start monitoring</div>
   {% if current_user.is_admin %}
   <button class="btn btn-primary" onclick="document.getElementById('modal-conn').classList.add('open')">Add Connection</button>
   {% endif %}
 </div>
 {% else %}
 
-<!-- Summary bar -->
-<div class="stat-grid" style="margin-bottom:20px;">
-  <div class="sc total"><div class="sv" style="color:var(--accent)">{{ watches|length }}</div><div class="sl">Watching</div></div>
-  <div class="sc online"><div class="sv" style="color:var(--green)" id="live-count">—</div><div class="sl">Live Tables</div></div>
-  <div class="sc offline"><div class="sv" style="color:var(--yellow)" id="paused-count">{{ watches|selectattr("paused")|list|length }}</div><div class="sl">Paused</div></div>
-  <div class="sc warn"><div class="sv" style="color:var(--accent)" id="total-recent">—</div><div class="sl">Rows / min</div></div>
-</div>
-
-<!-- Watch cards -->
 {% for w in watches %}
-<div class="watch-card" id="wcard-{{ w.id }}">
-  <div class="watch-header">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-      <div>
-        <div style="font-weight:600;font-size:14px;">{{ w.display_name or (w.schema_name ~ "." ~ w.table_name) }}</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:1px;">
-          <span class="mono">{{ w.schema_name }}.{{ w.table_name }}</span>
-          &bull; {{ w.conn_name }}
-        </div>
+<div class="wcard" id="wcard-{{ w.id }}">
+  <div class="wcard-main">
+
+    <!-- Status pill -->
+    <div id="pill-{{ w.id }}" class="status-pill loading">
+      <span class="status-dot"></span>
+      <span id="pill-txt-{{ w.id }}">…</span>
+    </div>
+
+    <!-- Name + sub -->
+    <div class="wcard-info">
+      <div class="wcard-name">{{ w.display_name or (w.schema_name ~ "." ~ w.table_name) }}</div>
+      <div class="wcard-sub">{{ w.schema_name }}.{{ w.table_name }} &bull; {{ w.conn_name }}</div>
+    </div>
+
+    <!-- Stats -->
+    <div class="wcard-stats">
+      <div class="wstat">
+        <div class="wstat-val" id="stat-rows-{{ w.id }}">—</div>
+        <div class="wstat-lbl">Total Rows</div>
       </div>
-      <div id="status-{{ w.id }}">
-        {% if w.paused %}
-        <span class="status-paused"><span class="badge badge-warning">PAUSED</span></span>
-        {% else %}
-        <span class="status-live"><span class="pulse"></span> <span class="badge badge-online">LIVE</span></span>
-        {% endif %}
+      <div class="wstat">
+        <div class="wstat-val" id="stat-last-{{ w.id }}" style="font-size:11px;max-width:130px;line-height:1.3;">—</div>
+        <div class="wstat-lbl">Last Data</div>
       </div>
-      <div style="font-size:11px;color:var(--text-muted);">
-        <span id="recent-{{ w.id }}" style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent);">—</span> rows/min
+      <div class="wstat" id="stat-dead-wrap-{{ w.id }}" style="display:none;">
+        <div class="dead-since" id="stat-dead-{{ w.id }}">—</div>
+        <div class="wstat-lbl">Stopped</div>
       </div>
     </div>
-    <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+
+    <!-- Toggles + remove -->
+    <div class="toggles">
       {% if current_user.is_admin %}
-      <form method="POST" action="{{ url_for('dbmonitor.toggle_watch', watch_id=w.id) }}" style="display:inline;">
-        <button type="submit" class="btn btn-ghost btn-sm">
-          {{ '▶ Resume' if w.paused else '⏸ Pause' }}
-        </button>
-      </form>
-      <form method="POST" action="{{ url_for('dbmonitor.delete_watch', watch_id=w.id) }}" style="display:inline;"
+
+      <!-- Monitor toggle -->
+      <div class="toggle-wrap">
+        <span class="toggle-lbl">Monitor</span>
+        <form class="toggle-form" method="POST" action="{{ url_for('dbmonitor.toggle_monitoring', watch_id=w.id) }}">
+          <button type="submit" class="tog {% if w.monitoring %}on-monitor{% endif %}">
+            {% if w.monitoring %}● ON{% else %}○ OFF{% endif %}
+          </button>
+        </form>
+      </div>
+
+      <!-- Alert toggle -->
+      <div class="toggle-wrap">
+        <span class="toggle-lbl">Alert</span>
+        <form class="toggle-form" method="POST" action="{{ url_for('dbmonitor.toggle_alerts', watch_id=w.id) }}">
+          <button type="submit" class="tog {% if w.alerts_enabled %}on-alert{% endif %}">
+            {% if w.alerts_enabled %}🔔 ON{% else %}🔕 OFF{% endif %}
+          </button>
+        </form>
+      </div>
+
+      <!-- Remove -->
+      <form method="POST" action="{{ url_for('dbmonitor.delete_watch', watch_id=w.id) }}"
             onsubmit="return confirm('Remove this watch?')">
-        <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+        <button type="submit" class="btn-remove">✕</button>
       </form>
+
       {% endif %}
     </div>
+
   </div>
-  <div class="watch-body">
-    <div id="table-{{ w.id }}" style="overflow-x:auto;">
-      <table class="watch-table">
-        <thead><tr><td colspan="20" class="loading-row" style="padding:16px;text-align:center;color:var(--text-muted);">Loading...</td></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
+
+  <!-- Email config row (admin only) -->
+  {% if current_user.is_admin %}
+  <div class="wcard-emails">
+    <label>Alert emails</label>
+    <form method="POST" action="{{ url_for('dbmonitor.update_emails', watch_id=w.id) }}" style="display:flex;flex:1;gap:8px;align-items:center;flex-wrap:wrap;">
+      <input type="text" name="alert_emails"
+             value="{{ w.alert_emails or '' }}"
+             placeholder="ops@example.com, team@example.com">
+      <button type="submit" class="btn-save">Save</button>
+    </form>
+    {% if not w.alerts_enabled %}
+    <span style="font-size:11px;color:var(--yellow);">⚠ Alerts disabled for this table</span>
+    {% endif %}
   </div>
+  {% endif %}
+
 </div>
 {% endfor %}
 {% endif %}
 
 <!-- Connections list (admin) -->
 {% if current_user.is_admin and connections %}
-<div class="card mt-2">
+<div class="card mt-3">
   <div class="card-title">DB Connections</div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Name</th><th>Host</th><th>DB</th><th>User</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Name</th><th>Host</th><th>Database</th><th>User</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>
         {% for c in connections %}
-        <tr>
+        <tr class="conn-row">
           <td class="mono" style="font-weight:600;">{{ c.name }}</td>
-          <td class="mono text-muted" style="font-size:12px;">{{ c.host }}:{{ c.port }}</td>
-          <td class="mono text-muted" style="font-size:12px;">{{ c.dbname }}</td>
-          <td class="mono text-muted" style="font-size:12px;">{{ c.username }}</td>
-          <td><span id="conn-status-{{ c.id }}" class="badge badge-info">—</span></td>
+          <td class="mono text-muted">{{ c.host }}:{{ c.port }}</td>
+          <td class="mono text-muted">{{ c.dbname }}</td>
+          <td class="mono text-muted">{{ c.username }}</td>
+          <td><span id="conn-st-{{ c.id }}" class="badge badge-info">—</span></td>
           <td style="display:flex;gap:6px;">
             <button class="btn btn-ghost btn-sm" onclick="testConn({{ c.id }})">Test</button>
             <form method="POST" action="{{ url_for('dbmonitor.delete_connection', conn_id=c.id) }}"
-                  onsubmit="return confirm('Delete this connection? All watches will be removed.')">
+                  onsubmit="return confirm('Delete connection? All watches will be removed.')">
               <button type="submit" class="btn btn-danger btn-sm">Delete</button>
             </form>
           </td>
@@ -134,19 +331,20 @@
 </div>
 {% endif %}
 
-<!-- Add Connection Modal -->
+
+<!-- ── Add Connection Modal ── -->
 <div class="modal-backdrop" id="modal-conn">
   <div class="modal">
     <div class="modal-title">Add DB Connection</div>
     <form method="POST" action="{{ url_for('dbmonitor.add_connection') }}">
-      <div class="form-group"><label>Name (label)</label><input type="text" name="name" placeholder="Production DB" required></div>
+      <div class="form-group"><label>Label / Name</label><input type="text" name="name" placeholder="Production DB" required></div>
       <div class="grid-2">
         <div class="form-group"><label>Host / IP</label><input type="text" name="host" placeholder="db.example.com" required></div>
         <div class="form-group"><label>Port</label><input type="number" name="port" value="5432"></div>
       </div>
-      <div class="form-group"><label>Database Name</label><input type="text" name="dbname" placeholder="reformmed_prod_db" required></div>
+      <div class="form-group"><label>Database Name</label><input type="text" name="dbname" placeholder="mydb" required></div>
       <div class="grid-2">
-        <div class="form-group"><label>Username</label><input type="text" name="username" placeholder="edge_admin" required></div>
+        <div class="form-group"><label>Username</label><input type="text" name="username" required></div>
         <div class="form-group"><label>Password</label><input type="password" name="password" required></div>
       </div>
       <div class="modal-footer">
@@ -157,7 +355,7 @@
   </div>
 </div>
 
-<!-- Add Watch Modal -->
+<!-- ── Add Watch Modal ── -->
 <div class="modal-backdrop" id="modal-watch">
   <div class="modal">
     <div class="modal-title">Watch a Table</div>
@@ -165,17 +363,21 @@
       <div class="form-group">
         <label>Connection</label>
         <select name="conn_id" required>
-          <option value="">Select connection...</option>
+          <option value="">Select connection…</option>
           {% for c in connections %}
           <option value="{{ c.id }}">{{ c.name }} ({{ c.dbname }})</option>
           {% endfor %}
         </select>
       </div>
       <div class="grid-2">
-        <div class="form-group"><label>Schema Name</label><input type="text" name="schema_name" placeholder="kangaroo_care" required></div>
-        <div class="form-group"><label>Table Name</label><input type="text" name="table_name" placeholder="kangaroo_care_hospital_data" required></div>
+        <div class="form-group"><label>Schema</label><input type="text" name="schema_name" placeholder="public" required></div>
+        <div class="form-group"><label>Table</label><input type="text" name="table_name" placeholder="sensor_readings" required></div>
       </div>
-      <div class="form-group"><label>Display Name (optional)</label><input type="text" name="display_name" placeholder="Kangaroo Care"></div>
+      <div class="form-group"><label>Display Name (optional)</label><input type="text" name="display_name" placeholder="Sensor Readings"></div>
+      <div class="form-group">
+        <label>Alert Emails (comma-separated)</label>
+        <input type="text" name="alert_emails" placeholder="ops@example.com, team@example.com">
+      </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-watch').classList.remove('open')">Cancel</button>
         <button type="submit" class="btn btn-primary">Start Watching</button>
@@ -183,114 +385,119 @@
     </form>
   </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
-const WATCHES = {{ watches | map(attribute='id') | list | tojson }};
-const PAUSED  = {{ watches | selectattr('paused') | map(attribute='id') | list | tojson }};
+const WATCH_IDS = {{ watches | map(attribute='id') | list | tojson }};
 
-function fmtVal(v) {
-  if (v === null || v === undefined) return '<span style="color:var(--text-muted)">—</span>';
-  const s = String(v);
-  if (s.length > 30) return '<span title="' + s.replace(/"/g,'&quot;') + '">' + s.slice(0,30) + '…</span>';
-  return s;
+// Format timestamp → short human string
+function fmtTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1)  return 'Just now';
+  if (diffMin < 60) return diffMin + 'm ago';
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24)   return diffH + 'h ' + (diffMin % 60) + 'm ago';
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
 }
 
-async function loadWatch(id) {
-  if (PAUSED.includes(id)) return;
+function fmtNum(n) {
+  if (n === null || n === undefined) return '—';
+  return Number(n).toLocaleString();
+}
+
+async function loadStatus(id) {
   try {
-    const r = await fetch('/dbmonitor/watch/' + id + '/data');
+    const r = await fetch('/dbmonitor/watch/' + id + '/status');
     const d = await r.json();
 
-    const recentEl = document.getElementById('recent-' + id);
-    if (d.paused) {
-      document.getElementById('status-' + id).innerHTML = '<span class="status-paused"><span class="badge badge-warning">PAUSED</span></span>';
-      return;
-    }
+    const card  = document.getElementById('wcard-' + id);
+    const pill  = document.getElementById('pill-' + id);
+    const ptxt  = document.getElementById('pill-txt-' + id);
+
     if (d.error) {
-      document.getElementById('status-' + id).innerHTML = '<span class="status-error"><span class="badge badge-offline">ERROR: ' + d.error.slice(0,40) + '</span></span>';
+      pill.className = 'status-pill dead';
+      ptxt.textContent = 'ERROR';
+      if (card) card.className = 'wcard dead';
+      document.getElementById('stat-last-' + id).textContent = d.error.slice(0, 40);
       return;
     }
 
-    if (recentEl) recentEl.textContent = d.count_recent || 0;
-
-    const container = document.getElementById('table-' + id);
-    if (!d.columns || !d.columns.length) {
-      container.innerHTML = '<p style="padding:16px;color:var(--text-muted);font-size:13px;">No data yet.</p>';
+    if (!d.monitoring) {
+      pill.className = 'status-pill paused';
+      ptxt.textContent = 'OFF';
+      if (card) card.className = 'wcard';
+      document.getElementById('stat-rows-' + id).textContent = '—';
+      document.getElementById('stat-last-' + id).textContent = 'Monitoring disabled';
+      document.getElementById('stat-dead-wrap-' + id).style.display = 'none';
       return;
     }
 
-    let html = '<div style="overflow-x:auto;"><table class="watch-table"><thead><tr>';
-    d.columns.forEach(col => { html += '<th>' + col + '</th>'; });
-    html += '</tr></thead><tbody>';
-
-    if (!d.rows.length) {
-      html += '<tr><td colspan="' + d.columns.length + '" style="padding:16px;text-align:center;color:var(--text-muted);">No rows yet.</td></tr>';
+    // Live vs Dead
+    if (d.is_dead) {
+      pill.className = 'status-pill dead';
+      ptxt.textContent = 'DEAD';
+      if (card) card.className = 'wcard dead';
+      document.getElementById('stat-dead-wrap-' + id).style.display = '';
+      document.getElementById('stat-dead-' + id).textContent = fmtTime(d.last_row_time);
     } else {
-      d.rows.forEach(row => {
-        html += '<tr>';
-        d.columns.forEach(col => { html += '<td>' + fmtVal(row[col]) + '</td>'; });
-        html += '</tr>';
-      });
+      pill.className = 'status-pill live';
+      ptxt.textContent = 'LIVE';
+      if (card) card.className = 'wcard live';
+      document.getElementById('stat-dead-wrap-' + id).style.display = 'none';
     }
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
 
-    document.getElementById('status-' + id).innerHTML =
-      '<span class="status-live"><span class="pulse"></span> <span class="badge badge-online">LIVE</span></span>';
+    document.getElementById('stat-rows-' + id).textContent = fmtNum(d.total_rows);
+    document.getElementById('stat-last-' + id).textContent = fmtTime(d.last_row_time);
+
   } catch(e) {
-    console.error('Watch ' + id + ':', e);
+    console.error('status fetch failed for watch', id, e);
   }
+}
+
+async function refreshAll() {
+  await Promise.all(WATCH_IDS.map(id => loadStatus(id)));
+
+  // Update summary
+  let live = 0, dead = 0;
+  WATCH_IDS.forEach(id => {
+    const pill = document.getElementById('pill-' + id);
+    if (!pill) return;
+    if (pill.classList.contains('live')) live++;
+    if (pill.classList.contains('dead')) dead++;
+  });
+  const sl = document.getElementById('sum-live');
+  const sd = document.getElementById('sum-dead');
+  if (sl) sl.textContent = live;
+  if (sd) sd.textContent = dead;
 }
 
 async function testConn(id) {
-  const el = document.getElementById('conn-status-' + id);
-  el.textContent = 'Testing...';
+  const el = document.getElementById('conn-st-' + id);
+  el.textContent = 'Testing…';
   el.className = 'badge badge-info';
   const r = await fetch('/dbmonitor/connection/' + id + '/test');
   const d = await r.json();
-  if (d.ok) {
-    el.textContent = 'Connected';
-    el.className = 'badge badge-online';
-  } else {
-    el.textContent = 'Failed: ' + (d.error || '?').slice(0,30);
-    el.className = 'badge badge-offline';
-  }
-}
-
-function updateSummary() {
-  let liveCount = 0, totalRecent = 0;
-  WATCHES.forEach(id => {
-    const el = document.getElementById('recent-' + id);
-    if (el && el.textContent !== '—') {
-      const v = parseInt(el.textContent) || 0;
-      if (v > 0) liveCount++;
-      totalRecent += v;
-    }
-  });
-  const lc = document.getElementById('live-count');
-  const tr = document.getElementById('total-recent');
-  if (lc) lc.textContent = liveCount;
-  if (tr) tr.textContent = totalRecent;
-}
-
-// Initial load + refresh every 5 seconds
-async function refreshAll() {
-  await Promise.all(WATCHES.map(id => loadWatch(id)));
-  updateSummary();
-}
-
-if (WATCHES.length) {
-  refreshAll();
-  setInterval(refreshAll, 5000);
+  el.textContent = d.ok ? 'OK' : ('✕ ' + (d.error || '?').slice(0, 28));
+  el.className   = d.ok ? 'badge badge-online' : 'badge badge-offline';
 }
 
 // Close modals on backdrop click
 ['modal-conn','modal-watch'].forEach(id => {
-  document.getElementById(id).addEventListener('click', function(e) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('click', function(e) {
     if (e.target === this) this.classList.remove('open');
   });
 });
+
+if (WATCH_IDS.length) {
+  refreshAll();
+  setInterval(refreshAll, 10000);  // poll every 10s
+}
 </script>
 {% endblock %}
