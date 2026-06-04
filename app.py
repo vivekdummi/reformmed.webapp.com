@@ -22,6 +22,8 @@ def create_app():
 
     # ── Init DB ──────────────────────────────────────────────────────────────
     init_db()
+    from blueprints.dbmonitor import init_dbmonitor_tables
+    init_dbmonitor_tables()
 
     # ── Flask-Login ──────────────────────────────────────────────────────────
     login_manager.init_app(app)
@@ -39,6 +41,7 @@ def create_app():
     from blueprints.users import users_bp
     from blueprints.alerts import alerts_bp
     from blueprints.api import api_bp
+    from blueprints.dbmonitor import dbmonitor_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(home_bp)
@@ -46,6 +49,7 @@ def create_app():
     app.register_blueprint(users_bp)
     app.register_blueprint(alerts_bp)
     app.register_blueprint(api_bp)
+    app.register_blueprint(dbmonitor_bp)
 
     return app
 
