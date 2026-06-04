@@ -237,8 +237,12 @@
         <div class="wstat-lbl">Total Rows</div>
       </div>
       <div class="wstat">
-        <div class="wstat-val" id="stat-last-{{ w.id }}" style="font-size:11px;max-width:130px;line-height:1.3;">—</div>
-        <div class="wstat-lbl">Last Data</div>
+        <div class="wstat-val" id="stat-rpm-{{ w.id }}" style="color:var(--green)">—</div>
+        <div class="wstat-lbl">Rows / min</div>
+      </div>
+      <div class="wstat">
+        <div class="wstat-val" id="stat-last-{{ w.id }}" style="font-size:11px;max-width:150px;line-height:1.4;">—</div>
+        <div class="wstat-lbl">Last Row</div>
       </div>
       <div class="wstat" id="stat-dead-wrap-{{ w.id }}" style="display:none;">
         <div class="dead-since" id="stat-dead-{{ w.id }}">—</div>
@@ -392,18 +396,23 @@
 <script>
 const WATCH_IDS = {{ watches | map(attribute='id') | list | tojson }};
 
-// Format timestamp → short human string
+// Format timestamp → precise human string showing exact time
 function fmtTime(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
   const now = new Date();
   const diffMs = now - d;
   const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1)  return 'Just now';
-  if (diffMin < 60) return diffMin + 'm ago';
+
+  // Show exact time always, plus relative duration
+  const timeStr = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  const dateStr = d.toLocaleDateString([], {day:'2-digit', month:'short'});
+
+  if (diffMin < 1)   return timeStr + ' (just now)';
+  if (diffMin < 60)  return timeStr + ' (' + diffMin + 'm ago)';
   const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24)   return diffH + 'h ' + (diffMin % 60) + 'm ago';
-  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  if (diffH  < 24)   return dateStr + ' ' + timeStr + ' (' + diffH + 'h ago)';
+  return dateStr + ' ' + timeStr;
 }
 
 function fmtNum(n) {
@@ -434,6 +443,8 @@ async function loadStatus(id) {
       if (card) card.className = 'wcard';
       document.getElementById('stat-rows-' + id).textContent = '—';
       document.getElementById('stat-last-' + id).textContent = 'Monitoring disabled';
+      const rpmEl2 = document.getElementById('stat-rpm-' + id);
+      if (rpmEl2) rpmEl2.textContent = '—';
       document.getElementById('stat-dead-wrap-' + id).style.display = 'none';
       return;
     }
@@ -454,6 +465,12 @@ async function loadStatus(id) {
 
     document.getElementById('stat-rows-' + id).textContent = fmtNum(d.total_rows);
     document.getElementById('stat-last-' + id).textContent = fmtTime(d.last_row_time);
+
+    const rpmEl = document.getElementById('stat-rpm-' + id);
+    if (rpmEl) {
+      rpmEl.textContent = d.rows_last_1min !== undefined ? fmtNum(d.rows_last_1min) : '—';
+      rpmEl.style.color = d.rows_last_1min > 0 ? 'var(--green)' : 'var(--text-muted)';
+    }
 
   } catch(e) {
     console.error('status fetch failed for watch', id, e);
