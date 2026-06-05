@@ -201,6 +201,9 @@
     <a href="{{ url_for('alerts.index') }}" class="nav-item {% if 'alerts' in request.endpoint %}active{% endif %}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>Alerts
     </a>
+    <a href="{{ url_for('dvr.index') }}" class="nav-item {% if 'dvr' in request.endpoint %}active{% endif %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3l-4 4-4-4"/><circle cx="12" cy="14" r="3"/></svg>DVRs
+    </a>
 
     {% if current_user.is_admin %}
     <div class="nav-section" style="margin-top:6px;">Admin</div>
