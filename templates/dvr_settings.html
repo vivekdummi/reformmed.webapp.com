@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}DVR Settings — REFORMMED{% endblock %}
+{% block page_title %}DVR Settings{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>DVR Settings</h1><p>Configure ping interval and alert emails</p></div>
+  <a href="{{ url_for('dvr.index') }}" class="btn btn-g btn-sm">← Back</a>
+</div>
+<div class="card" style="max-width:500px;">
+  <form method="POST">
+    <div class="fg">
+      <label>Ping Interval (seconds)</label>
+      <input type="number" name="ping_interval_sec" value="{{ settings.ping_interval_sec }}" min="5" max="3600" required>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">How often to check each DVR. Default: 30s</div>
+    </div>
+    <hr class="div">
+    <div class="fg">
+      <label>Alerts Enabled</label>
+      <select name="alerts_enabled">
+        <option value="1" {% if settings.alerts_enabled=="1" %}selected{% endif %}>Yes — send email alerts</option>
+        <option value="0" {% if settings.alerts_enabled!="1" %}selected{% endif %}>No — disable all DVR alerts</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Alert Email Recipients</label>
+      <input type="text" name="alert_emails" value="{{ settings.alert_emails }}" placeholder="admin@company.com, ops@company.com">
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Comma-separated. Leave blank to use ALERT_TO from .env</div>
+    </div>
+    <button type="submit" class="btn btn-p mt2">Save Settings</button>
+  </form>
+</div>
+{% endblock %}

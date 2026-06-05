@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}{{ hosp.name }} — DVR Monitor{% endblock %}
+{% block page_title %}{{ hosp.name }}{% endblock %}
+{% block extra_css %}
+<style>
+.dvr-row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(37,42,58,.5);gap:10px;flex-wrap:wrap;}
+.dvr-row:last-child{border-bottom:none;}
+.dvr-name{font-weight:600;font-size:14px;}
+.dvr-ip{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);}
+.dvr-status{display:flex;align-items:center;gap:6px;min-width:90px;}
+.dvr-time{font-size:11px;color:var(--muted);}
+.loc-section{background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden;}
+.loc-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg3);border-bottom:1px solid var(--border);}
+.loc-title{font-weight:600;font-size:14px;}
+.pinging{animation:blink 1s infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <a href="{{ url_for('dvr.index') }}" class="btn btn-g btn-sm">← Back</a>
+    <div>
+      <h1>{{ hosp.name }}</h1>
+      <p>{{ locations|length }} location(s) &bull; {{ devices|length }} DVR(s)</p>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <div class="live-b"><span class="pulse"></span> <span id="ping-status" style="font-size:11px;color:var(--muted);">Pinging...</span></div>
+    {% if current_user.is_admin %}
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('m-add-loc').classList.add('open')">+ Add Location</button>
+    <form method="POST" action="{{ url_for('dvr.delete_hospital', hid=hosp.id) }}"
+          onsubmit="return confirm('Delete hospital and all DVRs?')">
+      <button type="submit" class="btn btn-d btn-sm">Delete Hospital</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Summary cards -->
+<div class="stat-grid">
+  <div class="sc total"><div class="sv" style="color:var(--accent)">{{ devices|length }}</div><div class="sl">Total DVRs</div></div>
+  <div class="sc online"><div class="sv" style="color:var(--green)" id="h-online">{{ devices|selectattr("status","equalto","online")|list|length }}</div><div class="sl">Online</div></div>
+  <div class="sc offline"><div class="sv" style="color:var(--red)" id="h-offline">{{ devices|selectattr("status","equalto","offline")|list|length }}</div><div class="sl">Offline</div></div>
+  <div class="sc warn"><div class="sv" style="color:var(--yellow)">{{ locations|length }}</div><div class="sl">Locations</div></div>
+</div>
+
+{% for loc in locations %}
+<div class="loc-section">
+  <div class="loc-header">
+    <div>
+      <div class="loc-title">{{ loc.name }}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;">
+        <span id="loc-on-{{ loc.id }}" style="color:var(--green);">{{ loc.dvr_online or 0 }}</span> online &bull;
+        <span id="loc-off-{{ loc.id }}" style="color:var(--red);">{{ loc.dvr_offline or 0 }}</span> offline
+      </div>
+    </div>
+    {% if current_user.is_admin %}
+    <div style="display:flex;gap:6px;">
+      <button class="btn btn-g btn-sm" onclick="showAddDvr({{ loc.id }})">+ Add DVR</button>
+      <form method="POST" action="{{ url_for('dvr.delete_location', lid=loc.id) }}"
+            onsubmit="return confirm('Delete location and all DVRs?')">
+        <button type="submit" class="btn btn-d btn-sm">Delete</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+
+  {% set loc_devices = devices|selectattr("location_id","equalto",loc.id)|list %}
+  {% if not loc_devices %}
+  <div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">No DVRs yet.</div>
+  {% else %}
+  {% for d in loc_devices %}
+  <div class="dvr-row" id="dvr-row-{{ d.id }}">
+    <div>
+      <div class="dvr-name">{{ d.name }}</div>
+      <div class="dvr-ip">{{ d.ip }}:{{ d.port }}</div>
+    </div>
+    <div class="dvr-status" id="dvr-status-{{ d.id }}">
+      {% if d.status == "online" %}
+        <span class="dot online"></span><span class="badge b-on">ONLINE</span>
+      {% elif d.status == "offline" %}
+        <span class="dot offline"></span><span class="badge b-off">OFFLINE</span>
+      {% else %}
+        <span class="badge b-info">CHECKING</span>
+      {% endif %}
+    </div>
+    <div>
+      <div class="dvr-time" id="dvr-seen-{{ d.id }}">
+        {% if d.status == "online" and d.last_seen %}Last seen: {{ d.last_seen.strftime('%H:%M:%S') }}
+        {% elif d.status == "offline" and d.went_offline %}Offline since: {{ d.went_offline.strftime('%Y-%m-%d %H:%M') }}
+        {% else %}—{% endif %}
+      </div>
+    </div>
+    {% if current_user.is_admin %}
+    <form method="POST" action="{{ url_for('dvr.delete_dvr', did=d.id) }}"
+          onsubmit="return confirm('Remove this DVR?')">
+      <button type="submit" class="btn btn-d btn-sm">Remove</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:40px;">
+  <div style="font-size:32px;margin-bottom:10px;">📍</div>
+  <div style="font-weight:600;margin-bottom:6px;">No locations yet</div>
+  {% if current_user.is_admin %}
+  <button class="btn btn-p mt2" onclick="document.getElementById('m-add-loc').classList.add('open')">Add Location</button>
+  {% endif %}
+</div>
+{% endfor %}
+
+<!-- Add Location Modal -->
+<div class="modal-backdrop" id="m-add-loc">
+  <div class="modal">
+    <div class="modal-title">Add Location</div>
+    <form method="POST" action="{{ url_for('dvr.add_location', hid=hosp.id) }}">
+      <div class="fg"><label>Location Name</label><input type="text" name="name" placeholder="Ground Floor" required autofocus></div>
+      <div class="mo-f">
+        <button type="button" class="btn btn-g" onclick="document.getElementById('m-add-loc').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-p">Add</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add DVR Modal -->
+<div class="modal-backdrop" id="m-add-dvr">
+  <div class="modal">
+    <div class="modal-title">Add DVR</div>
+    <form method="POST" id="add-dvr-form">
+      <div class="fg"><label>DVR Name</label><input type="text" name="name" placeholder="DVR-01" required></div>
+      <div class="g2">
+        <div class="fg"><label>IP Address</label><input type="text" name="ip" placeholder="192.168.1.100" required></div>
+        <div class="fg"><label>Port</label><input type="number" name="port" value="80" required></div>
+      </div>
+      <div class="mo-f">
+        <button type="button" class="btn btn-g" onclick="document.getElementById('m-add-dvr').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-p">Add DVR</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Build device list
+const DEVICES = [{% for d in devices %}{{d.id}},{% endfor %}];
+let pingInterval = 30000;
+let pingCount = 0;
+
+function showAddDvr(locId) {
+  const form = document.getElementById('add-dvr-form');
+  form.action = '/dvr/location/' + locId + '/dvr/add';
+  document.getElementById('m-add-dvr').classList.add('open');
+}
+
+function timeSince(isoStr) {
+  if (!isoStr) return '—';
+  const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+  if (diff < 60) return diff + 's ago';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  return Math.floor(diff/3600) + 'h ago';
+}
+
+async function pingDevice(id) {
+  try {
+    const r = await fetch('/dvr/dvr/' + id + '/ping');
+    const d = await r.json();
+    if (d.error) return;
+
+    const statusEl = document.getElementById('dvr-status-' + id);
+    const seenEl   = document.getElementById('dvr-seen-' + id);
+    const rowEl    = document.getElementById('dvr-row-' + id);
+
+    if (d.status === 'online') {
+      statusEl.innerHTML = '<span class="dot online"></span><span class="badge b-on">ONLINE</span>';
+      seenEl.textContent = 'Last seen: ' + new Date(d.last_seen).toLocaleTimeString();
+      rowEl.style.background = '';
+    } else {
+      statusEl.innerHTML = '<span class="dot offline"></span><span class="badge b-off">OFFLINE</span>';
+      seenEl.textContent = d.went_offline ? 'Offline since: ' + new Date(d.went_offline).toLocaleString() : 'Offline';
+      rowEl.style.background = 'rgba(239,68,68,.04)';
+    }
+  } catch(e) { console.error('Ping ' + id, e); }
+}
+
+async function pingAll() {
+  document.getElementById('ping-status').textContent = 'Pinging...';
+  await Promise.all(DEVICES.map(pingDevice));
+  pingCount++;
+
+  // Update summary counts
+  let online=0, offline=0;
+  DEVICES.forEach(id => {
+    const el = document.getElementById('dvr-status-' + id);
+    if (el && el.innerHTML.includes('b-on')) online++;
+    else if (el && el.innerHTML.includes('b-off')) offline++;
+  });
+  document.getElementById('h-online').textContent = online;
+  document.getElementById('h-offline').textContent = offline;
+  document.getElementById('ping-status').textContent = 'Last checked: ' + new Date().toLocaleTimeString();
+}
+
+// Get ping interval from server then start
+fetch('/dvr/ping/all').then(r=>r.json()).then(d=>{
+  pingInterval = (d.interval || 30) * 1000;
+  if (DEVICES.length) {
+    pingAll();
+    setInterval(pingAll, pingInterval);
+  }
+});
+
+['m-add-loc','m-add-dvr','m-add-hosp'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('click', function(e){ if(e.target===this)this.classList.remove('open'); });
+});
+</script>
+{% endblock %}
