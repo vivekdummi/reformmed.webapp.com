@@ -1,74 +1,66 @@
 {% extends "base.html" %}
 {% block title %}DVR Monitor — REFORMMED{% endblock %}
 {% block page_title %}DVR Monitor{% endblock %}
-{% block extra_css %}
-<style>
-.hosp-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;cursor:pointer;transition:border-color .15s;text-decoration:none;display:block;}
-.hosp-card:hover{border-color:var(--accent);}
-.hosp-name{font-size:16px;font-weight:700;margin-bottom:8px;color:var(--text);}
-.dvr-bar{display:flex;gap:8px;align-items:center;margin-top:10px;}
-.dvr-stat{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;}
-.mini-bar{height:4px;border-radius:99px;background:var(--bg3);overflow:hidden;margin-top:6px;}
-.mini-fill{height:100%;border-radius:99px;}
-</style>
-{% endblock %}
 {% block content %}
 <div class="page-header">
   <div><h1>DVR Monitor</h1><p>Hospital-wise DVR online/offline status</p></div>
   <div style="display:flex;gap:8px;">
     {% if current_user.is_admin %}
     <a href="{{ url_for('dvr.settings') }}" class="btn btn-ghost btn-sm">⚙ Settings</a>
-    <button class="btn btn-primary btn-sm" onclick="document.getElementById('m-add-hosp').classList.add('open')">+ Add Hospital</button>
+    <button class="btn btn-primary btn-sm" onclick="document.getElementById('m-hosp').classList.add('open')">+ Add Hospital</button>
     {% endif %}
   </div>
 </div>
 
-<!-- Overall summary -->
 <div class="stat-grid">
-  <div class="sc total"><div class="sv" style="color:var(--accent)">{{ summary.total or 0 }}</div><div class="sl">Total DVRs</div></div>
-  <div class="sc online"><div class="sv" style="color:var(--green)" id="g-online">{{ summary.online or 0 }}</div><div class="sl">Online</div></div>
-  <div class="sc offline"><div class="sv" style="color:var(--red)" id="g-offline">{{ summary.offline or 0 }}</div><div class="sl">Offline</div></div>
-  <div class="sc warn"><div class="sv" style="color:var(--yellow)">{{ hospitals|length }}</div><div class="sl">Hospitals</div></div>
+  <div class="stat-card total"><div class="stat-value" style="color:var(--accent)">{{ summary.total or 0 }}</div><div class="stat-label">Total DVRs</div></div>
+  <div class="stat-card online"><div class="stat-value" style="color:var(--green)">{{ summary.online or 0 }}</div><div class="stat-label">Online</div></div>
+  <div class="stat-card offline"><div class="stat-value" style="color:var(--red)">{{ summary.offline or 0 }}</div><div class="stat-label">Offline</div></div>
+  <div class="stat-card warning"><div class="stat-value" style="color:var(--yellow)">{{ hospitals|length }}</div><div class="stat-label">Hospitals</div></div>
 </div>
 
 {% if not hospitals %}
 <div class="card" style="text-align:center;padding:48px;">
   <div style="font-size:40px;margin-bottom:12px;">📹</div>
   <div style="font-weight:600;font-size:16px;margin-bottom:6px;">No hospitals yet</div>
-  <div class="muted" style="font-size:13px;margin-bottom:20px;">Create a hospital to start monitoring DVRs</div>
+  <p class="text-muted" style="font-size:13px;margin-bottom:20px;">Create a hospital to start monitoring DVRs</p>
   {% if current_user.is_admin %}
-  <button class="btn btn-primary" onclick="document.getElementById('m-add-hosp').classList.add('open')">+ Add Hospital</button>
+  <button class="btn btn-primary" onclick="document.getElementById('m-hosp').classList.add('open')">+ Add Hospital</button>
   {% endif %}
 </div>
 {% else %}
-<div class="g3">
+<div class="grid-3">
   {% for h in hospitals %}
-  <a href="{{ url_for('dvr.hospital', hid=h.id) }}" class="hosp-card">
-    <div class="hosp-name">{{ h.name }}</div>
-    <div style="font-size:12px;color:var(--muted);">{{ h.loc_count }} location{{ 's' if h.loc_count!=1 else '' }} &bull; {{ h.dvr_total or 0 }} DVRs</div>
-    <div class="dvr-bar">
-      <span style="font-size:12px;color:var(--green);">● {{ h.dvr_online or 0 }} online</span>
-      <span style="font-size:12px;color:var(--red);">● {{ h.dvr_offline or 0 }} offline</span>
+  <a href="{{ url_for('dvr.hospital', hid=h.id) }}" style="text-decoration:none;">
+    <div class="card" style="cursor:pointer;transition:border-color .15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="font-size:16px;font-weight:700;margin-bottom:6px;color:var(--text);">{{ h.name }}</div>
+      <div class="text-muted" style="font-size:12px;margin-bottom:10px;">{{ h.loc_count }} location{{ 's' if h.loc_count!=1 else '' }} &bull; {{ h.dvr_total or 0 }} DVRs</div>
+      <div style="display:flex;gap:12px;margin-bottom:8px;">
+        <span style="font-size:13px;color:var(--green);">● {{ h.dvr_online or 0 }} online</span>
+        <span style="font-size:13px;color:var(--red);">● {{ h.dvr_offline or 0 }} offline</span>
+      </div>
+      {% if h.dvr_total %}
+      <div class="progress-bar">
+        <div class="progress-fill green" style="width:{{ ((h.dvr_online or 0)/(h.dvr_total)*100)|int }}%"></div>
+      </div>
+      {% endif %}
     </div>
-    {% if h.dvr_total %}
-    <div class="mini-bar">
-      <div class="mini-fill" style="width:{{ ((h.dvr_online or 0)/(h.dvr_total)*100)|int }}%;background:var(--green);"></div>
-    </div>
-    {% endif %}
   </a>
   {% endfor %}
 </div>
 {% endif %}
 
-<!-- Add Hospital Modal -->
-<div class="modal-backdrop" id="m-add-hosp">
+<div class="modal-backdrop" id="m-hosp">
   <div class="modal">
     <div class="modal-title">Add Hospital</div>
     <form method="POST" action="{{ url_for('dvr.add_hospital') }}">
-      <div class="fg"><label>Hospital Name</label><input type="text" name="name" placeholder="Kangaroo Care Bangalore" required autofocus></div>
-      <div class="mo-f">
-        <button type="button" class="btn btn-g" onclick="document.getElementById('m-add-hosp').classList.remove('open')">Cancel</button>
-        <button type="submit" class="btn btn-p">Create Hospital</button>
+      <div class="form-group">
+        <label>Hospital Name</label>
+        <input type="text" name="name" placeholder="Kangaroo Care Bangalore" required autofocus>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('m-hosp').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create</button>
       </div>
     </form>
   </div>
@@ -76,6 +68,6 @@
 {% endblock %}
 {% block extra_js %}
 <script>
-document.getElementById('m-add-hosp').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+document.getElementById('m-hosp').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
 </script>
 {% endblock %}
