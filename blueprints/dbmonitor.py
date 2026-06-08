@@ -133,29 +133,39 @@ def _detect_time_col_by_type(cur, schema, table):
 
 
 def _send_alert(watch_row, subject, body):
-    """Send alert email via SMTP env vars. Silently skips if not configured."""
+    """Send alert email and log to unified alert_log."""
     emails = [e.strip() for e in (watch_row.get("alert_emails") or "").split(",") if e.strip()]
-    if not emails:
-        return
-    smtp_host = os.getenv("SMTP_HOST", "")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER", "")
-    smtp_pass = os.getenv("SMTP_PASS", "")
-    from_addr = os.getenv("ALERT_FROM", smtp_user)
-    if not smtp_host:
-        return
+    ok = False
+    if emails:
+        smtp_host = os.getenv("SMTP_HOST", "")
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        smtp_user = os.getenv("SMTP_USER", "")
+        smtp_pass = os.getenv("SMTP_PASS", "")
+        from_addr = os.getenv("ALERT_FROM", smtp_user)
+        if smtp_host:
+            try:
+                msg = MIMEText(body, "plain")
+                msg["Subject"] = subject
+                msg["From"]    = from_addr
+                msg["To"]      = ", ".join(emails)
+                with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as s:
+                    s.starttls()
+                    if smtp_user:
+                        s.login(smtp_user, smtp_pass)
+                    s.sendmail(from_addr, emails, msg.as_string())
+                ok = True
+            except Exception as e:
+                print(f"[dbmonitor] alert email failed: {e}")
+    # Log to unified alert_log
+    machine_key = f"{watch_row.get('schema_name','')}.{watch_row.get('table_name','')}"
     try:
-        msg = MIMEText(body, "plain")
-        msg["Subject"] = subject
-        msg["From"]    = from_addr
-        msg["To"]      = ", ".join(emails)
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as s:
-            s.starttls()
-            if smtp_user:
-                s.login(smtp_user, smtp_pass)
-            s.sendmail(from_addr, emails, msg.as_string())
+        with get_db() as conn:
+            conn.cursor().execute("""
+                INSERT INTO alert_log (alert_type, source, machine_key, subject, body, success)
+                VALUES ('db_dead', 'dbmonitor', %s, %s, %s, %s)
+            """, (machine_key, subject, body, ok))
     except Exception as e:
-        print(f"[dbmonitor] alert email failed: {e}")
+        print(f"[dbmonitor] alert_log write failed: {e}")
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────

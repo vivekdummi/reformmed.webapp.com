@@ -6,31 +6,27 @@
 <div class="page-header">
   <div>
     <h1>Infrastructure Overview</h1>
-    <p>Real-time status of all registered machines</p>
+    <p>Real-time status — auto-refreshing data every <span id="refresh-interval">2</span>s</p>
   </div>
 </div>
 
-<!-- Stat cards -->
+<!-- Stat cards — updated via JS partial refresh -->
 <div class="stat-grid">
   <div class="stat-card total">
-    <div class="stat-value" style="color:var(--accent)">{{ total }}</div>
+    <div class="stat-value" style="color:var(--accent)" id="stat-total">{{ total }}</div>
     <div class="stat-label">Total Machines</div>
-    <div class="stat-icon">🖥️</div>
   </div>
   <div class="stat-card online">
-    <div class="stat-value" style="color:var(--green)">{{ online }}</div>
+    <div class="stat-value" style="color:var(--green)" id="stat-online">{{ online }}</div>
     <div class="stat-label">Online</div>
-    <div class="stat-icon">🟢</div>
   </div>
   <div class="stat-card offline">
-    <div class="stat-value" style="color:var(--red)">{{ offline }}</div>
+    <div class="stat-value" style="color:var(--red)" id="stat-offline">{{ offline }}</div>
     <div class="stat-label">Offline</div>
-    <div class="stat-icon">🔴</div>
   </div>
   <div class="stat-card warning">
-    <div class="stat-value" style="color:var(--yellow)" id="alert-count">—</div>
+    <div class="stat-value" style="color:var(--yellow)" id="stat-alerts">—</div>
     <div class="stat-label">Alerts Today</div>
-    <div class="stat-icon">🔔</div>
   </div>
 </div>
 
@@ -42,39 +38,32 @@
       <thead>
         <tr>
           <th>Machine</th>
-          <th>Location</th>
+          <th class="hide-mobile">Location</th>
           <th>Status</th>
-          <th>Hostname</th>
-          <th>IP</th>
+          <th class="hide-mobile">Hostname</th>
+          <th class="hide-mobile">IP</th>
           <th>Last Seen</th>
           <th></th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="machines-tbody">
         {% for m in recent %}
         <tr>
-          <td><span class="mono">{{ m.system_name }}</span></td>
-          <td class="text-muted">{{ m.location }}</td>
+          <td><span class="mono" style="font-size:12px">{{ m.system_name }}</span></td>
+          <td class="text-muted hide-mobile">{{ m.location }}</td>
           <td>
             <span class="status-dot {{ m.status }}"></span>
-            <span class="badge badge-{{ 'online' if m.status == 'online' else 'offline' }}">
-              {{ m.status }}
-            </span>
+            <span class="badge badge-{{ 'online' if m.status=='online' else 'offline' }}">{{ m.status }}</span>
           </td>
-          <td class="mono text-muted" style="font-size:12px">{{ m.hostname or '—' }}</td>
-          <td class="mono text-muted" style="font-size:12px">{{ m.public_ip or '—' }}</td>
+          <td class="mono text-muted hide-mobile" style="font-size:12px">{{ m.hostname or '—' }}</td>
+          <td class="mono text-muted hide-mobile" style="font-size:12px">{{ m.public_ip or '—' }}</td>
           <td class="text-muted" style="font-size:12px">
-            {{ m.last_seen.strftime('%Y-%m-%d %H:%M:%S') if m.last_seen else '—' }}
+            {{ m.last_seen.strftime('%m-%d %H:%M:%S') if m.last_seen else '—' }}
           </td>
-          <td>
-            <a href="{{ url_for('servers.detail', table_name=m.table_name) }}"
-               class="btn btn-ghost btn-sm">View →</a>
-          </td>
+          <td><a href="{{ url_for('servers.detail', table_name=m.table_name) }}" class="btn btn-ghost btn-sm">View →</a></td>
         </tr>
         {% else %}
-        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">
-          No machines registered yet.
-        </td></tr>
+        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">No machines registered yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -90,31 +79,23 @@
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Type</th><th>Machine</th><th>Subject</th><th>Time</th><th>Status</th></tr>
+        <tr><th>Type</th><th class="hide-mobile">Source</th><th>Machine</th><th>Subject</th><th class="hide-mobile">Time</th><th>Status</th></tr>
       </thead>
-      <tbody>
+      <tbody id="alerts-tbody">
         {% for a in alerts %}
         <tr>
-          <td>
-            <span class="badge badge-warning">{{ a.alert_type }}</span>
-          </td>
+          <td><span class="badge badge-warning">{{ a.alert_type }}</span></td>
+          <td class="hide-mobile"><span class="badge badge-info">{{ a.get('source','system') }}</span></td>
           <td class="mono" style="font-size:12px">{{ a.machine_key }}</td>
-          <td style="font-size:13px">{{ a.subject }}</td>
-          <td class="text-muted" style="font-size:12px">
-            {{ a.sent_at.strftime('%m-%d %H:%M') if a.sent_at else '—' }}
-          </td>
+          <td style="font-size:12px">{{ a.subject }}</td>
+          <td class="text-muted hide-mobile" style="font-size:12px">{{ a.sent_at.strftime('%m-%d %H:%M') if a.sent_at else '—' }}</td>
           <td>
-            {% if a.success %}
-              <span class="badge badge-online">sent</span>
-            {% else %}
-              <span class="badge badge-offline">failed</span>
-            {% endif %}
+            {% if a.success %}<span class="badge badge-online">sent</span>
+            {% else %}<span class="badge badge-offline">failed</span>{% endif %}
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">
-          No alerts yet.
-        </td></tr>
+        <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No alerts yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -124,8 +105,79 @@
 
 {% block extra_js %}
 <script>
-  // Count today's alerts from table rows
-  const alertRows = document.querySelectorAll('tbody tr td .badge-warning, tbody tr td .badge-offline');
-  document.getElementById('alert-count').textContent = {{ alerts | length }};
+var _homeRefreshInterval = 2000;
+
+function fmtDate(s){
+  if(!s||s==='None')return '—';
+  var d=new Date(s);
+  if(isNaN(d))return s;
+  return (d.getMonth()+1).toString().padStart(2,'0')+'-'+
+         d.getDate().toString().padStart(2,'0')+' '+
+         d.getHours().toString().padStart(2,'0')+':'+
+         d.getMinutes().toString().padStart(2,'0')+':'+
+         d.getSeconds().toString().padStart(2,'0');
+}
+
+function updateHome(){
+  fetch('/api/home/data')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      // Stats
+      document.getElementById('stat-total').textContent   = d.total;
+      document.getElementById('stat-online').textContent  = d.online;
+      document.getElementById('stat-offline').textContent = d.offline;
+      document.getElementById('stat-alerts').textContent  = d.alerts_today;
+
+      // Machines table
+      var mtb = document.getElementById('machines-tbody');
+      if(d.recent && d.recent.length){
+        mtb.innerHTML = d.recent.map(function(m){
+          var statusCls = m.status==='online'?'online':'offline';
+          return '<tr>'+
+            '<td><span class="mono" style="font-size:12px">'+m.system_name+'</span></td>'+
+            '<td class="text-muted hide-mobile">'+m.location+'</td>'+
+            '<td><span class="status-dot '+statusCls+'"></span> <span class="badge badge-'+statusCls+'">'+m.status+'</span></td>'+
+            '<td class="mono text-muted hide-mobile" style="font-size:12px">'+(m.hostname||'—')+'</td>'+
+            '<td class="mono text-muted hide-mobile" style="font-size:12px">'+(m.public_ip||'—')+'</td>'+
+            '<td class="text-muted" style="font-size:12px">'+fmtDate(m.last_seen)+'</td>'+
+            '<td><a href="/servers/'+m.table_name+'" class="btn btn-ghost btn-sm">View →</a></td>'+
+          '</tr>';
+        }).join('');
+      } else {
+        mtb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">No machines registered yet.</td></tr>';
+      }
+
+      // Alerts table
+      var atb = document.getElementById('alerts-tbody');
+      if(d.alerts && d.alerts.length){
+        atb.innerHTML = d.alerts.map(function(a){
+          var src = a.source||'system';
+          return '<tr>'+
+            '<td><span class="badge badge-warning">'+a.alert_type+'</span></td>'+
+            '<td class="hide-mobile"><span class="badge badge-info">'+src+'</span></td>'+
+            '<td class="mono" style="font-size:12px">'+a.machine_key+'</td>'+
+            '<td style="font-size:12px">'+a.subject+'</td>'+
+            '<td class="text-muted hide-mobile" style="font-size:12px">'+fmtDate(a.sent_at)+'</td>'+
+            '<td><span class="badge badge-'+(a.success?'online':'offline')+'">'+(a.success?'sent':'failed')+'</span></td>'+
+          '</tr>';
+        }).join('');
+      } else {
+        atb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No alerts yet.</td></tr>';
+      }
+    })
+    .catch(function(){/* silent fail — stale data shows */});
+}
+
+// Read refresh interval from settings if available
+fetch('/api/settings').then(function(r){return r.json();}).then(function(s){
+  if(s&&s.home_refresh_secs){
+    _homeRefreshInterval = parseInt(s.home_refresh_secs)*1000||2000;
+    var el=document.getElementById('refresh-interval');
+    if(el)el.textContent=s.home_refresh_secs;
+  }
+}).catch(function(){});
+
+setInterval(updateHome, _homeRefreshInterval);
+updateHome();
 </script>
 {% endblock %}

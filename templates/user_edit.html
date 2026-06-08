@@ -6,12 +6,12 @@
 <div class="page-header">
   <div>
     <h1>Edit User: <span class="mono">{{ user.username }}</span></h1>
-    <p>Update account details and server access permissions</p>
+    <p>Update account details, feature permissions, and server access</p>
   </div>
-  <a href="{{ url_for('users.index') }}" class="btn btn-ghost">← Back to Users</a>
+  <a href="{{ url_for('users.index') }}" class="btn btn-ghost">← Back</a>
 </div>
 
-<div class="card" style="max-width:680px">
+<div class="card" style="max-width:720px">
   <form method="POST">
     <div class="grid-2">
       <div class="form-group">
@@ -26,9 +26,9 @@
     <div class="grid-2">
       <div class="form-group">
         <label>Role</label>
-        <select name="role" id="edit-role" onchange="toggleAccess(this.value)">
-          <option value="user" {% if user.role == 'user' %}selected{% endif %}>User</option>
-          <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+        <select name="role" id="edit-role" onchange="togglePermsSection(this.value,'edit')">
+          <option value="user" {% if user.role=='user' %}selected{% endif %}>User</option>
+          <option value="admin" {% if user.role=='admin' %}selected{% endif %}>Admin</option>
         </select>
       </div>
       <div class="form-group">
@@ -44,29 +44,46 @@
       <input type="password" name="password" placeholder="Leave blank to keep unchanged">
     </div>
 
-    <div id="access-section" {% if user.role == 'admin' %}style="display:none"{% endif %}>
+    <!-- Feature permissions + server access (hidden for admin) -->
+    <div id="edit-perms-section" {% if user.role=='admin' %}style="display:none"{% endif %}>
       <hr class="divider">
-      <div class="form-group">
-        <label>Server Access</label>
-        <div style="max-height:220px;overflow-y:auto;background:var(--bg3);
-                    border:1px solid var(--border);border-radius:8px;padding:12px">
-          {% for srv in servers %}
-          <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;
-                         text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
-            <input type="checkbox" name="server_access" value="{{ srv.table_name }}"
-                   {% if srv.table_name in current_access %}checked{% endif %}
-                   style="width:auto;margin:0">
-            <span class="mono" style="font-size:12px;color:var(--accent)">{{ srv.system_name }}</span>
-            <span class="text-muted">— {{ srv.location }}</span>
-          </label>
-          {% else %}
-          <span class="text-muted" style="font-size:13px">No servers registered.</span>
-          {% endfor %}
-        </div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Feature Permissions</div>
+      <div class="grid-2" style="margin-bottom:14px">
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
+          <input type="checkbox" name="can_view_servers" value="1" {% if user.can_view_servers %}checked{% endif %} style="width:auto;margin:0">
+          <span>Servers page</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
+          <input type="checkbox" name="can_view_dvr" value="1" {% if user.can_view_dvr %}checked{% endif %} style="width:auto;margin:0">
+          <span>DVR Monitor</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
+          <input type="checkbox" name="can_view_dbmon" value="1" {% if user.can_view_dbmon %}checked{% endif %} style="width:auto;margin:0">
+          <span>DB Monitor</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
+          <input type="checkbox" name="can_view_alerts" value="1" {% if user.can_view_alerts %}checked{% endif %} style="width:auto;margin:0">
+          <span>Alerts page</span>
+        </label>
+      </div>
+      <hr class="divider">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Server Access</div>
+      <div style="max-height:200px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px">
+        {% for srv in servers %}
+        <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
+          <input type="checkbox" name="server_access" value="{{ srv.table_name }}"
+                 {% if srv.table_name in current_access %}checked{% endif %}
+                 style="width:auto;margin:0">
+          <span class="mono" style="font-size:12px;color:var(--accent)">{{ srv.system_name }}</span>
+          <span class="text-muted">— {{ srv.location }}</span>
+        </label>
+        {% else %}
+        <span class="text-muted" style="font-size:13px">No servers registered.</span>
+        {% endfor %}
       </div>
     </div>
 
-    <div style="display:flex;gap:10px;margin-top:8px">
+    <div style="display:flex;gap:10px;margin-top:18px">
       <button type="submit" class="btn btn-primary">Save Changes</button>
       <a href="{{ url_for('users.index') }}" class="btn btn-ghost">Cancel</a>
     </div>
@@ -76,8 +93,9 @@
 
 {% block extra_js %}
 <script>
-function toggleAccess(role) {
-  document.getElementById('access-section').style.display = role === 'user' ? '' : 'none';
+function togglePermsSection(role, prefix){
+  var el=document.getElementById(prefix+'-perms-section');
+  if(el) el.style.display=role==='admin'?'none':'';
 }
 </script>
 {% endblock %}
