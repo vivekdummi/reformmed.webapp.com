@@ -117,11 +117,19 @@ def home_data():
         recent = [dict(r, last_seen=str(r["last_seen"])) for r in cur.fetchall()]
 
         # ── Recent alerts ──
-        cur.execute("""
-            SELECT alert_type, source, machine_key, subject, sent_at, success
-            FROM alert_log ORDER BY sent_at DESC LIMIT 10
-        """)
-        alerts = [dict(r, sent_at=str(r["sent_at"])) for r in cur.fetchall()]
+        try:
+            cur.execute("""
+                SELECT alert_type, COALESCE(source,'system') AS source,
+                       machine_key, subject, sent_at, success
+                FROM alert_log ORDER BY sent_at DESC LIMIT 10
+            """)
+        except Exception:
+            cur.execute("""
+                SELECT alert_type, 'system' AS source,
+                       machine_key, subject, sent_at, success
+                FROM alert_log ORDER BY sent_at DESC LIMIT 10
+            """)
+        alerts = [dict(r, sent_at=str(r['sent_at'])) for r in cur.fetchall()]
 
         # ── Alerts today count ──
         cur.execute("""
