@@ -55,6 +55,7 @@ services:
       GMAIL_APP_PASS:    ${GMAIL_APP_PASS}
       SMTP_HOST:         smtp.gmail.com
       SMTP_PORT:         "465"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
     ports:
       - "5000:5000"
     depends_on:

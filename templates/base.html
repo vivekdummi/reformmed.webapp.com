@@ -628,7 +628,7 @@ var _userInitial  = ('{{ current_user.username }}')[0].toUpperCase();
 
 // Pre-load context when page loads (silent)
 function loadAgentContext(){
-  fetch('/api/agent/context')
+  fetch('/api/agent/context', {credentials:'include'})
     .then(function(r){ return r.json(); })
     .then(function(d){
       _agentCtx = d;
@@ -712,69 +712,36 @@ function sendAgent(){
 
   _agentBusy = true;
   document.getElementById('agent-send').disabled = true;
+  addTyping();
 
-  var typing  = addTyping();
-  var bubRef  = null;
-  var buffer  = '';
-
-  // If context not loaded yet, try again
   if(!_agentCtx) loadAgentContext();
 
-  fetch('/api/agent/chat', {
+  fetch('/api/agent/chat', {credentials:'include',
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({
-      messages: _agentHistory.slice(-12),   // keep last 12 turns
+      messages: _agentHistory.slice(-12),
       context:  _agentCtx || {},
       page:     window.location.pathname,
     }),
-  }).then(function(resp){
-    if(!resp.ok){ throw new Error('HTTP '+resp.status); }
-    var reader  = resp.body.getReader();
-    var decoder = new TextDecoder();
-
-    function pump(){
-      return reader.read().then(function(result){
-        if(result.done) return;
-        var lines = decoder.decode(result.value, {stream:true}).split('\n');
-        lines.forEach(function(line){
-          line = line.trim();
-          if(!line.startsWith('data:')) return;
-          var chunk = line.slice(5).trim();
-          var obj; try{ obj=JSON.parse(chunk); }catch(e){ return; }
-
-          if(obj.error){
-            removeTyping();
-            addMessage('assistant', 'Error: '+obj.error);
-            _agentBusy=false;
-            document.getElementById('agent-send').disabled=false;
-            return;
-          }
-          if(obj.done){
-            _agentHistory.push({role:'assistant', content:buffer});
-            _agentBusy=false;
-            document.getElementById('agent-send').disabled=false;
-            return;
-          }
-          if(obj.text){
-            if(!bubRef){
-              removeTyping();
-              bubRef = addMessage('assistant', '');
-            }
-            buffer += obj.text;
-            bubRef.textContent = buffer;
-            scrollAgent();
-          }
-        });
-        return pump();
-      });
-    }
-    return pump();
-  }).catch(function(e){
+  })
+  .then(function(resp){ return resp.json(); })
+  .then(function(d){
     removeTyping();
-    addMessage('assistant', 'Could not reach the AI. Check ANTHROPIC_API_KEY in .env.');
-    _agentBusy=false;
-    document.getElementById('agent-send').disabled=false;
+    if(d.error){
+      addMessage('assistant', 'Error: '+d.error);
+    } else {
+      _agentHistory.push({role:'assistant', content:d.text});
+      addMessage('assistant', d.text);
+    }
+  })
+  .catch(function(e){
+    removeTyping();
+    addMessage('assistant', 'Network error: '+e.message);
+  })
+  .finally(function(){
+    _agentBusy = false;
+    document.getElementById('agent-send').disabled = false;
   });
 }
 </script>

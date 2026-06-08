@@ -200,9 +200,16 @@ def agent_context():
 
         # Latest metrics per machine
         metrics = []
+        # Re-fetch with table_name
+        try:
+            cur.execute("SELECT system_name, table_name FROM machine_registry")
+            tbl_map = {r["system_name"]: r["table_name"] for r in cur.fetchall()}
+        except Exception:
+            tbl_map = {}
         for m in ctx.get("machines", []):
             try:
-                tbl = next(r["table_name"] for r in machines if r["system_name"]==m["system_name"])
+                tbl = tbl_map.get(m["system_name"], "")
+                if not tbl: continue
                 cur.execute(f"SELECT cpu_percent,ram_percent,cpu_temp,disk_partitions FROM {tbl} ORDER BY ts DESC LIMIT 1")
                 row = cur.fetchone()
                 if row:
@@ -264,9 +271,9 @@ def agent_context():
 @api_bp.route("/agent/chat", methods=["POST"])
 @login_required
 def agent_chat():
-    """Stream a Claude response for the AI agent popup."""
+    """Simple (non-streaming) Claude response for the AI agent popup."""
     import json, urllib.request, os
-    from flask import request, Response, stream_with_context
+    from flask import request
 
     body = request.get_json(silent=True) or {}
     messages  = body.get("messages", [])   # full conversation history
@@ -320,43 +327,29 @@ You can answer questions about:
 Be concise, direct, and use bullet points for lists. For normal conversation, reply in 1-3 sentences. Always reference actual data from the context above when answering infrastructure questions."""
 
     payload = json.dumps({
-        "model":      "claude-sonnet-4-20250514",
+        "model":      "claude-sonnet-4-6",
         "max_tokens": 800,
         "stream":     True,
         "system":     system,
         "messages":   messages,
     }).encode()
 
-    def generate():
-        try:
-            req = urllib.request.Request(
-                "https://api.anthropic.com/v1/messages",
-                data=payload,
-                headers={
-                    "x-api-key":         os.getenv("ANTHROPIC_API_KEY",""),
-                    "anthropic-version": "2023-06-01",
-                    "content-type":      "application/json",
-                },
-            )
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                for raw_line in resp:
-                    line = raw_line.decode("utf-8").strip()
-                    if not line.startswith("data:"): continue
-                    chunk = line[5:].strip()
-                    if chunk == "[DONE]": break
-                    try:
-                        obj   = json.loads(chunk)
-                        delta = (obj.get("delta") or {}).get("text","")
-                        if delta:
-                            yield f"data:{json.dumps({'text':delta})}\n\n"
-                    except Exception:
-                        pass
-            yield 'data:{"done":true}\n\n'
-        except Exception as e:
-            yield f'data:{json.dumps({"error":str(e)})}\n\n'
-
-    return Response(
-        stream_with_context(generate()),
-        mimetype="text/event-stream",
-        headers={"Cache-Control":"no-cache","X-Accel-Buffering":"no"},
-    )
+    try:
+        # Non-streaming request
+        payload_ns = json.loads(payload.decode())
+        payload_ns["stream"] = False
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=json.dumps(payload_ns).encode(),
+            headers={
+                "x-api-key":         os.getenv("ANTHROPIC_API_KEY",""),
+                "anthropic-version": "2023-06-01",
+                "content-type":      "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read().decode())
+            text = data.get("content",[{}])[0].get("text","")
+            return jsonify({"text": text})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
