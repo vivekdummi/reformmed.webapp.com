@@ -1,13 +1,6 @@
 """
 REFORMMED Monitor — Flask Web Dashboard
-Replaces Grafana with a custom Flask app featuring:
-  - Login / session auth (users stored in DB)
-  - Home: machine summary (total / online / offline)
-  - Servers: list + full detail with live metrics
-  - Users: admin-managed users with role-based access
-  - Alerts: configurable email alerts per threshold
 """
-
 import os
 from flask import Flask
 from flask_login import LoginManager
@@ -15,6 +8,7 @@ from db import init_db, get_db
 from models import User
 
 login_manager = LoginManager()
+
 
 def create_app():
     app = Flask(__name__)
@@ -37,14 +31,16 @@ def create_app():
         return User.get_by_id(int(user_id))
 
     # ── Blueprints ───────────────────────────────────────────────────────────
-    from blueprints.auth import auth_bp
-    from blueprints.home import home_bp
-    from blueprints.servers import servers_bp
-    from blueprints.users import users_bp
-    from blueprints.alerts import alerts_bp
-    from blueprints.api import api_bp
-    from blueprints.dvr import dvr_bp
+    from blueprints.auth     import auth_bp
+    from blueprints.home     import home_bp
+    from blueprints.servers  import servers_bp
+    from blueprints.users    import users_bp
+    from blueprints.alerts   import alerts_bp
+    from blueprints.api      import api_bp
+    from blueprints.dvr      import dvr_bp
     from blueprints.dbmonitor import dbmonitor_bp
+    from blueprints.settings import settings_bp
+    from blueprints.review  import review_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(home_bp)
@@ -54,6 +50,8 @@ def create_app():
     app.register_blueprint(api_bp)
     app.register_blueprint(dvr_bp)
     app.register_blueprint(dbmonitor_bp)
+    app.register_blueprint(settings_bp)
+    app.register_blueprint(review_bp)
 
     return app
 
