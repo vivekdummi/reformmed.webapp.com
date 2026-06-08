@@ -124,8 +124,18 @@
 
 {% block extra_js %}
 <script>
-  // Count today's alerts from table rows
-  const alertRows = document.querySelectorAll('tbody tr td .badge-warning, tbody tr td .badge-offline');
+  // Count today's alerts (you already had this)
   document.getElementById('alert-count').textContent = {{ alerts | length }};
+
+  // Auto-refresh every 5 seconds
+  function autoRefresh() {
+    location.reload();
+  }
+
+  // Start auto-refresh
+  setInterval(autoRefresh, 5000);
+
+  // Optional: Show a small refresh indicator
+  console.log('✅ Auto-refresh enabled (every 5 seconds)');
 </script>
 {% endblock %}
