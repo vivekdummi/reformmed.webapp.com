@@ -6,11 +6,9 @@
 <div class="page-header">
   <div>
     <h1>Users</h1>
-    <p>Manage login accounts and server access permissions</p>
+    <p>Manage login accounts, roles, and feature permissions</p>
   </div>
-  <button class="btn btn-primary" onclick="document.getElementById('modal-create').classList.add('open')">
-    + Create User
-  </button>
+  <button class="btn btn-primary" onclick="document.getElementById('modal-create').classList.add('open')">+ Create User</button>
 </div>
 
 <div class="card">
@@ -19,11 +17,11 @@
       <thead>
         <tr>
           <th>Username</th>
-          <th>Email</th>
+          <th class="hide-mobile">Email</th>
           <th>Role</th>
           <th>Status</th>
-          <th>Last Login</th>
-          <th>Created</th>
+          <th class="hide-mobile">Permissions</th>
+          <th class="hide-mobile">Last Login</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -32,43 +30,41 @@
         <tr>
           <td>
             <div style="display:flex;align-items:center;gap:8px">
-              <div style="width:28px;height:28px;background:linear-gradient(135deg,#7c3aed,#00d4ff);
-                          border-radius:6px;display:flex;align-items:center;justify-content:center;
-                          font-size:11px;font-weight:700;color:white;">
+              <div style="width:28px;height:28px;background:linear-gradient(135deg,#7c3aed,#00d4ff);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0;">
                 {{ u.username[0].upper() }}
               </div>
-              <span class="mono" style="font-weight:600">{{ u.username }}</span>
+              <span class="mono" style="font-weight:600;font-size:13px">{{ u.username }}</span>
             </div>
           </td>
-          <td class="text-muted" style="font-size:13px">{{ u.email }}</td>
+          <td class="text-muted hide-mobile" style="font-size:13px">{{ u.email }}</td>
           <td>
-            {% if u.role == 'admin' %}
-              <span class="badge badge-admin">ADMIN</span>
-            {% else %}
-              <span class="badge badge-info">USER</span>
-            {% endif %}
+            {% if u.role=='admin' %}<span class="badge badge-admin">ADMIN</span>
+            {% else %}<span class="badge badge-info">USER</span>{% endif %}
           </td>
           <td>
-            {% if u.is_active %}
-              <span class="badge badge-online">Active</span>
+            {% if u.is_active %}<span class="badge badge-online">Active</span>
+            {% else %}<span class="badge badge-offline">Disabled</span>{% endif %}
+          </td>
+          <td class="hide-mobile" style="font-size:11px">
+            {% if u.role=='admin' %}
+              <span class="text-muted">Full access</span>
             {% else %}
-              <span class="badge badge-offline">Disabled</span>
+              {% if u.can_view_servers %}<span class="badge badge-info" style="margin:1px">Servers</span>{% endif %}
+              {% if u.can_view_dvr %}<span class="badge badge-info" style="margin:1px">DVR</span>{% endif %}
+              {% if u.can_view_dbmon %}<span class="badge badge-info" style="margin:1px">DB Mon</span>{% endif %}
+              {% if u.can_view_alerts %}<span class="badge badge-info" style="margin:1px">Alerts</span>{% endif %}
             {% endif %}
           </td>
-          <td class="text-muted" style="font-size:12px">
+          <td class="text-muted hide-mobile" style="font-size:12px">
             {{ u.last_login.strftime('%Y-%m-%d %H:%M') if u.last_login else 'Never' }}
-          </td>
-          <td class="text-muted" style="font-size:12px">
-            {{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '—' }}
           </td>
           <td>
             <div style="display:flex;gap:6px">
-              <a href="{{ url_for('users.edit', user_id=u.id) }}"
-                 class="btn btn-ghost btn-sm">Edit</a>
+              <a href="{{ url_for('users.edit', user_id=u.id) }}" class="btn btn-ghost btn-sm">Edit</a>
               {% if u.id != current_user.id %}
               <form method="POST" action="{{ url_for('users.delete', user_id=u.id) }}"
                     onsubmit="return confirm('Delete user {{ u.username }}?')">
-                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                <button type="submit" class="btn btn-danger btn-sm">Del</button>
               </form>
               {% endif %}
             </div>
@@ -80,8 +76,8 @@
   </div>
 </div>
 
-<!-- Create user modal -->
-<div class="modal-backdrop" id="modal-create">
+<!-- ── Create User Modal ── -->
+<div class="modal-backdrop" id="modal-create" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="modal">
     <div class="modal-title">Create New User</div>
     <form method="POST" action="{{ url_for('users.create') }}">
@@ -102,22 +98,41 @@
         </div>
         <div class="form-group">
           <label>Role</label>
-          <select name="role" id="new-role" onchange="toggleServerAccess(this.value)">
-            <option value="user">User (limited access)</option>
+          <select name="role" id="new-role" onchange="togglePermsSection(this.value,'new')">
+            <option value="user">User (limited)</option>
             <option value="admin">Admin (full access)</option>
           </select>
         </div>
       </div>
 
-      <div id="server-access-section" class="form-group">
-        <label>Server Access (select servers this user can view)</label>
-        <div style="max-height:200px;overflow-y:auto;background:var(--bg3);
-                    border:1px solid var(--border);border-radius:8px;padding:12px">
+      <!-- Feature permissions (shown only for user role) -->
+      <div id="new-perms-section">
+        <hr class="divider">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Feature Permissions</div>
+        <div class="grid-2">
+          <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
+            <input type="checkbox" name="can_view_servers" value="1" checked style="width:auto;margin:0">
+            <span>Servers page</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
+            <input type="checkbox" name="can_view_dvr" value="1" checked style="width:auto;margin:0">
+            <span>DVR Monitor</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
+            <input type="checkbox" name="can_view_dbmon" value="1" style="width:auto;margin:0">
+            <span>DB Monitor</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
+            <input type="checkbox" name="can_view_alerts" value="1" checked style="width:auto;margin:0">
+            <span>Alerts page</span>
+          </label>
+        </div>
+        <hr class="divider">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Server Access</div>
+        <div style="max-height:160px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px">
           {% for srv in servers %}
-          <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;
-                         text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
-            <input type="checkbox" name="server_access" value="{{ srv.table_name }}"
-                   style="width:auto;margin:0">
+          <label style="display:flex;align-items:center;gap:8px;margin-bottom:7px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
+            <input type="checkbox" name="server_access" value="{{ srv.table_name }}" style="width:auto;margin:0">
             <span class="mono" style="font-size:12px;color:var(--accent)">{{ srv.system_name }}</span>
             <span class="text-muted">— {{ srv.location }}</span>
           </label>
@@ -128,10 +143,7 @@
       </div>
 
       <div class="modal-footer">
-        <button type="button" class="btn btn-ghost"
-                onclick="document.getElementById('modal-create').classList.remove('open')">
-          Cancel
-        </button>
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-create').classList.remove('open')">Cancel</button>
         <button type="submit" class="btn btn-primary">Create User</button>
       </div>
     </form>
@@ -141,13 +153,9 @@
 
 {% block extra_js %}
 <script>
-function toggleServerAccess(role) {
-  const section = document.getElementById('server-access-section');
-  section.style.display = role === 'user' ? '' : 'none';
+function togglePermsSection(role, prefix){
+  var el = document.getElementById(prefix+'-perms-section');
+  if(el) el.style.display = role==='admin' ? 'none' : '';
 }
-// Close modal on backdrop click
-document.getElementById('modal-create').addEventListener('click', function(e) {
-  if (e.target === this) this.classList.remove('open');
-});
 </script>
 {% endblock %}

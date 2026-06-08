@@ -10,7 +10,6 @@ home_bp = Blueprint("home", __name__)
 def index():
     with get_db() as conn:
         cur = conn.cursor()
-
         allowed = current_user.allowed_servers()  # None = all
 
         if allowed is None:
@@ -23,7 +22,8 @@ def index():
             """)
         else:
             if not allowed:
-                return render_template("home.html", total=0, online=0, offline=0, recent=[])
+                return render_template("home.html", total=0, online=0, offline=0,
+                                       recent=[], alerts=[])
             placeholders = ",".join(["%s"] * len(allowed))
             cur.execute(f"""
                 SELECT
@@ -38,7 +38,7 @@ def index():
         online  = row["online"]  or 0
         offline = row["offline"] or 0
 
-        # Recent machines (last 6 seen)
+        # Recent machines
         if allowed is None:
             cur.execute("""
                 SELECT system_name, location, table_name, status, last_seen, hostname, public_ip
@@ -53,11 +53,19 @@ def index():
             """, list(allowed))
         recent = cur.fetchall()
 
-        # Recent alerts
-        cur.execute("""
-            SELECT alert_type, machine_key, subject, sent_at, success
-            FROM alert_log ORDER BY sent_at DESC LIMIT 10
-        """)
+        # Recent alerts — use COALESCE so missing source column doesn't crash
+        try:
+            cur.execute("""
+                SELECT alert_type, COALESCE(source,'system') AS source,
+                       machine_key, subject, sent_at, success
+                FROM alert_log ORDER BY sent_at DESC LIMIT 10
+            """)
+        except Exception:
+            cur.execute("""
+                SELECT alert_type, 'system' AS source,
+                       machine_key, subject, sent_at, success
+                FROM alert_log ORDER BY sent_at DESC LIMIT 10
+            """)
         alerts = cur.fetchall()
 
     return render_template("home.html",

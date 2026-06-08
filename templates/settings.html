@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Settings — REFORMMED Monitor{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Settings</h1>
+    <p>App-wide configuration — all settings stored in database</p>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tabgroup="settings" data-tabid="general" onclick="showTab('settings','general')">General</button>
+  <button class="tab-btn" data-tabgroup="settings" data-tabid="data" onclick="showTab('settings','data')">Data Retention</button>
+  <button class="tab-btn" data-tabgroup="settings" data-tabid="email" onclick="showTab('settings','email')">Email / SMTP</button>
+</div>
+
+<!-- ── GENERAL ── -->
+<div class="tab-panel active" data-tabpanel="settings" data-panelid="general">
+  <div class="card" style="max-width:560px">
+    <div class="card-title">General Settings</div>
+    <form method="POST" action="{{ url_for('settings.save') }}">
+      <div class="form-group">
+        <label>App Name</label>
+        <input type="text" name="app_name" value="{{ s.get('app_name','REFORMMED Monitor') }}">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Shown in the browser title bar</div>
+      </div>
+      <div class="form-group">
+        <label>Home Page Refresh Interval (seconds)</label>
+        <input type="number" name="home_refresh_secs" value="{{ s.get('home_refresh_secs','2') }}" min="1" max="60">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">How often the home page data auto-refreshes. Min 1s, recommended 2–5s.</div>
+      </div>
+      <div class="form-group">
+        <label>Default Sidebar State</label>
+        <select name="sidebar_default">
+          <option value="expanded" {% if s.get('sidebar_default','expanded')=='expanded' %}selected{% endif %}>Expanded</option>
+          <option value="collapsed" {% if s.get('sidebar_default','expanded')=='collapsed' %}selected{% endif %}>Collapsed (mini)</option>
+        </select>
+      </div>
+      <!-- Hidden fields so other tab values aren't wiped -->
+      <input type="hidden" name="data_retention_days" value="{{ s.get('data_retention_days','7') }}">
+      <input type="hidden" name="smtp_host" value="{{ s.get('smtp_host','smtp.gmail.com') }}">
+      <input type="hidden" name="smtp_port" value="{{ s.get('smtp_port','465') }}">
+      <input type="hidden" name="alert_from_email" value="{{ s.get('alert_from_email','') }}">
+      <button type="submit" class="btn btn-primary mt-2">Save General Settings</button>
+    </form>
+  </div>
+</div>
+
+<!-- ── DATA RETENTION ── -->
+<div class="tab-panel" data-tabpanel="settings" data-panelid="data">
+  <div class="card" style="max-width:560px">
+    <div class="card-title">Data Retention</div>
+    <form method="POST" action="{{ url_for('settings.save') }}">
+      <div class="form-group">
+        <label>Retention Period (days)</label>
+        <input type="number" name="data_retention_days" value="{{ s.get('data_retention_days','7') }}" min="1" max="365">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+          Metric rows and alert logs older than this are deleted automatically.
+          Default: <strong>7 days</strong>. Reduces DB size significantly.
+        </div>
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:6px">What gets purged</div>
+        <ul style="font-size:12px;color:var(--text-muted);list-style:disc;padding-left:18px;line-height:1.8">
+          <li>Machine metric rows older than retention days (from each machine's table)</li>
+          <li>Alert log entries older than retention days</li>
+          <li>Machine registry, DVR devices, and DB Monitor watches are never deleted</li>
+        </ul>
+      </div>
+      <!-- Hidden fields -->
+      <input type="hidden" name="app_name" value="{{ s.get('app_name','REFORMMED Monitor') }}">
+      <input type="hidden" name="home_refresh_secs" value="{{ s.get('home_refresh_secs','2') }}">
+      <input type="hidden" name="sidebar_default" value="{{ s.get('sidebar_default','expanded') }}">
+      <input type="hidden" name="smtp_host" value="{{ s.get('smtp_host','smtp.gmail.com') }}">
+      <input type="hidden" name="smtp_port" value="{{ s.get('smtp_port','465') }}">
+      <input type="hidden" name="alert_from_email" value="{{ s.get('alert_from_email','') }}">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button type="submit" class="btn btn-primary">Save Retention Settings</button>
+        <form method="POST" action="{{ url_for('settings.purge_now') }}" onsubmit="return confirm('Run data purge now? This deletes old metric rows and alert logs permanently.')">
+          <button type="submit" class="btn btn-danger">Purge Old Data Now</button>
+        </form>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── EMAIL / SMTP ── -->
+<div class="tab-panel" data-tabpanel="settings" data-panelid="email">
+  <div class="card" style="max-width:560px">
+    <div class="card-title">Email / SMTP Settings</div>
+    <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--yellow)">
+      ⚠️ These settings are stored in the database. For passwords and secrets, editing the <code style="background:var(--bg3);padding:1px 5px;border-radius:4px">.env</code> file is more secure.
+    </div>
+    <form method="POST" action="{{ url_for('settings.save') }}">
+      <div class="grid-2">
+        <div class="form-group">
+          <label>SMTP Host</label>
+          <input type="text" name="smtp_host" value="{{ s.get('smtp_host','smtp.gmail.com') }}" placeholder="smtp.gmail.com">
+        </div>
+        <div class="form-group">
+          <label>SMTP Port</label>
+          <input type="number" name="smtp_port" value="{{ s.get('smtp_port','465') }}" placeholder="465">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>From Email (sender)</label>
+        <input type="email" name="alert_from_email" value="{{ s.get('alert_from_email','') }}" placeholder="info@reformmed.ai">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">If blank, falls back to GMAIL_USER in .env</div>
+      </div>
+      <!-- Hidden fields -->
+      <input type="hidden" name="app_name" value="{{ s.get('app_name','REFORMMED Monitor') }}">
+      <input type="hidden" name="home_refresh_secs" value="{{ s.get('home_refresh_secs','2') }}">
+      <input type="hidden" name="sidebar_default" value="{{ s.get('sidebar_default','expanded') }}">
+      <input type="hidden" name="data_retention_days" value="{{ s.get('data_retention_days','7') }}">
+      <button type="submit" class="btn btn-primary mt-2">Save Email Settings</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

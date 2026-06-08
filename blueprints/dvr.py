@@ -80,30 +80,39 @@ def _ping(ip, port, timeout=3):
         return False
 
 
-def _send_alert(subject, body):
+def _send_alert(subject, body, machine_key="dvr"):
     emails = get_setting("alert_emails","")
     gmail_user = os.getenv("GMAIL_USER","")
     gmail_pass = os.getenv("GMAIL_APP_PASS","")
     recipients = [e.strip() for e in emails.split(",") if e.strip()]
-    if not gmail_user or not gmail_pass or not recipients:
-        return False
+    ok = False
+    if gmail_user and gmail_pass and recipients:
+        try:
+            from email.mime.text import MIMEText
+            from email.mime.multipart import MIMEMultipart
+            msg = MIMEMultipart()
+            msg["Subject"] = f"[REFORMMED DVR] {subject}"
+            msg["From"] = gmail_user
+            msg["To"] = ", ".join(recipients)
+            msg.attach(MIMEText(body, "plain"))
+            ctx = ssl.create_default_context()
+            with smtplib.SMTP_SSL(os.getenv("SMTP_HOST","smtp.gmail.com"),
+                                   int(os.getenv("SMTP_PORT","465")), context=ctx) as srv:
+                srv.login(gmail_user, gmail_pass)
+                srv.sendmail(gmail_user, recipients, msg.as_string())
+            ok = True
+        except Exception as e:
+            print(f"DVR alert failed: {e}")
+    # Log to unified alert_log
     try:
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-        msg = MIMEMultipart()
-        msg["Subject"] = f"[REFORMMED DVR] {subject}"
-        msg["From"] = gmail_user
-        msg["To"] = ", ".join(recipients)
-        msg.attach(MIMEText(body, "plain"))
-        ctx = ssl.create_default_context()
-        with smtplib.SMTP_SSL(os.getenv("SMTP_HOST","smtp.gmail.com"),
-                               int(os.getenv("SMTP_PORT","465")), context=ctx) as srv:
-            srv.login(gmail_user, gmail_pass)
-            srv.sendmail(gmail_user, recipients, msg.as_string())
-        return True
+        with get_db() as conn:
+            conn.cursor().execute("""
+                INSERT INTO alert_log (alert_type, source, machine_key, subject, body, success)
+                VALUES ('dvr_offline', 'dvr', %s, %s, %s, %s)
+            """, (machine_key, subject, body, ok))
     except Exception as e:
-        print(f"DVR alert failed: {e}")
-        return False
+        print(f"DVR alert_log write failed: {e}")
+    return ok
 
 
 # ── Pages ──────────────────────────────────────────────────────────────────
@@ -325,13 +334,15 @@ def ping_dvr(did):
             if alerts_enabled:
                 _send_alert(
                     f"DVR RECOVERED — {dev['name']}",
-                    f"DVR '{dev['name']}' ({dev['ip']}:{dev['port']}) is back ONLINE."
+                    f"DVR '{dev['name']}' ({dev['ip']}:{dev['port']}) is back ONLINE.",
+                    machine_key=f"{dev['name']}@{dev['ip']}"
                 )
 
         if status == "offline" and not alert_sent and alerts_enabled:
             ok = _send_alert(
                 f"DVR OFFLINE — {dev['name']}",
-                f"DVR '{dev['name']}' ({dev['ip']}:{dev['port']}) went OFFLINE.\nTime: {now.isoformat()}"
+                f"DVR '{dev['name']}' ({dev['ip']}:{dev['port']}) went OFFLINE.\nTime: {now.isoformat()}",
+                machine_key=f"{dev['name']}@{dev['ip']}"
             )
             if ok:
                 alert_sent = True
