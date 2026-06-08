@@ -105,7 +105,8 @@
 
 {% block extra_js %}
 <script>
-var _homeRefreshInterval = 2000;
+var _refreshTimer = null;
+var _refreshSecs  = 2;
 
 function fmtDate(s){
   if(!s||s==='None')return '—';
@@ -118,66 +119,84 @@ function fmtDate(s){
          d.getSeconds().toString().padStart(2,'0');
 }
 
-function updateHome(){
-  fetch('/api/home/data')
-    .then(function(r){return r.json();})
-    .then(function(d){
-      // Stats
-      document.getElementById('stat-total').textContent   = d.total;
-      document.getElementById('stat-online').textContent  = d.online;
-      document.getElementById('stat-offline').textContent = d.offline;
-      document.getElementById('stat-alerts').textContent  = d.alerts_today;
+function applyHomeData(d){
+  // Guard: only update if response looks valid (total is a number)
+  if(typeof d.total !== 'number') return;
 
-      // Machines table
-      var mtb = document.getElementById('machines-tbody');
-      if(d.recent && d.recent.length){
-        mtb.innerHTML = d.recent.map(function(m){
-          var statusCls = m.status==='online'?'online':'offline';
-          return '<tr>'+
-            '<td><span class="mono" style="font-size:12px">'+m.system_name+'</span></td>'+
-            '<td class="text-muted hide-mobile">'+m.location+'</td>'+
-            '<td><span class="status-dot '+statusCls+'"></span> <span class="badge badge-'+statusCls+'">'+m.status+'</span></td>'+
-            '<td class="mono text-muted hide-mobile" style="font-size:12px">'+(m.hostname||'—')+'</td>'+
-            '<td class="mono text-muted hide-mobile" style="font-size:12px">'+(m.public_ip||'—')+'</td>'+
-            '<td class="text-muted" style="font-size:12px">'+fmtDate(m.last_seen)+'</td>'+
-            '<td><a href="/servers/'+m.table_name+'" class="btn btn-ghost btn-sm">View →</a></td>'+
-          '</tr>';
-        }).join('');
-      } else {
-        mtb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">No machines registered yet.</td></tr>';
-      }
+  // Stats — only update if value actually changed (avoids flicker)
+  function setIfChanged(id, val){
+    var el=document.getElementById(id);
+    if(el && el.textContent !== String(val)) el.textContent = val;
+  }
+  setIfChanged('stat-total',   d.total);
+  setIfChanged('stat-online',  d.online);
+  setIfChanged('stat-offline', d.offline);
+  setIfChanged('stat-alerts',  d.alerts_today);
 
-      // Alerts table
-      var atb = document.getElementById('alerts-tbody');
-      if(d.alerts && d.alerts.length){
-        atb.innerHTML = d.alerts.map(function(a){
-          var src = a.source||'system';
-          return '<tr>'+
-            '<td><span class="badge badge-warning">'+a.alert_type+'</span></td>'+
-            '<td class="hide-mobile"><span class="badge badge-info">'+src+'</span></td>'+
-            '<td class="mono" style="font-size:12px">'+a.machine_key+'</td>'+
-            '<td style="font-size:12px">'+a.subject+'</td>'+
-            '<td class="text-muted hide-mobile" style="font-size:12px">'+fmtDate(a.sent_at)+'</td>'+
-            '<td><span class="badge badge-'+(a.success?'online':'offline')+'">'+(a.success?'sent':'failed')+'</span></td>'+
-          '</tr>';
-        }).join('');
-      } else {
-        atb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No alerts yet.</td></tr>';
-      }
-    })
-    .catch(function(){/* silent fail — stale data shows */});
+  // Machines table — only rewrite if row count changed or status changed
+  var mtb = document.getElementById('machines-tbody');
+  if(d.recent && d.recent.length){
+    var newHtml = d.recent.map(function(m){
+      var sc = m.status==='online'?'online':'offline';
+      return '<tr>'+
+        '<td><span class="mono" style="font-size:12px">'+m.system_name+'</span></td>'+
+        '<td class="text-muted hide-mobile">'+m.location+'</td>'+
+        '<td><span class="status-dot '+sc+'"></span> <span class="badge badge-'+sc+'">'+m.status+'</span></td>'+
+        '<td class="mono text-muted hide-mobile" style="font-size:12px">'+(m.hostname||'—')+'</td>'+
+        '<td class="mono text-muted hide-mobile" style="font-size:12px">'+(m.public_ip||'—')+'</td>'+
+        '<td class="text-muted" style="font-size:12px">'+fmtDate(m.last_seen)+'</td>'+
+        '<td><a href="/servers/'+m.table_name+'" class="btn btn-ghost btn-sm">View →</a></td>'+
+      '</tr>';
+    }).join('');
+    if(mtb.innerHTML !== newHtml) mtb.innerHTML = newHtml;
+  }
+  // Don't overwrite with "No machines" if we already have rows rendered by SSR
+
+  // Alerts table
+  var atb = document.getElementById('alerts-tbody');
+  if(d.alerts && d.alerts.length){
+    var newAlerts = d.alerts.map(function(a){
+      var src=a.source||'system';
+      return '<tr>'+
+        '<td><span class="badge badge-warning">'+a.alert_type+'</span></td>'+
+        '<td class="hide-mobile"><span class="badge badge-info">'+src+'</span></td>'+
+        '<td class="mono" style="font-size:12px">'+a.machine_key+'</td>'+
+        '<td style="font-size:12px">'+a.subject+'</td>'+
+        '<td class="text-muted hide-mobile" style="font-size:12px">'+fmtDate(a.sent_at)+'</td>'+
+        '<td><span class="badge badge-'+(a.success?'online':'offline')+'">'+(a.success?'sent':'failed')+'</span></td>'+
+      '</tr>';
+    }).join('');
+    if(atb.innerHTML !== newAlerts) atb.innerHTML = newAlerts;
+  }
+  // Don't overwrite alerts with "No alerts" if SSR already rendered them
 }
 
-// Read refresh interval from settings if available
-fetch('/api/settings').then(function(r){return r.json();}).then(function(s){
-  if(s&&s.home_refresh_secs){
-    _homeRefreshInterval = parseInt(s.home_refresh_secs)*1000||2000;
-    var el=document.getElementById('refresh-interval');
-    if(el)el.textContent=s.home_refresh_secs;
-  }
-}).catch(function(){});
+function updateHome(){
+  fetch('/api/home/data')
+    .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function(d){ applyHomeData(d); })
+    .catch(function(){}); // silent — keep showing last good data
+}
 
-setInterval(updateHome, _homeRefreshInterval);
-updateHome();
+function startRefreshTimer(secs){
+  if(_refreshTimer) clearInterval(_refreshTimer);
+  _refreshTimer = setInterval(updateHome, secs * 1000);
+}
+
+// Load settings first, THEN start the timer — no double-timer problem
+fetch('/api/settings')
+  .then(function(r){ return r.json(); })
+  .then(function(s){
+    if(s && s.home_refresh_secs){
+      _refreshSecs = parseInt(s.home_refresh_secs) || 2;
+      var el = document.getElementById('refresh-interval');
+      if(el) el.textContent = _refreshSecs;
+    }
+  })
+  .catch(function(){})
+  .finally(function(){
+    // Start timer AFTER settings load (or fail) — single timer only
+    startRefreshTimer(_refreshSecs);
+  });
 </script>
 {% endblock %}
