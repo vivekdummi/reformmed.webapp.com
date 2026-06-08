@@ -3,7 +3,7 @@ AI Review blueprint — Claude-powered infrastructure summary.
 Pulls live data from PostgreSQL and streams an AI analysis.
 """
 import json
-from flask import Blueprint, render_template, Response, stream_with_context, abort
+from flask import Blueprint, render_template, Response, stream_with_context, abort, jsonify
 from flask_login import login_required, current_user
 from db import get_db
 
@@ -239,3 +239,36 @@ def stream():
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@review_bp.route("/run", methods=["POST"])
+@login_required
+def run():
+    """Non-streaming review endpoint — avoids nginx SSE buffering issues."""
+    if not current_user.is_admin:
+        abort(403)
+    import json, urllib.request, os
+    try:
+        data   = _collect_data()
+        prompt = _build_prompt(data)
+        payload = json.dumps({
+            "model":      "claude-sonnet-4-6",
+            "max_tokens": 1500,
+            "stream":     False,
+            "messages":   [{"role": "user", "content": prompt}],
+        }).encode()
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=payload,
+            headers={
+                "x-api-key":         os.getenv("ANTHROPIC_API_KEY", ""),
+                "anthropic-version": "2023-06-01",
+                "content-type":      "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            result = json.loads(resp.read().decode())
+            text = result.get("content", [{}])[0].get("text", "")
+            return jsonify({"text": text})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
