@@ -20,7 +20,7 @@ services:
 
   api:
     build:
-      context: ../monitor.reformmed.server/server
+      context: ./server
     container_name: reformmed_api
     command: python main.py
     environment:
