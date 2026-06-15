@@ -330,6 +330,11 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
       <span class="nav-label">Users</span>
     </a>
+    <a href="{{ url_for('terminal.index') }}" data-label="Terminal"
+       class="nav-item {% if 'terminal' in request.endpoint %}active{% endif %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      <span class="nav-label">Terminal</span>
+    </a>
     <a href="{{ url_for('review.index') }}" data-label="AI Review"
        class="nav-item {% if 'review' in request.endpoint %}active{% endif %}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
@@ -628,7 +633,7 @@ var _userInitial  = ('{{ current_user.username }}')[0].toUpperCase();
 
 // Pre-load context when page loads (silent)
 function loadAgentContext(){
-  fetch('/api/agent/context', {credentials:'include'})
+  fetch('/api/agent/context')
     .then(function(r){ return r.json(); })
     .then(function(d){
       _agentCtx = d;
@@ -716,7 +721,7 @@ function sendAgent(){
 
   if(!_agentCtx) loadAgentContext();
 
-  fetch('/api/agent/chat', {credentials:'include',
+  fetch('/api/agent/chat', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({

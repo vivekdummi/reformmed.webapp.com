@@ -1,0 +1,380 @@
+{% extends "base.html" %}
+{% block title %}Terminal — REFORMMED Monitor{% endblock %}
+{% block page_title %}SQL Terminal{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Terminal layout */
+  .term-wrap{display:flex;gap:0;height:calc(100vh - 120px);min-height:500px;}
+  .term-sidebar{width:220px;flex-shrink:0;background:var(--bg2);border:1px solid var(--border);border-radius:12px 0 0 12px;overflow-y:auto;display:flex;flex-direction:column;}
+  .term-main{flex:1;display:flex;flex-direction:column;border:1px solid var(--border);border-left:none;border-radius:0 12px 12px 0;overflow:hidden;background:var(--bg);}
+
+  /* Sidebar */
+  .term-sidebar-title{padding:12px 14px;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);flex-shrink:0;}
+  .machine-item{padding:9px 14px;cursor:pointer;border-left:3px solid transparent;transition:all .15s;font-size:12px;}
+  .machine-item:hover{background:var(--bg3);border-left-color:var(--border);}
+  .machine-item.active{background:rgba(0,212,255,.08);border-left-color:var(--accent);}
+  .machine-name{font-weight:600;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;}
+  .machine-loc{font-size:10px;color:var(--text-muted);margin-top:2px;}
+  .machine-status{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;}
+  .machine-status.online{background:var(--green);}
+  .machine-status.offline{background:var(--red);}
+  .schema-toggle{padding:6px 14px 10px;font-size:10px;color:var(--accent);cursor:pointer;}
+  .schema-panel{display:none;padding:0 14px 10px;font-size:11px;}
+  .schema-panel.open{display:block;}
+  .schema-col{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);color:var(--text-muted);}
+  .schema-col span:first-child{color:var(--text);font-family:'JetBrains Mono',monospace;}
+
+  /* Tabs */
+  .term-tabs{display:flex;align-items:center;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 8px;gap:2px;flex-shrink:0;overflow-x:auto;}
+  .term-tab{display:flex;align-items:center;gap:6px;padding:8px 14px;font-size:12px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-muted);white-space:nowrap;transition:all .15s;user-select:none;}
+  .term-tab:hover{color:var(--text);}
+  .term-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .term-tab .tab-close{width:14px;height:14px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-muted);transition:all .15s;}
+  .term-tab .tab-close:hover{background:var(--red);color:white;}
+  .tab-add{padding:6px 10px;color:var(--text-muted);cursor:pointer;font-size:16px;line-height:1;transition:color .15s;flex-shrink:0;}
+  .tab-add:hover{color:var(--accent);}
+
+  /* Editor area */
+  .term-editor-area{padding:12px;display:flex;flex-direction:column;gap:8px;flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--border);}
+  .term-editor{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;padding:12px;resize:vertical;min-height:80px;outline:none;transition:border-color .15s;line-height:1.6;}
+  .term-editor:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,212,255,.08);}
+  .term-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .term-hint{font-size:11px;color:var(--text-muted);flex:1;}
+  .term-run{display:flex;align-items:center;gap:6px;padding:8px 18px;background:var(--accent);color:#0d0f14;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;}
+  .term-run:hover{opacity:.88;}
+  .term-run:disabled{opacity:.5;cursor:not-allowed;}
+  .term-clear{padding:7px 12px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-size:12px;cursor:pointer;font-family:inherit;transition:all .15s;}
+  .term-clear:hover{border-color:var(--text-muted);color:var(--text);}
+
+  /* Results */
+  .term-results{flex:1;overflow:auto;padding:12px;}
+  .result-block{margin-bottom:16px;}
+  .result-meta{font-size:11px;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .result-meta .r-sql{font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px;background:var(--bg2);padding:3px 8px;border-radius:4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .result-meta .r-count{color:var(--green);font-weight:600;}
+  .result-meta .r-time{color:var(--text-muted);}
+  .result-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:12px;color:var(--red);font-family:'JetBrains Mono',monospace;font-size:12px;margin-bottom:12px;}
+  .result-table-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border);}
+  .result-table{width:100%;border-collapse:collapse;font-size:12px;font-family:'JetBrains Mono',monospace;}
+  .result-table th{background:var(--bg2);padding:8px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0;}
+  .result-table td{padding:7px 12px;border-bottom:1px solid rgba(37,42,58,.4);color:var(--text);white-space:nowrap;max-width:300px;overflow:hidden;text-overflow:ellipsis;}
+  .result-table tr:last-child td{border-bottom:none;}
+  .result-table tr:hover td{background:rgba(0,212,255,.04);}
+  .result-table td.null{color:var(--text-muted);font-style:italic;}
+  .dl-btn{padding:5px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-muted);font-size:11px;cursor:pointer;font-family:inherit;transition:all .15s;}
+  .dl-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;color:var(--text-muted);gap:10px;font-size:13px;}
+  .empty-state svg{opacity:.3;}
+
+  /* Quick queries */
+  .quick-queries{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;}
+  .qq{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--text-muted);cursor:pointer;white-space:nowrap;transition:all .15s;font-family:inherit;}
+  .qq:hover{border-color:var(--accent);color:var(--accent);}
+
+  @media(max-width:768px){
+    .term-wrap{flex-direction:column;height:auto;}
+    .term-sidebar{width:100%;border-radius:12px 12px 0 0;max-height:180px;}
+    .term-main{border-radius:0 0 12px 12px;border-left:1px solid var(--border);}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom:12px">
+  <div>
+    <h1>SQL Terminal</h1>
+    <p>Read-only access to machine metric tables — SELECT only, max 500 rows</p>
+  </div>
+</div>
+
+<div class="term-wrap">
+  <!-- Sidebar — machine list -->
+  <div class="term-sidebar">
+    <div class="term-sidebar-title">Machine Tables</div>
+    {% for m in machines %}
+    <div class="machine-item" onclick="selectMachine('{{ m.table_name }}','{{ m.system_name }}')" id="mi-{{ m.table_name }}">
+      <div class="machine-name">
+        <span class="machine-status {{ m.status }}"></span>{{ m.system_name }}
+      </div>
+      <div class="machine-loc">{{ m.location }}</div>
+      <div class="schema-toggle" onclick="event.stopPropagation();toggleSchema('{{ m.table_name }}')">⌕ Schema</div>
+      <div class="schema-panel" id="schema-{{ m.table_name }}">Loading...</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Main terminal -->
+  <div class="term-main">
+    <!-- Tabs -->
+    <div class="term-tabs" id="tabs-bar">
+      <!-- tabs injected by JS -->
+      <div class="tab-add" onclick="addTab()" title="New tab">＋</div>
+    </div>
+
+    <!-- Quick queries -->
+    <div class="quick-queries" id="quick-queries">
+      <span style="font-size:10px;color:var(--text-muted);align-self:center">Quick:</span>
+      <button class="qq" onclick="setQuick('latest10')">Latest 10 rows</button>
+      <button class="qq" onclick="setQuick('hightemp')">Temp &gt; 90°C</button>
+      <button class="qq" onclick="setQuick('highcpu')">CPU &gt; 80%</button>
+      <button class="qq" onclick="setQuick('highram')">RAM &gt; 80%</button>
+      <button class="qq" onclick="setQuick('highdisk')">High Disk</button>
+      <button class="qq" onclick="setQuick('count')">Row count</button>
+      <button class="qq" onclick="setQuick('daterange')">Date range</button>
+    </div>
+
+    <!-- Editor -->
+    <div class="term-editor-area">
+      <textarea class="term-editor" id="sql-input" placeholder="SELECT * FROM machine_nephro_rcore_pc1_hyderabad WHERE cpu_temp > 90 ORDER BY ts DESC LIMIT 100"
+        onkeydown="handleKey(event)"></textarea>
+      <div class="term-toolbar">
+        <span class="term-hint">Ctrl+Enter to run · SELECT only · max 500 rows auto-applied</span>
+        <button class="term-clear" onclick="clearResults()">Clear</button>
+        <button class="term-run" id="run-btn" onclick="runQuery()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Run Query
+        </button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="term-results" id="results-area">
+      <div class="empty-state">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+          <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+        <div>Select a machine from the left, then run a query</div>
+        <div style="font-size:11px">Ctrl+Enter to execute · Results auto-download as CSV</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Tab system ────────────────────────────────────────────────────────────────
+var _tabs = [];
+var _activeTab = null;
+var _tabCounter = 0;
+
+function addTab(name){
+  _tabCounter++;
+  var id = 'tab' + _tabCounter;
+  var tab = {
+    id: id,
+    name: name || ('Query ' + _tabCounter),
+    sql: '',
+    results: null,
+  };
+  _tabs.push(tab);
+  renderTabs();
+  activateTab(id);
+  return id;
+}
+
+function renderTabs(){
+  var bar = document.getElementById('tabs-bar');
+  // Remove old tabs (keep the + button)
+  bar.querySelectorAll('.term-tab').forEach(function(el){ el.remove(); });
+  var addBtn = bar.querySelector('.tab-add');
+  _tabs.forEach(function(t){
+    var el = document.createElement('div');
+    el.className = 'term-tab' + (t.id === _activeTab ? ' active' : '');
+    el.dataset.id = t.id;
+    el.innerHTML = '<span onclick="activateTab(\''+t.id+'\')" style="flex:1">'+escHtml(t.name)+'</span>'+
+      '<span class="tab-close" onclick="closeTab(\''+t.id+'\',event)" title="Close">✕</span>';
+    bar.insertBefore(el, addBtn);
+  });
+}
+
+function activateTab(id){
+  // Save current SQL
+  if(_activeTab){
+    var cur = _tabs.find(function(t){ return t.id===_activeTab; });
+    if(cur) cur.sql = document.getElementById('sql-input').value;
+  }
+  _activeTab = id;
+  var tab = _tabs.find(function(t){ return t.id===id; });
+  if(!tab) return;
+  document.getElementById('sql-input').value = tab.sql || '';
+  document.getElementById('results-area').innerHTML = tab.results || '<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><div>Run a query to see results</div></div>';
+  renderTabs();
+  document.getElementById('sql-input').focus();
+}
+
+function closeTab(id, e){
+  if(e) e.stopPropagation();
+  _tabs = _tabs.filter(function(t){ return t.id!==id; });
+  if(_tabs.length === 0){ addTab(); return; }
+  if(_activeTab === id) activateTab(_tabs[_tabs.length-1].id);
+  else renderTabs();
+}
+
+// ── Machine selection ─────────────────────────────────────────────────────────
+var _currentTable = '';
+
+function selectMachine(tbl, name){
+  _currentTable = tbl;
+  document.querySelectorAll('.machine-item').forEach(function(el){ el.classList.remove('active'); });
+  document.getElementById('mi-'+tbl).classList.add('active');
+  // Update active tab name
+  var tab = _tabs.find(function(t){ return t.id===_activeTab; });
+  if(tab){ tab.name = name; renderTabs(); }
+  // Set default query
+  var sql = 'SELECT ts, cpu_percent, cpu_temp, ram_percent\nFROM ' + tbl + '\nORDER BY ts DESC\nLIMIT 50';
+  document.getElementById('sql-input').value = sql;
+  if(tab) tab.sql = sql;
+}
+
+// ── Schema panel ──────────────────────────────────────────────────────────────
+var _schemaCache = {};
+
+function toggleSchema(tbl){
+  var panel = document.getElementById('schema-'+tbl);
+  panel.classList.toggle('open');
+  if(panel.classList.contains('open') && !_schemaCache[tbl]){
+    fetch('/terminal/schema/'+tbl, {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        _schemaCache[tbl] = d;
+        var html = '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">'+
+          d.stats.count+' rows · '+d.stats.oldest.slice(0,10)+' – '+d.stats.newest.slice(0,10)+'</div>';
+        d.columns.forEach(function(c){
+          html += '<div class="schema-col"><span>'+c.column_name+'</span><span>'+c.data_type.replace('timestamp with time zone','timestamptz')+'</span></div>';
+        });
+        panel.innerHTML = html;
+      }).catch(function(){ panel.innerHTML = '<span style="color:var(--red);font-size:11px">Failed to load</span>'; });
+  }
+}
+
+// ── Quick queries ─────────────────────────────────────────────────────────────
+function setQuick(type){
+  var tbl = _currentTable || 'machine_nephro_rcore_pc1_hyderabad';
+  var sqls = {
+    latest10:  'SELECT ts, cpu_percent, cpu_temp, ram_percent, swap_percent\nFROM '+tbl+'\nORDER BY ts DESC\nLIMIT 10',
+    hightemp:  'SELECT ts AT TIME ZONE \'Asia/Kolkata\' AS ts_ist,\n       cpu_temp, cpu_percent, ram_percent\nFROM '+tbl+'\nWHERE cpu_temp > 90\nORDER BY ts DESC\nLIMIT 100',
+    highcpu:   'SELECT ts AT TIME ZONE \'Asia/Kolkata\' AS ts_ist,\n       cpu_percent, cpu_temp, ram_percent\nFROM '+tbl+'\nWHERE cpu_percent > 80\nORDER BY ts DESC\nLIMIT 100',
+    highram:   'SELECT ts AT TIME ZONE \'Asia/Kolkata\' AS ts_ist,\n       ram_percent, ram_used_gb, cpu_percent\nFROM '+tbl+'\nWHERE ram_percent > 80\nORDER BY ts DESC\nLIMIT 100',
+    highdisk:  'SELECT ts AT TIME ZONE \'Asia/Kolkata\' AS ts_ist,\n       disk_partitions\nFROM '+tbl+'\nWHERE disk_partitions::text LIKE \'%"percent": 8%\'\nORDER BY ts DESC\nLIMIT 50',
+    count:     'SELECT COUNT(*) AS total_rows,\n       MIN(ts AT TIME ZONE \'Asia/Kolkata\') AS oldest,\n       MAX(ts AT TIME ZONE \'Asia/Kolkata\') AS newest,\n       MAX(ts AT TIME ZONE \'Asia/Kolkata\') - MIN(ts AT TIME ZONE \'Asia/Kolkata\') AS data_range\nFROM '+tbl,
+    daterange: 'SELECT DATE(ts AT TIME ZONE \'Asia/Kolkata\') AS day,\n       COUNT(*) AS readings,\n       ROUND(AVG(cpu_temp)::numeric,1) AS avg_temp,\n       MAX(cpu_temp) AS max_temp,\n       ROUND(AVG(cpu_percent)::numeric,1) AS avg_cpu\nFROM '+tbl+'\nGROUP BY day\nORDER BY day DESC\nLIMIT 30',
+  };
+  document.getElementById('sql-input').value = sqls[type] || '';
+  var tab = _tabs.find(function(t){ return t.id===_activeTab; });
+  if(tab) tab.sql = sqls[type] || '';
+}
+
+// ── Query execution ───────────────────────────────────────────────────────────
+var _lastData = null;
+
+function handleKey(e){
+  if(e.ctrlKey && e.key==='Enter'){ e.preventDefault(); runQuery(); }
+}
+
+function runQuery(){
+  var sql = document.getElementById('sql-input').value.trim();
+  if(!sql) return;
+  var tab = _tabs.find(function(t){ return t.id===_activeTab; });
+  if(tab) tab.sql = sql;
+
+  var btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg> Running…';
+
+  var t0 = Date.now();
+  fetch('/terminal/query', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({sql: sql}),
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    var elapsed = ((Date.now()-t0)/1000).toFixed(2);
+    var html = '';
+    if(d.error){
+      html = '<div class="result-error">⚠️ ' + escHtml(d.error) + '</div>';
+    } else {
+      _lastData = d;
+      var sqlShort = (d.sql||sql).slice(0,80) + ((d.sql||sql).length>80?'…':'');
+      html += '<div class="result-meta">';
+      html += '<span class="r-sql" title="'+escHtml(d.sql||sql)+'">'+escHtml(sqlShort)+'</span>';
+      html += '<span class="r-count">'+d.count+' rows</span>';
+      html += '<span class="r-time">'+elapsed+'s</span>';
+      if(d.count>0){
+        html += '<button class="dl-btn" onclick="downloadCSV()">⬇ CSV</button>';
+      }
+      html += '</div>';
+      if(d.count === 0){
+        html += '<div style="color:var(--text-muted);font-size:13px;padding:20px">No rows returned.</div>';
+      } else {
+        html += '<div class="result-table-wrap"><table class="result-table"><thead><tr>';
+        d.columns.forEach(function(c){ html += '<th>'+escHtml(c)+'</th>'; });
+        html += '</tr></thead><tbody>';
+        d.rows.forEach(function(row){
+          html += '<tr>';
+          row.forEach(function(val){
+            if(val===null || val===undefined){
+              html += '<td class="null">NULL</td>';
+            } else {
+              html += '<td title="'+escHtml(String(val))+'">'+escHtml(String(val))+'</td>';
+            }
+          });
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+      }
+    }
+    document.getElementById('results-area').innerHTML = html;
+    if(tab) tab.results = html;
+  })
+  .catch(function(e){
+    document.getElementById('results-area').innerHTML = '<div class="result-error">Network error: '+escHtml(e.message)+'</div>';
+  })
+  .finally(function(){
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Query';
+  });
+}
+
+function clearResults(){
+  _lastData = null;
+  document.getElementById('results-area').innerHTML = '<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><div>Run a query to see results</div></div>';
+  var tab = _tabs.find(function(t){ return t.id===_activeTab; });
+  if(tab) tab.results = null;
+}
+
+// ── CSV download ──────────────────────────────────────────────────────────────
+function downloadCSV(){
+  if(!_lastData || !_lastData.columns) return;
+  var lines = [_lastData.columns.join(',')];
+  _lastData.rows.forEach(function(row){
+    lines.push(row.map(function(v){
+      if(v===null||v===undefined) return '';
+      var s = String(v);
+      if(s.includes(',') || s.includes('"') || s.includes('\n')){
+        return '"' + s.replace(/"/g,'""') + '"';
+      }
+      return s;
+    }).join(','));
+  });
+  var blob = new Blob([lines.join('\n')], {type:'text/csv'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'query_result_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.csv';
+  a.click();
+}
+
+function escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+addTab('Query 1');
+addTab('Query 2');
+addTab('Query 3');
+activateTab(_tabs[0].id);
+</script>
+{% endblock %}

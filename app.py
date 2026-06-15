@@ -40,7 +40,8 @@ def create_app():
     from blueprints.dvr      import dvr_bp
     from blueprints.dbmonitor import dbmonitor_bp
     from blueprints.settings import settings_bp
-    from blueprints.review  import review_bp
+    from blueprints.review    import review_bp
+    from blueprints.terminal  import terminal_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(home_bp)
@@ -52,6 +53,7 @@ def create_app():
     app.register_blueprint(dbmonitor_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(review_bp)
+    app.register_blueprint(terminal_bp)
 
     return app
 
