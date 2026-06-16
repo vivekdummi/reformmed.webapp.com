@@ -333,7 +333,7 @@ jobs:
             if [ "$status" = "200" ]; then
               echo ""
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-              echo "  ---✅ DEPLOYMENT SUCCESSFUL---"
+              echo "  ----✅ DEPLOYMENT SUCCESSFUL----"
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             else
               echo "❌ Health check failed — HTTP $status"
