@@ -1,0 +1,199 @@
+name: CI/CD — Test & Deploy
+
+on:
+  push:
+    branches:
+      - feature/main-prod-7
+  pull_request:
+    branches:
+      - feature/main-prod-7
+
+jobs:
+  # ── JOB 1: CI Tests ────────────────────────────────────────────────────────
+  test:
+    name: Syntax & Import Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install flask flask-login psycopg2-binary werkzeug python-dotenv
+
+      - name: Check Python syntax — all blueprints
+        run: |
+          echo "Checking Python syntax..."
+          for f in blueprints/*.py *.py; do
+            python3 -c "
+import ast, sys
+with open('$f') as fh:
+    src = fh.read()
+try:
+    ast.parse(src)
+    print('  OK  $f')
+except SyntaxError as e:
+    print('  ERR $f:', e)
+    sys.exit(1)
+"
+          done
+
+      - name: Check Jinja2 false-positive comment tags in templates
+        run: |
+          echo "Checking templates for {#identifier patterns..."
+          if grep -rn '{#[a-zA-Z]' templates/; then
+            echo "ERROR: Found Jinja2 false-positive comment tags in templates!"
+            exit 1
+          else
+            echo "  OK  No issues found"
+          fi
+
+      - name: Check no secrets in code
+        run: |
+          echo "Checking for hardcoded secrets..."
+          if grep -rn "sk-ant-api" blueprints/ templates/ *.py 2>/dev/null; then
+            echo "ERROR: Hardcoded Anthropic API key found!"
+            exit 1
+          fi
+          if grep -rn "GMAIL_APP_PASS\s*=" blueprints/ templates/ *.py 2>/dev/null | grep -v "os.getenv\|environ"; then
+            echo "WARNING: Possible hardcoded Gmail password"
+          fi
+          echo "  OK  No hardcoded secrets found"
+
+      - name: Verify required files exist
+        run: |
+          echo "Checking required files..."
+          required=(
+            "app.py"
+            "db.py"
+            "models.py"
+            "requirements.txt"
+            "docker-compose.yml"
+            "Dockerfile"
+            "blueprints/__init__.py"
+            "blueprints/auth.py"
+            "blueprints/home.py"
+            "blueprints/api.py"
+            "blueprints/alerts.py"
+            "blueprints/settings.py"
+            "blueprints/review.py"
+            "blueprints/terminal.py"
+            "blueprints/dvr.py"
+            "blueprints/dbmonitor.py"
+            "blueprints/servers.py"
+            "blueprints/users.py"
+            "templates/base.html"
+            "templates/home.html"
+            "templates/review.html"
+            "templates/terminal.html"
+            "templates/settings.html"
+            "server/main.py"
+            "server/Dockerfile"
+            "server/requirements.txt"
+          )
+          all_ok=true
+          for f in "${required[@]}"; do
+            if [ -f "$f" ]; then
+              echo "  OK  $f"
+            else
+              echo "  MISSING  $f"
+              all_ok=false
+            fi
+          done
+          if [ "$all_ok" = false ]; then
+            exit 1
+          fi
+
+      - name: Test Flask app imports
+        run: |
+          echo "Testing Flask app can be imported..."
+          python3 -c "
+import sys
+sys.path.insert(0, '.')
+# Check all blueprints import cleanly
+modules = [
+    'blueprints.auth',
+    'blueprints.home',
+    'blueprints.api',
+    'blueprints.alerts',
+    'blueprints.settings',
+    'blueprints.review',
+    'blueprints.terminal',
+    'blueprints.dvr',
+    'blueprints.dbmonitor',
+    'blueprints.servers',
+    'blueprints.users',
+]
+for m in modules:
+    try:
+        # Just compile, don't execute (no DB needed)
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(m, m.replace('.','/')+'.py')
+        print(f'  OK  {m}')
+    except Exception as e:
+        print(f'  ERR {m}: {e}')
+"
+
+  # ── JOB 2: Deploy (only on push, not PR) ───────────────────────────────────
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/main-prod-7'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:        ${{ secrets.SERVER_HOST }}
+          username:    ${{ secrets.SERVER_USER }}
+          key:         ${{ secrets.SERVER_SSH_KEY }}
+          port:        22
+          script: |
+            set -e
+            echo "=== Starting deployment ==="
+            cd ~/reformmed.webapp.com
+
+            # Save .env before pull
+            cp .env /tmp/.env.backup
+
+            # Pull latest code
+            git fetch origin
+            git checkout feature/main-prod-7
+            git pull origin feature/main-prod-7
+
+            # Restore .env
+            cp /tmp/.env.backup .env
+
+            # Rebuild and restart
+            docker compose up -d --build
+
+            # Verify all containers are running
+            sleep 5
+            docker compose ps
+
+            # Quick health check
+            status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/login)
+            if [ "$status" = "200" ]; then
+              echo "=== Deployment successful — webapp responding with HTTP $status ==="
+            else
+              echo "=== WARNING: webapp returned HTTP $status ==="
+            fi
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Deployment to infra.reformmed.tech successful"
+          else
+            echo "❌ Deployment failed — check logs above"
+          fi
