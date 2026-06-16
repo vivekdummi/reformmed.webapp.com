@@ -272,6 +272,9 @@ jobs:
   deploy:
     name: 🚀 Deploy to Production
     runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://infra.reformmed.tech
     needs:
       - syntax-check
       - template-check
@@ -330,7 +333,7 @@ jobs:
             if [ "$status" = "200" ]; then
               echo ""
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-              echo "  ✅ DEPLOYMENT SUCCESSFUL"
+              echo "  ---✅ DEPLOYMENT SUCCESSFUL---"
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             else
               echo "❌ Health check failed — HTTP $status"
