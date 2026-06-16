@@ -1,92 +1,284 @@
-name: CI/CD — Test & Deploy
+name: CI/CD — REFORMMED Monitor
 
 on:
   push:
     branches:
-      - feature/main-prod-7
+      - 'feature/main-prod-*'
+      - main
+      - staging
   pull_request:
     branches:
-      - feature/main-prod-7
+      - 'feature/main-prod-*'
+      - main
+      - staging
 
 jobs:
-  # ── JOB 1: CI Tests ──────────────────────────────────────────────────────
-  test:
-    name: Syntax & Security Check
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 1 — Python Syntax Check
+  # ════════════════════════════════════════════════════════════
+  syntax-check:
+    name: 🐍 Python Syntax Check
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
-        run: pip install flask flask-login psycopg2-binary werkzeug python-dotenv
-
-      - name: Check Python syntax
+      - name: Check root Python files
         run: |
-          echo "Checking Python syntax..."
-          python3 -m py_compile app.py db.py models.py alert_sender.py
-          for f in blueprints/*.py; do
-            python3 -m py_compile "$f" && echo "  OK  $f" || exit 1
+          echo "── Checking root files ──"
+          for f in app.py db.py models.py alert_sender.py offline_checker.py; do
+            if [ -f "$f" ]; then
+              python3 -m py_compile "$f" && echo "  ✅ $f" || { echo "  ❌ $f"; exit 1; }
+            fi
           done
-          echo "All Python files OK"
 
-      - name: Check Jinja2 templates for false-positive comment tags
+      - name: Check all blueprints
         run: |
-          echo "Checking templates..."
+          echo "── Checking blueprints/ ──"
+          for f in blueprints/*.py; do
+            python3 -m py_compile "$f" && echo "  ✅ $f" || { echo "  ❌ $f"; exit 1; }
+          done
+
+      - name: Check server files
+        run: |
+          echo "── Checking server/ ──"
+          for f in server/*.py; do
+            if [ -f "$f" ]; then
+              python3 -m py_compile "$f" && echo "  ✅ $f" || { echo "  ❌ $f"; exit 1; }
+            fi
+          done
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 2 — Template Check
+  # ════════════════════════════════════════════════════════════
+  template-check:
+    name: 🧩 Jinja2 Template Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for Jinja2 false-positive comment tags
+        run: |
+          echo "── Checking for {#identifier patterns ──"
           if grep -rn '{#[a-zA-Z]' templates/; then
-            echo "ERROR: Jinja2 false-positive comment tags found!"
+            echo "❌ ERROR: Jinja2 false-positive comment tags found!"
+            echo "   Fix: change {#id{...}} to { #id { ... } }"
             exit 1
           fi
-          echo "All templates OK"
+          echo "✅ No Jinja2 comment tag issues"
 
-      - name: Check no hardcoded secrets
+      - name: Check all templates extend base.html
         run: |
-          echo "Checking for hardcoded secrets..."
-          if grep -rn "sk-ant-api" blueprints/ templates/ *.py 2>/dev/null; then
-            echo "ERROR: Hardcoded Anthropic API key found!"
-            exit 1
-          fi
-          echo "No hardcoded secrets found"
+          echo "── Checking template inheritance ──"
+          for f in templates/*.html; do
+            name=$(basename "$f")
+            if [ "$name" != "base.html" ] && [ "$name" != "login.html" ]; then
+              if grep -q "extends" "$f"; then
+                echo "  ✅ $name"
+              else
+                echo "  ⚠️  $name does not extend base.html"
+              fi
+            fi
+          done
 
-      - name: Verify required files exist
+      - name: Check required templates exist
         run: |
-          echo "Checking required files..."
-          files=(
-            "app.py" "db.py" "models.py" "requirements.txt"
-            "docker-compose.yml" "Dockerfile"
-            "blueprints/__init__.py" "blueprints/auth.py"
-            "blueprints/home.py" "blueprints/api.py"
-            "blueprints/alerts.py" "blueprints/settings.py"
-            "blueprints/review.py" "blueprints/terminal.py"
-            "blueprints/dvr.py" "blueprints/dbmonitor.py"
-            "blueprints/servers.py" "blueprints/users.py"
-            "templates/base.html" "templates/home.html"
-            "templates/review.html" "templates/terminal.html"
+          echo "── Checking required templates ──"
+          required=(
+            "templates/base.html"
+            "templates/home.html"
+            "templates/login.html"
+            "templates/alerts.html"
             "templates/settings.html"
-            "server/main.py" "server/Dockerfile" "server/requirements.txt"
+            "templates/review.html"
+            "templates/terminal.html"
+            "templates/users.html"
+            "templates/user_edit.html"
+            "templates/servers.html"
+            "templates/server_detail.html"
           )
           all_ok=true
-          for f in "${files[@]}"; do
-            if [ -f "$f" ]; then
-              echo "  OK  $f"
-            else
-              echo "  MISSING  $f"
-              all_ok=false
-            fi
+          for f in "${required[@]}"; do
+            [ -f "$f" ] && echo "  ✅ $f" || { echo "  ❌ MISSING: $f"; all_ok=false; }
           done
           $all_ok || exit 1
 
-  # ── JOB 2: Deploy (push only, not PR) ───────────────────────────────────
-  deploy:
-    name: Deploy to Production
+  # ════════════════════════════════════════════════════════════
+  # JOB 3 — Security Check
+  # ════════════════════════════════════════════════════════════
+  security-check:
+    name: 🔒 Security Check
     runs-on: ubuntu-latest
-    needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/main-prod-7'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for hardcoded Anthropic API keys
+        run: |
+          echo "── Scanning for Anthropic API keys ──"
+          if grep -rn "sk-ant-api" blueprints/ templates/ *.py server/ 2>/dev/null; then
+            echo "❌ ERROR: Hardcoded Anthropic API key found!"
+            exit 1
+          fi
+          echo "✅ No hardcoded Anthropic keys"
+
+      - name: Check for hardcoded passwords
+        run: |
+          echo "── Scanning for hardcoded passwords ──"
+          if grep -rn "GMAIL_APP_PASS\s*=\s*['\"][^'\"]" blueprints/ *.py 2>/dev/null; then
+            echo "❌ ERROR: Hardcoded Gmail password found!"
+            exit 1
+          fi
+          echo "✅ No hardcoded passwords"
+
+      - name: Check .env is not tracked
+        run: |
+          echo "── Checking .env is gitignored ──"
+          if git ls-files --error-unmatch .env 2>/dev/null; then
+            echo "❌ ERROR: .env file is tracked by git!"
+            exit 1
+          fi
+          echo "✅ .env is not tracked"
+
+      - name: Check .gitignore has .env
+        run: |
+          echo "── Checking .gitignore ──"
+          if grep -q "\.env" .gitignore; then
+            echo "✅ .env is in .gitignore"
+          else
+            echo "❌ ERROR: .env is not in .gitignore!"
+            exit 1
+          fi
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 4 — File Structure Check
+  # ════════════════════════════════════════════════════════════
+  file-check:
+    name: 📁 File Structure Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required Python files
+        run: |
+          echo "── Checking Python files ──"
+          files=(
+            "app.py" "db.py" "models.py"
+            "requirements.txt" "Dockerfile"
+            "docker-compose.yml" "alert_sender.py"
+          )
+          all_ok=true
+          for f in "${files[@]}"; do
+            [ -f "$f" ] && echo "  ✅ $f" || { echo "  ❌ MISSING: $f"; all_ok=false; }
+          done
+          $all_ok || exit 1
+
+      - name: Check blueprints
+        run: |
+          echo "── Checking blueprints/ ──"
+          files=(
+            "blueprints/__init__.py"
+            "blueprints/auth.py"
+            "blueprints/home.py"
+            "blueprints/api.py"
+            "blueprints/alerts.py"
+            "blueprints/settings.py"
+            "blueprints/review.py"
+            "blueprints/terminal.py"
+            "blueprints/dvr.py"
+            "blueprints/dbmonitor.py"
+            "blueprints/servers.py"
+            "blueprints/users.py"
+          )
+          all_ok=true
+          for f in "${files[@]}"; do
+            [ -f "$f" ] && echo "  ✅ $f" || { echo "  ❌ MISSING: $f"; all_ok=false; }
+          done
+          $all_ok || exit 1
+
+      - name: Check server files
+        run: |
+          echo "── Checking server/ ──"
+          files=(
+            "server/main.py"
+            "server/Dockerfile"
+            "server/requirements.txt"
+            "server/offline_checker.py"
+            "server/dashboard_manager.py"
+          )
+          all_ok=true
+          for f in "${files[@]}"; do
+            [ -f "$f" ] && echo "  ✅ $f" || { echo "  ❌ MISSING: $f"; all_ok=false; }
+          done
+          $all_ok || exit 1
+
+      - name: Check docker-compose services
+        run: |
+          echo "── Checking docker-compose.yml ──"
+          services=("postgres" "api" "webapp" "checker")
+          for s in "${services[@]}"; do
+            if grep -q "container_name: reformmed_$s" docker-compose.yml; then
+              echo "  ✅ service: $s"
+            else
+              echo "  ❌ MISSING service: $s"
+              exit 1
+            fi
+          done
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 5 — Dependencies Check
+  # ════════════════════════════════════════════════════════════
+  deps-check:
+    name: 📦 Dependencies Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check webapp requirements installable
+        run: |
+          echo "── Installing webapp requirements ──"
+          pip install -r requirements.txt --dry-run 2>&1 | tail -5
+          echo "✅ Webapp requirements OK"
+
+      - name: Check server requirements installable
+        run: |
+          echo "── Installing server requirements ──"
+          pip install -r server/requirements.txt --dry-run 2>&1 | tail -5
+          echo "✅ Server requirements OK"
+
+      - name: Check required packages in requirements.txt
+        run: |
+          echo "── Checking required packages ──"
+          packages=("flask" "flask-login" "psycopg2" "werkzeug")
+          for p in "${packages[@]}"; do
+            if grep -qi "$p" requirements.txt; then
+              echo "  ✅ $p"
+            else
+              echo "  ❌ MISSING: $p in requirements.txt"
+              exit 1
+            fi
+          done
+
+  # ════════════════════════════════════════════════════════════
+  # JOB 6 — Deploy (runs only after ALL checks pass)
+  # ════════════════════════════════════════════════════════════
+  deploy:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    needs:
+      - syntax-check
+      - template-check
+      - security-check
+      - file-check
+      - deps-check
+    if: github.event_name == 'push'
 
     steps:
       - name: Deploy via SSH
@@ -98,20 +290,50 @@ jobs:
           port: 22
           script: |
             set -e
-            echo "=== Starting deployment ==="
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "  REFORMMED Monitor — Auto Deploy"
+            echo "  Branch: ${{ github.ref_name }}"
+            echo "  Commit: ${{ github.sha }}"
+            echo "  Time:   $(date '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
             cd ~/reformmed.webapp.com
 
+            # Save .env
             cp .env /tmp/.env.backup
+            echo "✅ .env backed up"
+
+            # Pull latest
             git fetch origin
-            git checkout feature/main-prod-7
-            git pull origin feature/main-prod-7
+            git checkout ${{ github.ref_name }}
+            git pull origin ${{ github.ref_name }}
             cp /tmp/.env.backup .env
+            echo "✅ Code updated to latest commit"
 
+            # Build & restart
+            echo "── Building Docker images ──"
             docker compose up -d --build
-            sleep 8
+            echo "✅ Containers rebuilt"
 
+            # Wait for startup
+            sleep 10
+
+            # Show container status
+            echo "── Container Status ──"
             docker compose ps
+
+            # Health check
+            echo "── Health Check ──"
             status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/login)
-            echo "=== Webapp health check: HTTP $status ==="
-            [ "$status" = "200" ] || exit 1
-            echo "==== Deployment successful ====="
+            echo "  Webapp: HTTP $status"
+
+            if [ "$status" = "200" ]; then
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "  ✅ DEPLOYMENT SUCCESSFUL"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            else
+              echo "❌ Health check failed — HTTP $status"
+              docker compose logs webapp --tail=20
+              exit 1
+            fi
