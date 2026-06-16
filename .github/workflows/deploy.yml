@@ -114,4 +114,4 @@ jobs:
             status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/login)
             echo "=== Webapp health check: HTTP $status ==="
             [ "$status" = "200" ] || exit 1
-            echo "==== Deployment successful ===="
+            echo "==== Deployment successful ====="
