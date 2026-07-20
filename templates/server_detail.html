@@ -85,6 +85,18 @@
 
 {% block content %}
 
+{% if machine.status == 'offline' %}
+<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-size:13px;color:#ef4444;">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+  <span>This machine is <strong>offline</strong> — charts and metrics below show the <strong>last recorded data only</strong> and are not live.</span>
+</div>
+<style>
+  .metric-row { opacity: 0.55; filter: grayscale(50%); }
+  .metric-val { color: var(--text-muted) !important; }
+  .disk-section, .procs-card { opacity: 0.55; filter: grayscale(50%); }
+</style>
+{% endif %}
+
 <!-- ── Header ── -->
 <div class="server-header">
   <div class="server-title">
@@ -819,6 +831,11 @@ async function pollLive() {
   }
 }
 
+{% if machine.status == 'offline' %}
+// Machine is offline — do not poll live data
+// Charts show last recorded historical data
+{% else %}
 setInterval(pollLive, 2000);
+{% endif %}
 </script>
 {% endblock %}
