@@ -145,7 +145,7 @@ jobs:
         run: |
           files=(
             "server/main.py" "server/Dockerfile"
-            "server/requirements.txt" 
+            "server/requirements.txt"
             "server/dashboard_manager.py"
           )
           for f in "${files[@]}"; do
