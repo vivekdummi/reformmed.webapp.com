@@ -157,7 +157,7 @@ async def register(request: Request, x_api_key: str = Header(...)):
                 (system_name, location, table_name, os_type, hostname, public_ip, last_seen, status)
             VALUES ($1, $2, $3, $4, $5, $6, NOW(), 'online')
             ON CONFLICT (table_name) DO UPDATE
-            SET last_seen=NOW(), status='online', os_type=$4, hostname=$5, public_ip=$6
+            SET last_seen=NOW(), os_type=$4, hostname=$5, public_ip=$6
         """, system_name, location, table_name,
             data.get("os_type"), data.get("hostname"), data.get("public_ip"))
 
@@ -225,7 +225,7 @@ async def metrics(request: Request, x_api_key: str = Header(...)):
     async with pool.acquire() as conn:
         await conn.execute("""
             UPDATE machine_registry
-            SET last_seen=NOW(), status='online', public_ip=$2, hostname=$3
+            SET last_seen=NOW(), public_ip=$2, hostname=$3
             WHERE table_name=$1
         """, table_name, data.get("public_ip"), data.get("hostname"))
 
