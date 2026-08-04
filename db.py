@@ -17,6 +17,11 @@ DB_CONFIG = {
     "dbname":   os.getenv("POSTGRES_DB", "monitor_machine"),
     "user":     os.getenv("POSTGRES_USER", "admin"),
     "password": os.getenv("POSTGRES_PASSWORD", ""),
+    # Every session on this connection reads/writes timestamps as IST (UTC+5:30).
+    # TIMESTAMPTZ columns still store the correct absolute instant underneath —
+    # this only changes the timezone Postgres converts to when handing values
+    # back to psycopg2 (and therefore what str()/.strftime() show in templates).
+    "options":  "-c timezone=Asia/Kolkata",
 }
 
 

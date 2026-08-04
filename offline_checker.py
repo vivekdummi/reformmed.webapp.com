@@ -243,6 +243,7 @@ async def main():
         host=DB_HOST, port=DB_PORT, database=DB_NAME,
         user=DB_USER, password=DB_PASS,
         min_size=2, max_size=5,
+        server_settings={"timezone": "Asia/Kolkata"},
     )
     log.info("✅ Connected to database")
 

@@ -65,6 +65,7 @@ async def lifespan(app: FastAPI):
         host=DB_HOST, port=DB_PORT, database=DB_NAME,
         user=DB_USER, password=DB_PASS,
         min_size=5, max_size=20,
+        server_settings={"timezone": "Asia/Kolkata"},
     )
     # Ensure registry table exists and pre-load known tables
     async with pool.acquire() as conn:

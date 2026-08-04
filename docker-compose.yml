@@ -7,6 +7,7 @@ services:
       POSTGRES_USER:     ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB:       ${POSTGRES_DB}
+      TZ:                Asia/Kolkata
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -32,6 +33,7 @@ services:
       API_SECRET:        ${API_SECRET}
       API_HOST:          0.0.0.0
       API_PORT:          8000
+      TZ:                Asia/Kolkata
     ports:
       - "8000:8000"
     depends_on:
@@ -56,6 +58,7 @@ services:
       SMTP_HOST:         smtp.gmail.com
       SMTP_PORT:         "465"
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      TZ:                Asia/Kolkata
     ports:
       - "5000:5000"
     depends_on:
@@ -81,6 +84,7 @@ services:
       SMTP_PORT:           "465"
       OFFLINE_AFTER_SECS:  "60"
       CHECK_INTERVAL_SECS: "15"
+      TZ:                  Asia/Kolkata
     depends_on:
       postgres:
         condition: service_healthy
