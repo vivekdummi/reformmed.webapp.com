@@ -9,8 +9,20 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import asyncpg
+
+IST = ZoneInfo("Asia/Kolkata")
+
+
+def _fmt_ist(dt: datetime) -> str:
+    """Format a UTC-aware datetime as an IST string, e.g. '04 Aug 2026, 03:13 PM IST'."""
+    if dt is None:
+        return "—"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [CHECKER] %(message)s")
 log = logging.getLogger("checker")
@@ -53,8 +65,67 @@ GMAIL_PASS = os.getenv("GMAIL_APP_PASS", "")
 SMTP_HOST  = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT  = int(os.getenv("SMTP_PORT", "465"))
 
+# Per-alert-type look (accent color + icon) for the HTML card
+_ALERT_STYLE = {
+    "offline": ("#e5484d", "🔴", "OFFLINE"),
+    "online":  ("#2fb344", "🟢", "ONLINE"),
+    "cpu":     ("#f0883e", "🔥", "HIGH CPU"),
+    "ram":     ("#f0883e", "🧠", "HIGH RAM"),
+    "temp":    ("#f0883e", "🌡️", "HIGH TEMP"),
+    "disk":    ("#f0883e", "💿", "DISK FULL"),
+}
 
-def _send_email(subject: str, body: str, to_list: list[str]) -> bool:
+
+def _style_for(alert_type: str):
+    base_type = alert_type.split(":", 1)[0]  # "disk:/mount" → "disk"
+    return _ALERT_STYLE.get(base_type, ("#6b7280", "⚠️", alert_type.upper()))
+
+
+def _render_alert(alert_type: str, system_name: str, location: str,
+                   rows: list[tuple[str, str]], now: datetime = None) -> tuple[str, str, str]:
+    """
+    Build (subject, plain_text, html) for an alert.
+    rows: ordered list of (label, value) pairs shown in the email body,
+          e.g. [("Last seen", "..."), ("Threshold", "90%")]
+    """
+    color, icon, label = _style_for(alert_type)
+    now = now or datetime.now(timezone.utc)
+    subject = f"{icon} {label} — {system_name} ({location})"
+
+    all_rows = [("Machine", system_name), ("Location", location)] + rows + \
+               [("Time", _fmt_ist(now))]
+
+    plain_lines = [f"{label} — {system_name} ({location})", ""]
+    plain_lines += [f"{lbl}: {val}" for lbl, val in all_rows]
+    plain = "\n".join(plain_lines)
+
+    html_rows = "".join(
+        f'<tr>'
+        f'<td style="padding:7px 0;color:#8a8f98;font-size:13px;width:120px;">{lbl}</td>'
+        f'<td style="padding:7px 0;color:#1c1e21;font-size:13px;font-weight:600;">{val}</td>'
+        f'</tr>'
+        for lbl, val in all_rows
+    )
+    html = f"""\
+<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:480px;margin:0 auto;
+            border:1px solid #e6e6e9;border-radius:10px;overflow:hidden;">
+  <div style="background:{color};padding:16px 22px;">
+    <span style="color:#ffffff;font-size:15px;font-weight:700;letter-spacing:.2px;">
+      {icon}&nbsp; {label}
+    </span>
+  </div>
+  <div style="padding:20px 22px;background:#ffffff;">
+    <table style="width:100%;border-collapse:collapse;">{html_rows}</table>
+  </div>
+  <div style="background:#f7f7f9;padding:10px 22px;border-top:1px solid #eee;">
+    <span style="font-size:11px;color:#a0a4ab;">REFORMMED Monitor · automated alert</span>
+  </div>
+</div>
+"""
+    return subject, plain, html
+
+
+def _send_email(subject: str, plain: str, html: str, to_list: list[str]) -> bool:
     if not GMAIL_USER or not GMAIL_PASS or not to_list:
         log.warning("Email not configured or no recipients — skipping: %s", subject)
         return False
@@ -63,7 +134,8 @@ def _send_email(subject: str, body: str, to_list: list[str]) -> bool:
         msg["Subject"] = f"[REFORMMED] {subject}"
         msg["From"]    = GMAIL_USER
         msg["To"]      = ", ".join(to_list)
-        msg.attach(MIMEText(body, "plain"))
+        msg.attach(MIMEText(plain, "plain"))
+        msg.attach(MIMEText(html, "html"))
         ctx = ssl.create_default_context()
         with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx) as srv:
             srv.login(GMAIL_USER, GMAIL_PASS)
@@ -97,16 +169,18 @@ def _recipients(config: dict, atype: str) -> list[str]:
     return [e.strip() for e in emails.split(",") if e.strip()]
 
 
-async def _alert(conn, config: dict, machine_key: str, alert_type: str, subject: str, body: str):
+async def _alert(conn, config: dict, machine_key: str, alert_type: str,
+                  system_name: str, location: str, rows: list[tuple[str, str]]):
     cfg = config.get(alert_type, {})
     if not cfg.get("enabled", True):
         return
     cooldown = cfg.get("cooldown_minutes", 10)
     if _cooldown_ok(machine_key, alert_type, cooldown):
+        subject, plain, html = _render_alert(alert_type, system_name, location, rows)
         to_list = _recipients(config, alert_type)
-        ok = _send_email(subject, body, to_list)
+        ok = _send_email(subject, plain, html, to_list)
         _mark_sent(machine_key, alert_type)
-        await _log_alert(conn, alert_type, machine_key, subject, body, ok)
+        await _log_alert(conn, alert_type, machine_key, subject, plain, ok)
 
 
 async def check_metrics(conn, machine, config):
@@ -137,19 +211,16 @@ async def check_metrics(conn, machine, config):
     temp = row["cpu_temp"]
 
     if cpu is not None and cpu_cfg.get("enabled") and cpu >= (cpu_cfg.get("threshold") or 90):
-        await _alert(conn, config, key, "cpu",
-                     f"🔥 HIGH CPU — {system_name} ({location})",
-                     f"CPU usage is {cpu:.1f}% (threshold: {cpu_cfg.get('threshold')}%)\nMachine: {system_name} | {location}")
+        await _alert(conn, config, key, "cpu", system_name, location,
+                     [("CPU usage", f"{cpu:.1f}%"), ("Threshold", f"{cpu_cfg.get('threshold')}%")])
 
     if ram is not None and ram_cfg.get("enabled") and ram >= (ram_cfg.get("threshold") or 90):
-        await _alert(conn, config, key, "ram",
-                     f"🧠 HIGH RAM — {system_name} ({location})",
-                     f"RAM usage is {ram:.1f}% (threshold: {ram_cfg.get('threshold')}%)\nMachine: {system_name} | {location}")
+        await _alert(conn, config, key, "ram", system_name, location,
+                     [("RAM usage", f"{ram:.1f}%"), ("Threshold", f"{ram_cfg.get('threshold')}%")])
 
     if temp is not None and temp_cfg.get("enabled") and temp >= (temp_cfg.get("threshold") or 80):
-        await _alert(conn, config, key, "temp",
-                     f"🌡️ HIGH TEMP — {system_name} ({location})",
-                     f"CPU temp is {temp:.1f}°C (threshold: {temp_cfg.get('threshold')}°C)\nMachine: {system_name} | {location}")
+        await _alert(conn, config, key, "temp", system_name, location,
+                     [("CPU temp", f"{temp:.1f}°C"), ("Threshold", f"{temp_cfg.get('threshold')}°C")])
 
     if row["disk_partitions"] and disk_cfg.get("enabled"):
         partitions = row["disk_partitions"]
@@ -162,9 +233,8 @@ async def check_metrics(conn, machine, config):
                 continue
             pct = float(part.get("percent", 0))
             if pct >= disk_thresh:
-                await _alert(conn, config, key, f"disk:{mount}",
-                             f"💿 DISK FULL — {system_name} ({location}) [{mount}]",
-                             f"Disk {mount} is {pct:.1f}% full (threshold: {disk_thresh}%)\nMachine: {system_name} | {location}")
+                await _alert(conn, config, key, f"disk:{mount}", system_name, location,
+                             [("Mount", mount), ("Usage", f"{pct:.1f}%"), ("Threshold", f"{disk_thresh}%")])
 
 
 async def main():
@@ -204,14 +274,12 @@ async def main():
                         )
                         if new_status == "offline" and offline_cfg.get("enabled", True):
                             log.warning("🔴 %s (%s) went OFFLINE", system_name, location)
-                            await _alert(conn, config, key, "offline",
-                                         f"🔴 OFFLINE — {system_name} ({location})",
-                                         f"{system_name} at {location} went OFFLINE.\nLast seen: {last_seen.isoformat()}")
+                            await _alert(conn, config, key, "offline", system_name, location,
+                                         [("Last seen", _fmt_ist(last_seen))])
                         elif new_status == "online" and online_cfg.get("enabled", True):
                             log.info("🟢 %s (%s) came back ONLINE", system_name, location)
-                            await _alert(conn, config, key, "online",
-                                         f"🟢 RECOVERED — {system_name} ({location})",
-                                         f"{system_name} at {location} is back ONLINE.")
+                            await _alert(conn, config, key, "online", system_name, location,
+                                         [("Back online since", _fmt_ist(now))])
 
                     if new_status == "online":
                         await check_metrics(conn, machine, config)
