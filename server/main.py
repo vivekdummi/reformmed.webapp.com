@@ -80,8 +80,15 @@ async def lifespan(app: FastAPI):
                 public_ip TEXT,
                 registered_at TIMESTAMPTZ DEFAULT NOW(),
                 last_seen TIMESTAMPTZ,
-                status TEXT DEFAULT 'offline'
+                status TEXT DEFAULT 'offline',
+                alerts_enabled BOOLEAN NOT NULL DEFAULT TRUE
             )
+        """)
+        # Idempotent — safe to run on every startup, only matters for DBs
+        # created before this column existed.
+        await conn.execute("""
+            ALTER TABLE machine_registry
+            ADD COLUMN IF NOT EXISTS alerts_enabled BOOLEAN NOT NULL DEFAULT TRUE
         """)
         await _load_registered_tables(conn)
     log.info(f"✅ Connected to {DB_HOST} as {DB_USER} — {len(registered_tables)} machines loaded")

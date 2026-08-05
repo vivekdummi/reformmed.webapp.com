@@ -22,7 +22,7 @@ def index():
         if allowed is None:
             cur.execute("""
                 SELECT system_name, location, table_name, os_type, hostname,
-                       public_ip, registered_at, last_seen, status
+                       public_ip, registered_at, last_seen, status, alerts_enabled
                 FROM machine_registry ORDER BY system_name, location
             """)
         else:
@@ -31,7 +31,7 @@ def index():
             placeholders = ",".join(["%s"] * len(allowed))
             cur.execute(f"""
                 SELECT system_name, location, table_name, os_type, hostname,
-                       public_ip, registered_at, last_seen, status
+                       public_ip, registered_at, last_seen, status, alerts_enabled
                 FROM machine_registry WHERE table_name IN ({placeholders})
                 ORDER BY system_name, location
             """, list(allowed))
@@ -127,6 +127,30 @@ def detail(table_name):
         chart_net_sent=json.dumps(chart_net_sent),
         chart_net_recv=json.dumps(chart_net_recv),
     )
+
+
+@servers_bp.route("/<table_name>/toggle-alerts", methods=["POST"])
+@login_required
+def toggle_alerts(table_name):
+    """Mute/unmute alert emails for one machine — status tracking is unaffected."""
+    _check_access(table_name)
+    if current_user.role != "admin":
+        abort(403)
+
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE machine_registry
+            SET alerts_enabled = NOT alerts_enabled
+            WHERE table_name = %s
+            RETURNING alerts_enabled
+        """, (table_name,))
+        row = cur.fetchone()
+        conn.commit()
+
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"alerts_enabled": row["alerts_enabled"]})
 
 
 @servers_bp.route("/<table_name>/live")

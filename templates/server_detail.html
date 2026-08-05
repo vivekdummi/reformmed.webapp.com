@@ -115,10 +115,39 @@
       </div>
     </div>
   </div>
-  <div style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:5px;">
-    <span class="pulse"></span> Live · 2s refresh
+  <div style="display:flex;align-items:center;gap:16px;">
+    {% if current_user.role == 'admin' %}
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);cursor:pointer;user-select:none;">
+      <span id="alerts-toggle-label">{{ 'Alerts on' if machine.alerts_enabled else 'Alerts muted' }}</span>
+      <span id="alerts-toggle-switch" onclick="toggleAlerts()"
+            style="position:relative;width:36px;height:20px;border-radius:10px;transition:background .2s;
+                   background:{{ '#22c55e' if machine.alerts_enabled else 'rgba(255,255,255,.15)' }};display:inline-block;">
+        <span id="alerts-toggle-knob"
+              style="position:absolute;top:2px;left:{{ '18px' if machine.alerts_enabled else '2px' }};
+                     width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;"></span>
+      </span>
+    </label>
+    {% endif %}
+    <div style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:5px;">
+      <span class="pulse"></span> Live · 2s refresh
+    </div>
   </div>
 </div>
+
+<script>
+function toggleAlerts() {
+  fetch("{{ url_for('servers.toggle_alerts', table_name=machine.table_name) }}", { method: "POST" })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) return;
+      const on = data.alerts_enabled;
+      document.getElementById("alerts-toggle-label").textContent = on ? "Alerts on" : "Alerts muted";
+      document.getElementById("alerts-toggle-switch").style.background = on ? "#22c55e" : "rgba(255,255,255,.15)";
+      document.getElementById("alerts-toggle-knob").style.left = on ? "18px" : "2px";
+    })
+    .catch(() => {});
+}
+</script>
 
 <!-- ═══ CPU ═══ -->
 <div class="metric-row">

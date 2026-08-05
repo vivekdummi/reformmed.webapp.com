@@ -36,6 +36,7 @@
           <th>Public IP</th>
           <th>Last Seen</th>
           <th>Registered</th>
+          <th>Alerts</th>
           <th></th>
         </tr>
       </thead>
@@ -65,13 +66,26 @@
             {{ m.registered_at.strftime('%Y-%m-%d') if m.registered_at else '—' }}
           </td>
           <td>
+            {% if current_user.role == 'admin' %}
+            <span class="alerts-toggle-switch" data-table="{{ m.table_name }}" onclick="toggleRowAlerts(this)"
+                  style="position:relative;width:32px;height:18px;border-radius:9px;cursor:pointer;display:inline-block;
+                         background:{{ '#22c55e' if m.alerts_enabled else 'rgba(255,255,255,.15)' }};">
+              <span class="alerts-toggle-knob"
+                    style="position:absolute;top:2px;left:{{ '16px' if m.alerts_enabled else '2px' }};
+                           width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s;"></span>
+            </span>
+            {% else %}
+            <span class="text-muted" style="font-size:12px">{{ 'On' if m.alerts_enabled else 'Muted' }}</span>
+            {% endif %}
+          </td>
+          <td>
             <a href="{{ url_for('servers.detail', table_name=m.table_name) }}"
                class="btn btn-primary btn-sm">Details →</a>
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="9" style="text-align:center;color:var(--text-muted);padding:48px">
+          <td colspan="10" style="text-align:center;color:var(--text-muted);padding:48px">
             No machines registered yet.
           </td>
         </tr>
@@ -84,6 +98,19 @@
 
 {% block extra_js %}
 <script>
+  function toggleRowAlerts(el) {
+    const tableName = el.dataset.table;
+    fetch(`/servers/${tableName}/toggle-alerts`, { method: "POST" })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) return;
+        const on = data.alerts_enabled;
+        el.style.background = on ? "#22c55e" : "rgba(255,255,255,.15)";
+        el.querySelector(".alerts-toggle-knob").style.left = on ? "16px" : "2px";
+      })
+      .catch(() => {});
+  }
+
   const searchInput  = document.getElementById('search');
   const statusFilter = document.getElementById('filter-status');
 

@@ -44,6 +44,20 @@ def init_db():
     with get_db() as conn:
         cur = conn.cursor()
 
+        # machine_registry itself is created by the ingestion API (server/main.py)
+        # — this guard just makes sure the alerts_enabled column exists regardless
+        # of which service (webapp or api) happens to start first. Wrapped since
+        # the table itself may not exist yet on a brand-new DB if webapp starts
+        # before the API's own migration has run.
+        try:
+            cur.execute("""
+                ALTER TABLE machine_registry
+                ADD COLUMN IF NOT EXISTS alerts_enabled BOOLEAN NOT NULL DEFAULT TRUE
+            """)
+        except Exception as e:
+            conn.rollback()
+            log.warning("alerts_enabled migration skipped (machine_registry not created yet): %s", e)
+
         # ── Users table ──────────────────────────────────────────────────────
         cur.execute("""
             CREATE TABLE IF NOT EXISTS webapp_users (

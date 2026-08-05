@@ -183,7 +183,7 @@ async def _alert(conn, config: dict, machine_key: str, alert_type: str,
         await _log_alert(conn, alert_type, machine_key, subject, plain, ok)
 
 
-async def check_metrics(conn, machine, config):
+async def check_metrics(conn, machine, config, alerts_enabled=True):
     system_name = machine["system_name"]
     location    = machine["location"]
     table_name  = machine["table_name"]
@@ -200,6 +200,9 @@ async def check_metrics(conn, machine, config):
 
     if not row:
         return
+
+    if not alerts_enabled:
+        return  # metrics still collected/stored as normal — only alerting is muted
 
     cpu_cfg  = config.get("cpu",  {})
     ram_cfg  = config.get("ram",  {})
@@ -263,6 +266,7 @@ async def main():
                     location       = machine["location"]
                     current_status = machine["status"]
                     last_seen      = machine["last_seen"]
+                    alerts_enabled = machine["alerts_enabled"]
                     key            = f"{system_name}@{location}"
 
                     seconds_offline = (now - last_seen).total_seconds()
@@ -273,7 +277,12 @@ async def main():
                             "UPDATE machine_registry SET status=$1 WHERE system_name=$2 AND location=$3",
                             new_status, system_name, location,
                         )
-                        if new_status == "offline" and offline_cfg.get("enabled", True):
+                        # Status always updates so the dashboard reflects reality —
+                        # alerts_enabled only controls whether we email about it.
+                        if not alerts_enabled:
+                            log.info("🔕 %s (%s) → %s (alerts muted for this machine)",
+                                     system_name, location, new_status)
+                        elif new_status == "offline" and offline_cfg.get("enabled", True):
                             log.warning("🔴 %s (%s) went OFFLINE", system_name, location)
                             await _alert(conn, config, key, "offline", system_name, location,
                                          [("Last seen", _fmt_ist(last_seen))])
@@ -283,7 +292,7 @@ async def main():
                                          [("Back online since", _fmt_ist(now))])
 
                     if new_status == "online":
-                        await check_metrics(conn, machine, config)
+                        await check_metrics(conn, machine, config, alerts_enabled)
 
             await asyncio.sleep(CHECK_INTERVAL_SECS)
 
