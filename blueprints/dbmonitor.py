@@ -3,6 +3,14 @@ DB Monitor blueprint — watches external PostgreSQL tables for live data.
 Shows LIVE / DEAD status per table (dead = no new rows in 5 min).
 Sends alert email when data stops, repeats every 1 hour until data resumes.
 Per-table controls: monitoring on/off, alerts on/off.
+
+Per-location breakdown: many watched tables mix rows from several physical
+locations (e.g. bodycraft_hospital_data has Vatika, JP Nagar, Sadashiva
+Nagar, ...). A table can look LIVE overall while one location's cameras are
+silently disconnected, because other locations keep rows flowing into the
+same table. Expanding a watch row auto-discovers distinct "Location" values
+and tracks live/dead + alert state for each one independently
+(dbmon_watch_locations table).
 """
 import smtplib
 import os
@@ -74,6 +82,27 @@ def init_dbmonitor_tables():
             except Exception:
                 pass
 
+        # ── Per-location breakdown within a watched table ───────────────────
+        # A single watch (e.g. bodycraft.bodycraft_hospital_data) mixes rows
+        # from many physical locations. This table tracks live/dead + alert
+        # state PER location value so one dead branch doesn't hide behind
+        # other branches that are still pushing data into the same table.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS dbmon_watch_locations (
+                id               SERIAL PRIMARY KEY,
+                watch_id         INTEGER NOT NULL REFERENCES dbmon_watches(id) ON DELETE CASCADE,
+                location_value   TEXT NOT NULL,
+                monitoring       BOOLEAN NOT NULL DEFAULT TRUE,
+                alerts_enabled   BOOLEAN NOT NULL DEFAULT TRUE,
+                alert_emails     TEXT NOT NULL DEFAULT '',
+                last_seen        TIMESTAMPTZ,
+                last_alert_sent  TIMESTAMPTZ,
+                was_dead         BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at       TIMESTAMPTZ DEFAULT NOW(),
+                UNIQUE(watch_id, location_value)
+            )
+        """)
+
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -132,9 +161,54 @@ def _detect_time_col_by_type(cur, schema, table):
     return None, None
 
 
-def _send_alert(watch_row, subject, body):
-    """Send alert email and log to unified alert_log."""
-    emails = [e.strip() for e in (watch_row.get("alert_emails") or "").split(",") if e.strip()]
+def _detect_location_col(cur, schema, table):
+    """
+    Find the column that holds the branch/location value, e.g. "Location".
+    Case-insensitive; tries an exact-name match first, then a substring match.
+    Returns column_name or None.
+    """
+    cur.execute("""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = %s AND table_name = %s
+        ORDER BY ordinal_position
+    """, (schema, table))
+    cols = [r["column_name"] for r in cur.fetchall()]
+    lower_map = {c.lower(): c for c in cols}
+
+    for exact in ("location", "site", "branch", "hospital", "clinic"):
+        if exact in lower_map:
+            return lower_map[exact]
+    for c in cols:
+        if "location" in c.lower():
+            return c
+    return None
+
+
+def _detect_area_col(cur, schema, table):
+    """Find an optional secondary grouping column (e.g. "Area") for display only."""
+    cur.execute("""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = %s AND table_name = %s
+        ORDER BY ordinal_position
+    """, (schema, table))
+    cols = [r["column_name"] for r in cur.fetchall()]
+    lower_map = {c.lower(): c for c in cols}
+    for exact in ("area", "room", "zone"):
+        if exact in lower_map:
+            return lower_map[exact]
+    return None
+
+
+def _send_alert(watch_row, subject, body, machine_key=None, alert_emails=None):
+    """Send alert email and log to unified alert_log.
+
+    machine_key / alert_emails let callers override the defaults derived from
+    watch_row — used for per-location alerts (e.g. "bodycraft.bodycraft_hospital_data:Bodycraft Sadashiva Nagar").
+    """
+    emails_src = alert_emails if alert_emails is not None else watch_row.get("alert_emails")
+    emails = [e.strip() for e in (emails_src or "").split(",") if e.strip()]
     ok = False
     if emails:
         smtp_host = os.getenv("SMTP_HOST", "")
@@ -157,7 +231,8 @@ def _send_alert(watch_row, subject, body):
             except Exception as e:
                 print(f"[dbmonitor] alert email failed: {e}")
     # Log to unified alert_log
-    machine_key = f"{watch_row.get('schema_name','')}.{watch_row.get('table_name','')}"
+    if machine_key is None:
+        machine_key = f"{watch_row.get('schema_name','')}.{watch_row.get('table_name','')}"
     try:
         with get_db() as conn:
             conn.cursor().execute("""
@@ -320,6 +395,199 @@ def update_emails(watch_id):
     return redirect(url_for("dbmonitor.index"))
 
 
+@dbmonitor_bp.route("/watch/<int:watch_id>/location/<int:loc_id>/toggle-monitoring", methods=["POST"])
+@login_required
+def toggle_location_monitoring(watch_id, loc_id):
+    _admin_required()
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT monitoring FROM dbmon_watch_locations WHERE id=%s AND watch_id=%s",
+            (loc_id, watch_id)
+        )
+        row = cur.fetchone()
+        if row:
+            cur.execute(
+                "UPDATE dbmon_watch_locations SET monitoring=%s WHERE id=%s",
+                (not row["monitoring"], loc_id)
+            )
+    return jsonify({"ok": bool(row)})
+
+
+@dbmonitor_bp.route("/watch/<int:watch_id>/location/<int:loc_id>/toggle-alerts", methods=["POST"])
+@login_required
+def toggle_location_alerts(watch_id, loc_id):
+    _admin_required()
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT alerts_enabled FROM dbmon_watch_locations WHERE id=%s AND watch_id=%s",
+            (loc_id, watch_id)
+        )
+        row = cur.fetchone()
+        if row:
+            cur.execute(
+                "UPDATE dbmon_watch_locations SET alerts_enabled=%s WHERE id=%s",
+                (not row["alerts_enabled"], loc_id)
+            )
+    return jsonify({"ok": bool(row)})
+
+
+@dbmonitor_bp.route("/watch/<int:watch_id>/location/<int:loc_id>/update-emails", methods=["POST"])
+@login_required
+def update_location_emails(watch_id, loc_id):
+    _admin_required()
+    emails = (request.get_json(silent=True) or {}).get("alert_emails", "").strip()
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE dbmon_watch_locations SET alert_emails=%s WHERE id=%s AND watch_id=%s",
+            (emails, loc_id, watch_id)
+        )
+    return jsonify({"ok": True})
+
+
+def _location_breakdown(cur2, schema, table, time_col):
+    """
+    Group the external table by its Location column (bounded to the last 24h
+    for performance — full-table GROUP BY on a multi-million-row table would
+    be far too slow to run on every 10s poll).
+    Returns (location_col_name, area_col_name, rows) where rows have
+    loc / last_t / recent_cnt / area_cnt. Locations with zero rows in the
+    last 24h simply won't appear here — the caller falls back to cached
+    last_seen for those.
+    """
+    loc_col = _detect_location_col(cur2, schema, table)
+    if not loc_col or not time_col:
+        return loc_col, None, []
+
+    area_col = _detect_area_col(cur2, schema, table)
+    area_select = f', COUNT(DISTINCT "{area_col}") AS area_cnt' if area_col else ", NULL AS area_cnt"
+
+    cur2.execute(f"""
+        SELECT "{loc_col}" AS loc,
+               MAX("{time_col}") AS last_t,
+               COUNT(*) FILTER (
+                   WHERE "{time_col}" > NOW() - INTERVAL '{DEAD_THRESHOLD_MINUTES} minutes'
+               ) AS recent_cnt
+               {area_select}
+        FROM "{schema}"."{table}"
+        WHERE "{time_col}" > NOW() - INTERVAL '1 day'
+        GROUP BY "{loc_col}"
+    """)
+    return loc_col, area_col, cur2.fetchall()
+
+
+def _sync_and_check_locations(watch, watch_id, schema, table, loc_rows):
+    """
+    Upsert newly-seen locations, load per-location toggle state, run the
+    same dead/alert logic as the table-level check but scoped to each
+    location, and return the list to embed in the /status JSON response.
+    All bookkeeping happens on ONE connection to avoid opening a new
+    connection per location on every poll.
+    """
+    now = datetime.now(timezone.utc)
+    data_by_loc = {(r["loc"] if r["loc"] is not None else "(blank)"): r for r in loc_rows}
+
+    out = []
+    with get_db() as conn:
+        cur = conn.cursor()
+
+        # Discover any location values not tracked yet
+        for lv in data_by_loc:
+            cur.execute("""
+                INSERT INTO dbmon_watch_locations (watch_id, location_value)
+                VALUES (%s, %s)
+                ON CONFLICT (watch_id, location_value) DO NOTHING
+            """, (watch_id, lv))
+
+        cur.execute(
+            "SELECT * FROM dbmon_watch_locations WHERE watch_id=%s ORDER BY location_value",
+            (watch_id,)
+        )
+        tracked = cur.fetchall()
+
+        for loc in tracked:
+            lv = loc["location_value"]
+            d = data_by_loc.get(lv)
+            recent_cnt = (d["recent_cnt"] or 0) if d else 0
+            last_t     = d["last_t"] if d else loc["last_seen"]
+            area_cnt   = d.get("area_cnt") if d else None
+            loc_is_dead = (recent_cnt == 0)
+
+            if last_t and last_t != loc["last_seen"]:
+                cur.execute(
+                    "UPDATE dbmon_watch_locations SET last_seen=%s WHERE id=%s",
+                    (last_t, loc["id"])
+                )
+
+            entry = {
+                "id":             loc["id"],
+                "location":       lv,
+                "monitoring":     loc["monitoring"],
+                "alerts_enabled": loc["alerts_enabled"],
+                "alert_emails":   loc["alert_emails"],
+                "is_dead":        loc_is_dead if loc["monitoring"] else None,
+                "last_seen":      last_t.isoformat() if last_t else None,
+                "recent_rows":    recent_cnt,
+                "area_count":     area_cnt,
+            }
+
+            # Per-location alerting — same cooldown/recovery pattern as the table-level alert
+            if loc["monitoring"] and loc["alerts_enabled"]:
+                emails_for_loc = loc["alert_emails"] or watch.get("alert_emails")
+                if emails_for_loc:
+                    last_sent = loc["last_alert_sent"]
+                    was_dead  = loc["was_dead"]
+                    machine_key = f"{schema}.{table}:{lv}"
+                    label = watch["display_name"] or f"{schema}.{table}"
+
+                    if loc_is_dead:
+                        should_send = (last_sent is None) or \
+                                      ((now - last_sent).total_seconds() >= ALERT_REPEAT_HOURS * 3600)
+                        if should_send:
+                            _send_alert(
+                                watch,
+                                subject=f"[REFORMMED] ⚠ Data stopped: {lv} ({label})",
+                                body=(
+                                    f"Table: {schema}.{table}\n"
+                                    f"Location: {lv}\n"
+                                    f"Status: No new rows for this location in the last "
+                                    f"{DEAD_THRESHOLD_MINUTES} minutes (other locations in this "
+                                    f"table may still be live).\n"
+                                    f"Last data received: {entry['last_seen'] or 'unknown'}\n\n"
+                                    f"This alert repeats every {ALERT_REPEAT_HOURS} hour(s) until data resumes."
+                                ),
+                                machine_key=machine_key,
+                                alert_emails=emails_for_loc,
+                            )
+                            cur.execute(
+                                "UPDATE dbmon_watch_locations SET last_alert_sent=%s, was_dead=TRUE WHERE id=%s",
+                                (now, loc["id"])
+                            )
+                    elif was_dead:
+                        _send_alert(
+                            watch,
+                            subject=f"[REFORMMED] ✅ Data resumed: {lv} ({label})",
+                            body=(
+                                f"Table: {schema}.{table}\n"
+                                f"Location: {lv}\n"
+                                f"Status: Data is flowing again for this location.\n"
+                                f"Last row time: {entry['last_seen'] or 'unknown'}\n"
+                            ),
+                            machine_key=machine_key,
+                            alert_emails=emails_for_loc,
+                        )
+                        cur.execute(
+                            "UPDATE dbmon_watch_locations SET was_dead=FALSE, last_alert_sent=NULL WHERE id=%s",
+                            (loc["id"],)
+                        )
+
+            out.append(entry)
+
+    return out
+
+
 @dbmonitor_bp.route("/watch/<int:watch_id>/status")
 @login_required
 def watch_status(watch_id):
@@ -401,7 +669,17 @@ def watch_status(watch_id):
             )
             rows_last_1min = cur2.fetchone()["cnt"]
 
+        # ── Per-location breakdown (Location column within this same table) ──
+        loc_col = area_col = None
+        loc_rows = []
+        if time_col:
+            loc_col, area_col, loc_rows = _location_breakdown(cur2, schema, table, time_col)
+
         c.close()
+
+        locations_out = []
+        if loc_col:
+            locations_out = _sync_and_check_locations(watch, watch_id, schema, table, loc_rows)
 
         # Determine live/dead
         is_dead = (rows_last_5min == 0)
@@ -462,6 +740,9 @@ def watch_status(watch_id):
             "rows_last_5min":  rows_last_5min,
             "rows_last_1min":  rows_last_1min,
             "time_col":        time_col,
+            "location_col":    loc_col,
+            "area_col":        area_col,
+            "locations":       locations_out,
         })
 
     except Exception as e:

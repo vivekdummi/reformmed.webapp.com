@@ -170,6 +170,49 @@
 
 /* conn table */
 .conn-row td { font-size: 12px; }
+
+/* ── Location expand panel ── */
+.wcard-expand-btn {
+  background: none; border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-muted); font-size: 11px; padding: 6px 10px; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.wcard-expand-btn:hover { color: var(--text); border-color: var(--accent); }
+.wcard-expand-btn .chev { transition: transform .15s; display: inline-block; }
+.wcard-expand-btn.open .chev { transform: rotate(90deg); }
+
+.wloc-panel {
+  display: none;
+  border-top: 1px solid var(--border);
+  padding: 14px 20px;
+  background: var(--bg1, rgba(0,0,0,.15));
+}
+.wloc-panel.open { display: block; }
+.wloc-panel-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
+.wloc-row {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 9px 12px; border-radius: 8px; background: var(--bg2);
+  border: 1px solid var(--border); margin-bottom: 6px;
+}
+.wloc-row.dead { border-color: rgba(239,68,68,.35); }
+.wloc-row.live { border-color: rgba(34,197,94,.25); }
+.wloc-name { font-weight: 600; font-size: 13px; flex: 1; min-width: 140px; }
+.wloc-sub  { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+.wloc-pill {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+  padding: 3px 9px; border-radius: 99px; letter-spacing: .4px;
+}
+.wloc-pill.live   { background: rgba(34,197,94,.12); color: var(--green); }
+.wloc-pill.dead   { background: rgba(239,68,68,.12); color: var(--red); }
+.wloc-pill.paused { background: rgba(245,158,11,.1); color: var(--yellow); }
+.wloc-toggles { display: flex; gap: 6px; }
+.wloc-tog {
+  border: 1px solid var(--border); background: none; border-radius: 6px;
+  font-size: 10px; padding: 4px 8px; cursor: pointer; color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+.wloc-tog.on-monitor { color: var(--accent); border-color: var(--accent); }
+.wloc-tog.on-alert   { color: var(--yellow); border-color: var(--yellow); }
 </style>
 {% endblock %}
 
@@ -250,6 +293,12 @@
       </div>
     </div>
 
+    <!-- Expand: per-location breakdown -->
+    <button type="button" class="wcard-expand-btn" id="expand-btn-{{ w.id }}"
+            onclick="toggleLocPanel({{ w.id }})">
+      <span class="chev">▸</span> <span id="expand-lbl-{{ w.id }}">Locations</span>
+    </button>
+
     <!-- Toggles + remove -->
     <div class="toggles">
       {% if current_user.is_admin %}
@@ -283,6 +332,14 @@
       {% endif %}
     </div>
 
+  </div>
+
+  <!-- Per-location breakdown panel (populated by JS from /status) -->
+  <div class="wloc-panel" id="wloc-panel-{{ w.id }}">
+    <div class="wloc-panel-title">Locations in this table</div>
+    <div id="wloc-list-{{ w.id }}">
+      <div class="text-muted" style="font-size:12px;">Loading…</div>
+    </div>
   </div>
 
   <!-- Email config row (admin only) -->
@@ -395,6 +452,8 @@
 {% block extra_js %}
 <script>
 const WATCH_IDS = {{ watches | map(attribute='id') | list | tojson }};
+const IS_ADMIN  = {{ current_user.is_admin | tojson }};
+const OPEN_PANELS = new Set();  // watch ids whose location panel is expanded
 
 // Format timestamp → precise human string showing exact time
 function fmtTime(iso) {
@@ -472,9 +531,99 @@ async function loadStatus(id) {
       rpmEl.style.color = d.rows_last_1min > 0 ? 'var(--green)' : 'var(--text-muted)';
     }
 
+    renderLocations(id, d.location_col, d.locations || []);
+
   } catch(e) {
     console.error('status fetch failed for watch', id, e);
   }
+}
+
+// ── Per-location breakdown panel ──────────────────────────────────────────
+
+function toggleLocPanel(watchId) {
+  const panel = document.getElementById('wloc-panel-' + watchId);
+  const btn   = document.getElementById('expand-btn-' + watchId);
+  if (!panel) return;
+  const nowOpen = !panel.classList.contains('open');
+  panel.classList.toggle('open', nowOpen);
+  btn.classList.toggle('open', nowOpen);
+  if (nowOpen) OPEN_PANELS.add(watchId); else OPEN_PANELS.delete(watchId);
+}
+
+function renderLocations(watchId, locationCol, locations) {
+  const btnLbl = document.getElementById('expand-lbl-' + watchId);
+  const listEl = document.getElementById('wloc-list-' + watchId);
+  if (!listEl) return;
+
+  if (!locationCol) {
+    if (btnLbl) btnLbl.textContent = 'No Location column';
+    listEl.innerHTML = '<div class="text-muted" style="font-size:12px;">' +
+      'No "Location" column was found on this table, so it can\'t be broken down.</div>';
+    return;
+  }
+
+  const deadCount = locations.filter(l => l.monitoring && l.is_dead).length;
+  if (btnLbl) {
+    btnLbl.textContent = 'Locations (' + locations.length + ')' +
+      (deadCount ? ' — ' + deadCount + ' dead' : '');
+    btnLbl.style.color = deadCount ? 'var(--red)' : '';
+  }
+
+  if (!locations.length) {
+    listEl.innerHTML = '<div class="text-muted" style="font-size:12px;">No locations discovered yet.</div>';
+    return;
+  }
+
+  listEl.innerHTML = locations.map(loc => {
+    let pillClass = 'paused', pillText = 'OFF';
+    if (loc.monitoring) {
+      pillClass = loc.is_dead ? 'dead' : 'live';
+      pillText  = loc.is_dead ? 'DEAD' : 'LIVE';
+    }
+    const rowClass = loc.monitoring ? (loc.is_dead ? 'dead' : 'live') : '';
+    const areaTxt = (loc.area_count !== null && loc.area_count !== undefined)
+      ? loc.area_count + ' area' + (loc.area_count === 1 ? '' : 's') + ' &bull; ' : '';
+
+    let toggles = '';
+    if (IS_ADMIN) {
+      toggles = `
+        <div class="wloc-toggles">
+          <button class="wloc-tog ${loc.monitoring ? 'on-monitor' : ''}"
+                  onclick="toggleLocMonitor(${watchId}, ${loc.id})">
+            ${loc.monitoring ? '● MONITOR' : '○ MONITOR'}
+          </button>
+          <button class="wloc-tog ${loc.alerts_enabled ? 'on-alert' : ''}"
+                  onclick="toggleLocAlert(${watchId}, ${loc.id})">
+            ${loc.alerts_enabled ? '🔔 ALERT' : '🔕 ALERT'}
+          </button>
+        </div>`;
+    }
+
+    return `
+      <div class="wloc-row ${rowClass}">
+        <div class="wloc-name">${escapeHtml(loc.location)}
+          <div class="wloc-sub">${areaTxt}last seen: ${fmtTime(loc.last_seen)}</div>
+        </div>
+        <span class="wloc-pill ${pillClass}">${pillText}</span>
+        ${toggles}
+      </div>`;
+  }).join('');
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+
+async function toggleLocMonitor(watchId, locId) {
+  await fetch('/dbmonitor/watch/' + watchId + '/location/' + locId + '/toggle-monitoring', { method: 'POST' });
+  loadStatus(watchId);
+}
+
+async function toggleLocAlert(watchId, locId) {
+  await fetch('/dbmonitor/watch/' + watchId + '/location/' + locId + '/toggle-alerts', { method: 'POST' });
+  loadStatus(watchId);
 }
 
 async function refreshAll() {
