@@ -103,6 +103,27 @@ def init_dbmonitor_tables():
             )
         """)
 
+        # ── Per-area breakdown, nested one level under location ─────────────
+        # Same idea one level finer: within one location, one camera/area
+        # (e.g. "Sadashiva Nagar FF Reception") can go dead while siblings
+        # under the same location keep pushing rows.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS dbmon_watch_areas (
+                id               SERIAL PRIMARY KEY,
+                watch_id         INTEGER NOT NULL REFERENCES dbmon_watches(id) ON DELETE CASCADE,
+                location_value   TEXT NOT NULL,
+                area_value       TEXT NOT NULL,
+                monitoring       BOOLEAN NOT NULL DEFAULT TRUE,
+                alerts_enabled   BOOLEAN NOT NULL DEFAULT TRUE,
+                alert_emails     TEXT NOT NULL DEFAULT '',
+                last_seen        TIMESTAMPTZ,
+                last_alert_sent  TIMESTAMPTZ,
+                was_dead         BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at       TIMESTAMPTZ DEFAULT NOW(),
+                UNIQUE(watch_id, location_value, area_value)
+            )
+        """)
+
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -447,13 +468,65 @@ def update_location_emails(watch_id, loc_id):
     return jsonify({"ok": True})
 
 
+@dbmonitor_bp.route("/watch/<int:watch_id>/area/<int:area_id>/toggle-monitoring", methods=["POST"])
+@login_required
+def toggle_area_monitoring(watch_id, area_id):
+    _admin_required()
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT monitoring FROM dbmon_watch_areas WHERE id=%s AND watch_id=%s",
+            (area_id, watch_id)
+        )
+        row = cur.fetchone()
+        if row:
+            cur.execute(
+                "UPDATE dbmon_watch_areas SET monitoring=%s WHERE id=%s",
+                (not row["monitoring"], area_id)
+            )
+    return jsonify({"ok": bool(row)})
+
+
+@dbmonitor_bp.route("/watch/<int:watch_id>/area/<int:area_id>/toggle-alerts", methods=["POST"])
+@login_required
+def toggle_area_alerts(watch_id, area_id):
+    _admin_required()
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT alerts_enabled FROM dbmon_watch_areas WHERE id=%s AND watch_id=%s",
+            (area_id, watch_id)
+        )
+        row = cur.fetchone()
+        if row:
+            cur.execute(
+                "UPDATE dbmon_watch_areas SET alerts_enabled=%s WHERE id=%s",
+                (not row["alerts_enabled"], area_id)
+            )
+    return jsonify({"ok": bool(row)})
+
+
+@dbmonitor_bp.route("/watch/<int:watch_id>/area/<int:area_id>/update-emails", methods=["POST"])
+@login_required
+def update_area_emails(watch_id, area_id):
+    _admin_required()
+    emails = (request.get_json(silent=True) or {}).get("alert_emails", "").strip()
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE dbmon_watch_areas SET alert_emails=%s WHERE id=%s AND watch_id=%s",
+            (emails, area_id, watch_id)
+        )
+    return jsonify({"ok": True})
+
+
 def _location_breakdown(cur2, schema, table, time_col):
     """
-    Group the external table by its Location column (bounded to the last 24h
-    for performance — full-table GROUP BY on a multi-million-row table would
-    be far too slow to run on every 10s poll).
-    Returns (location_col_name, area_col_name, rows) where rows have
-    loc / last_t / recent_cnt / area_cnt. Locations with zero rows in the
+    Group the external table by Location (and Area, if present), bounded to
+    the last 24h for performance — a full-table GROUP BY on a multi-million
+    row table would be far too slow to run on every 10s poll.
+    Returns (location_col_name, area_col_name, rows) where each row has
+    loc / area / last_t / recent_cnt. Locations/areas with zero rows in the
     last 24h simply won't appear here — the caller falls back to cached
     last_seen for those.
     """
@@ -462,57 +535,91 @@ def _location_breakdown(cur2, schema, table, time_col):
         return loc_col, None, []
 
     area_col = _detect_area_col(cur2, schema, table)
-    area_select = f', COUNT(DISTINCT "{area_col}") AS area_cnt' if area_col else ", NULL AS area_cnt"
+    area_select = f', "{area_col}" AS area' if area_col else ", NULL AS area"
+    group_cols  = f'"{loc_col}", "{area_col}"' if area_col else f'"{loc_col}"'
 
     cur2.execute(f"""
-        SELECT "{loc_col}" AS loc,
+        SELECT "{loc_col}" AS loc
+               {area_select},
                MAX("{time_col}") AS last_t,
                COUNT(*) FILTER (
                    WHERE "{time_col}" > NOW() - INTERVAL '{DEAD_THRESHOLD_MINUTES} minutes'
                ) AS recent_cnt
-               {area_select}
         FROM "{schema}"."{table}"
         WHERE "{time_col}" > NOW() - INTERVAL '1 day'
-        GROUP BY "{loc_col}"
+        GROUP BY {group_cols}
     """)
     return loc_col, area_col, cur2.fetchall()
 
 
-def _sync_and_check_locations(watch, watch_id, schema, table, loc_rows):
+def _sync_and_check_locations(watch, watch_id, schema, table, area_col, raw_rows):
     """
-    Upsert newly-seen locations, load per-location toggle state, run the
-    same dead/alert logic as the table-level check but scoped to each
-    location, and return the list to embed in the /status JSON response.
-    All bookkeeping happens on ONE connection to avoid opening a new
-    connection per location on every poll.
+    Upsert newly-seen locations AND areas, load per-item toggle state, run
+    the same dead/alert logic as the table-level check but scoped to each
+    location and each area within it, and return the nested list to embed
+    in the /status JSON response. All bookkeeping happens on ONE connection
+    to avoid opening a new connection per row on every poll.
     """
     now = datetime.now(timezone.utc)
-    data_by_loc = {(r["loc"] if r["loc"] is not None else "(blank)"): r for r in loc_rows}
+
+    # ── Roll raw (loc, area) rows up into a per-location structure ──────────
+    locs = {}  # loc_value -> {"last_t":..., "recent_cnt": int, "areas": {area_value: {last_t, recent_cnt}}}
+    for r in raw_rows:
+        lv = r["loc"] if r["loc"] is not None else "(blank)"
+        av = (r["area"] if r["area"] is not None else "(blank)") if area_col else None
+        recent = r["recent_cnt"] or 0
+        last_t = r["last_t"]
+
+        loc_entry = locs.setdefault(lv, {"last_t": None, "recent_cnt": 0, "areas": {}})
+        loc_entry["recent_cnt"] += recent
+        if last_t and (loc_entry["last_t"] is None or last_t > loc_entry["last_t"]):
+            loc_entry["last_t"] = last_t
+
+        if area_col:
+            loc_entry["areas"][av] = {"last_t": last_t, "recent_cnt": recent}
 
     out = []
     with get_db() as conn:
         cur = conn.cursor()
 
-        # Discover any location values not tracked yet
-        for lv in data_by_loc:
+        # Discover new locations
+        for lv in locs:
             cur.execute("""
                 INSERT INTO dbmon_watch_locations (watch_id, location_value)
                 VALUES (%s, %s)
                 ON CONFLICT (watch_id, location_value) DO NOTHING
             """, (watch_id, lv))
 
+        # Discover new areas
+        if area_col:
+            for lv, ld in locs.items():
+                for av in ld["areas"]:
+                    cur.execute("""
+                        INSERT INTO dbmon_watch_areas (watch_id, location_value, area_value)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (watch_id, location_value, area_value) DO NOTHING
+                    """, (watch_id, lv, av))
+
         cur.execute(
             "SELECT * FROM dbmon_watch_locations WHERE watch_id=%s ORDER BY location_value",
             (watch_id,)
         )
-        tracked = cur.fetchall()
+        tracked_locs = cur.fetchall()
 
-        for loc in tracked:
+        tracked_areas_by_loc = {}
+        if area_col:
+            cur.execute(
+                "SELECT * FROM dbmon_watch_areas WHERE watch_id=%s ORDER BY location_value, area_value",
+                (watch_id,)
+            )
+            for a in cur.fetchall():
+                tracked_areas_by_loc.setdefault(a["location_value"], []).append(a)
+
+        for loc in tracked_locs:
             lv = loc["location_value"]
-            d = data_by_loc.get(lv)
-            recent_cnt = (d["recent_cnt"] or 0) if d else 0
-            last_t     = d["last_t"] if d else loc["last_seen"]
-            area_cnt   = d.get("area_cnt") if d else None
+            ld = locs.get(lv)
+            recent_cnt = ld["recent_cnt"] if ld else 0
+            last_t     = ld["last_t"] if ld else loc["last_seen"]
             loc_is_dead = (recent_cnt == 0)
 
             if last_t and last_t != loc["last_seen"]:
@@ -520,6 +627,86 @@ def _sync_and_check_locations(watch, watch_id, schema, table, loc_rows):
                     "UPDATE dbmon_watch_locations SET last_seen=%s WHERE id=%s",
                     (last_t, loc["id"])
                 )
+
+            # ── Areas nested under this location ──
+            areas_out = []
+            for a in tracked_areas_by_loc.get(lv, []):
+                av = a["area_value"]
+                ad = ld["areas"].get(av) if ld else None
+                a_recent = (ad["recent_cnt"] or 0) if ad else 0
+                a_last_t = ad["last_t"] if ad else a["last_seen"]
+                a_is_dead = (a_recent == 0)
+
+                if a_last_t and a_last_t != a["last_seen"]:
+                    cur.execute(
+                        "UPDATE dbmon_watch_areas SET last_seen=%s WHERE id=%s",
+                        (a_last_t, a["id"])
+                    )
+
+                area_entry = {
+                    "id":             a["id"],
+                    "area":           av,
+                    "monitoring":     a["monitoring"],
+                    "alerts_enabled": a["alerts_enabled"],
+                    "alert_emails":   a["alert_emails"],
+                    "is_dead":        a_is_dead if a["monitoring"] else None,
+                    "last_seen":      a_last_t.isoformat() if a_last_t else None,
+                    "recent_rows":    a_recent,
+                }
+
+                # Per-area alerting — only if both the area AND its parent location are being monitored
+                if loc["monitoring"] and a["monitoring"] and a["alerts_enabled"]:
+                    emails_for_area = a["alert_emails"] or loc["alert_emails"] or watch.get("alert_emails")
+                    if emails_for_area:
+                        last_sent = a["last_alert_sent"]
+                        was_dead  = a["was_dead"]
+                        machine_key = f"{schema}.{table}:{lv}:{av}"
+                        label = watch["display_name"] or f"{schema}.{table}"
+
+                        if a_is_dead:
+                            should_send = (last_sent is None) or \
+                                          ((now - last_sent).total_seconds() >= ALERT_REPEAT_HOURS * 3600)
+                            if should_send:
+                                _send_alert(
+                                    watch,
+                                    subject=f"[REFORMMED] ⚠ Data stopped: {lv} / {av} ({label})",
+                                    body=(
+                                        f"Table: {schema}.{table}\n"
+                                        f"Location: {lv}\n"
+                                        f"Area: {av}\n"
+                                        f"Status: No new rows for this area in the last "
+                                        f"{DEAD_THRESHOLD_MINUTES} minutes (other areas/locations in "
+                                        f"this table may still be live).\n"
+                                        f"Last data received: {area_entry['last_seen'] or 'unknown'}\n\n"
+                                        f"This alert repeats every {ALERT_REPEAT_HOURS} hour(s) until data resumes."
+                                    ),
+                                    machine_key=machine_key,
+                                    alert_emails=emails_for_area,
+                                )
+                                cur.execute(
+                                    "UPDATE dbmon_watch_areas SET last_alert_sent=%s, was_dead=TRUE WHERE id=%s",
+                                    (now, a["id"])
+                                )
+                        elif was_dead:
+                            _send_alert(
+                                watch,
+                                subject=f"[REFORMMED] ✅ Data resumed: {lv} / {av} ({label})",
+                                body=(
+                                    f"Table: {schema}.{table}\n"
+                                    f"Location: {lv}\n"
+                                    f"Area: {av}\n"
+                                    f"Status: Data is flowing again for this area.\n"
+                                    f"Last row time: {area_entry['last_seen'] or 'unknown'}\n"
+                                ),
+                                machine_key=machine_key,
+                                alert_emails=emails_for_area,
+                            )
+                            cur.execute(
+                                "UPDATE dbmon_watch_areas SET was_dead=FALSE, last_alert_sent=NULL WHERE id=%s",
+                                (a["id"],)
+                            )
+
+                areas_out.append(area_entry)
 
             entry = {
                 "id":             loc["id"],
@@ -530,7 +717,8 @@ def _sync_and_check_locations(watch, watch_id, schema, table, loc_rows):
                 "is_dead":        loc_is_dead if loc["monitoring"] else None,
                 "last_seen":      last_t.isoformat() if last_t else None,
                 "recent_rows":    recent_cnt,
-                "area_count":     area_cnt,
+                "area_count":     len(areas_out) if area_col else None,
+                "areas":          areas_out,
             }
 
             # Per-location alerting — same cooldown/recovery pattern as the table-level alert
@@ -679,7 +867,7 @@ def watch_status(watch_id):
 
         locations_out = []
         if loc_col:
-            locations_out = _sync_and_check_locations(watch, watch_id, schema, table, loc_rows)
+            locations_out = _sync_and_check_locations(watch, watch_id, schema, table, area_col, loc_rows)
 
         # Determine live/dead
         is_dead = (rows_last_5min == 0)

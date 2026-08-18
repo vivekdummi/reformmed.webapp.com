@@ -172,14 +172,18 @@
 .conn-row td { font-size: 12px; }
 
 /* ── Location expand panel ── */
-.wcard-expand-btn {
-  background: none; border: 1px solid var(--border); border-radius: 8px;
-  color: var(--text-muted); font-size: 11px; padding: 6px 10px; cursor: pointer;
-  display: flex; align-items: center; gap: 6px; white-space: nowrap;
+.wcard-name-click {
+  cursor: pointer;
+  display: flex; align-items: center; gap: 7px;
+  user-select: none;
 }
-.wcard-expand-btn:hover { color: var(--text); border-color: var(--accent); }
-.wcard-expand-btn .chev { transition: transform .15s; display: inline-block; }
-.wcard-expand-btn.open .chev { transform: rotate(90deg); }
+.wcard-name-click:hover { color: var(--accent); }
+.wcard-name-click .chev {
+  transition: transform .15s; display: inline-block;
+  font-size: 11px; color: var(--text-muted); flex-shrink: 0;
+}
+.wcard-name-click.open .chev { transform: rotate(90deg); }
+.name-sub-lbl { font-size: 11px; font-weight: 500; color: var(--text-muted); margin-left: 4px; }
 
 .wloc-panel {
   display: none;
@@ -196,7 +200,18 @@
 }
 .wloc-row.dead { border-color: rgba(239,68,68,.35); }
 .wloc-row.live { border-color: rgba(34,197,94,.25); }
-.wloc-name { font-weight: 600; font-size: 13px; flex: 1; min-width: 140px; }
+.wloc-info { flex: 1; min-width: 140px; }
+.wloc-name-click {
+  font-weight: 600; font-size: 13px;
+  display: flex; align-items: center; gap: 6px;
+}
+.wloc-name-click.clickable { cursor: pointer; user-select: none; }
+.wloc-name-click.clickable:hover { color: var(--accent); }
+.wloc-name-click .chev {
+  transition: transform .15s; display: inline-block;
+  font-size: 10px; color: var(--text-muted); flex-shrink: 0;
+}
+.wloc-name-click.open .chev { transform: rotate(90deg); }
 .wloc-sub  { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
 .wloc-pill {
   font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
@@ -213,6 +228,34 @@
 }
 .wloc-tog.on-monitor { color: var(--accent); border-color: var(--accent); }
 .wloc-tog.on-alert   { color: var(--yellow); border-color: var(--yellow); }
+
+/* ── Area sub-panel (nested one level under a location) ── */
+.wloc-row { flex-direction: column; align-items: stretch; }
+.wloc-row-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.warea-panel { display: none; margin-top: 8px; padding-left: 18px; border-left: 2px solid var(--border); }
+.warea-panel.open { display: block; }
+.warea-row {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 6px 10px; border-radius: 6px; background: var(--bg1, rgba(0,0,0,.15));
+  margin-bottom: 4px; font-size: 12px;
+}
+.warea-row.dead { outline: 1px solid rgba(239,68,68,.3); }
+.warea-name { flex: 1; min-width: 120px; font-weight: 500; }
+.warea-sub  { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+.warea-pill {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  padding: 2px 7px; border-radius: 99px;
+}
+.warea-pill.live   { background: rgba(34,197,94,.12); color: var(--green); }
+.warea-pill.dead   { background: rgba(239,68,68,.12); color: var(--red); }
+.warea-pill.paused { background: rgba(245,158,11,.1); color: var(--yellow); }
+.warea-tog {
+  border: 1px solid var(--border); background: none; border-radius: 5px;
+  font-size: 9px; padding: 3px 7px; cursor: pointer; color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+.warea-tog.on-monitor { color: var(--accent); border-color: var(--accent); }
+.warea-tog.on-alert   { color: var(--yellow); border-color: var(--yellow); }
 </style>
 {% endblock %}
 
@@ -267,9 +310,13 @@
       <span id="pill-txt-{{ w.id }}">…</span>
     </div>
 
-    <!-- Name + sub -->
+    <!-- Name + sub — click name to expand/collapse locations -->
     <div class="wcard-info">
-      <div class="wcard-name">{{ w.display_name or (w.schema_name ~ "." ~ w.table_name) }}</div>
+      <div class="wcard-name wcard-name-click" id="wcard-name-{{ w.id }}" onclick="toggleLocPanel({{ w.id }})">
+        <span class="chev" id="wcard-chev-{{ w.id }}">▸</span>
+        {{ w.display_name or (w.schema_name ~ "." ~ w.table_name) }}
+        <span class="name-sub-lbl" id="expand-lbl-{{ w.id }}"></span>
+      </div>
       <div class="wcard-sub">{{ w.schema_name }}.{{ w.table_name }} &bull; {{ w.conn_name }}</div>
     </div>
 
@@ -292,12 +339,6 @@
         <div class="wstat-lbl">Stopped</div>
       </div>
     </div>
-
-    <!-- Expand: per-location breakdown -->
-    <button type="button" class="wcard-expand-btn" id="expand-btn-{{ w.id }}"
-            onclick="toggleLocPanel({{ w.id }})">
-      <span class="chev">▸</span> <span id="expand-lbl-{{ w.id }}">Locations</span>
-    </button>
 
     <!-- Toggles + remove -->
     <div class="toggles">
@@ -542,31 +583,30 @@ async function loadStatus(id) {
 
 function toggleLocPanel(watchId) {
   const panel = document.getElementById('wloc-panel-' + watchId);
-  const btn   = document.getElementById('expand-btn-' + watchId);
+  const nameEl = document.getElementById('wcard-name-' + watchId);
   if (!panel) return;
   const nowOpen = !panel.classList.contains('open');
   panel.classList.toggle('open', nowOpen);
-  btn.classList.toggle('open', nowOpen);
+  if (nameEl) nameEl.classList.toggle('open', nowOpen);
   if (nowOpen) OPEN_PANELS.add(watchId); else OPEN_PANELS.delete(watchId);
 }
 
 function renderLocations(watchId, locationCol, locations) {
-  const btnLbl = document.getElementById('expand-lbl-' + watchId);
+  const lbl    = document.getElementById('expand-lbl-' + watchId);
   const listEl = document.getElementById('wloc-list-' + watchId);
   if (!listEl) return;
 
   if (!locationCol) {
-    if (btnLbl) btnLbl.textContent = 'No Location column';
+    if (lbl) { lbl.textContent = ''; }
     listEl.innerHTML = '<div class="text-muted" style="font-size:12px;">' +
       'No "Location" column was found on this table, so it can\'t be broken down.</div>';
     return;
   }
 
   const deadCount = locations.filter(l => l.monitoring && l.is_dead).length;
-  if (btnLbl) {
-    btnLbl.textContent = 'Locations (' + locations.length + ')' +
-      (deadCount ? ' — ' + deadCount + ' dead' : '');
-    btnLbl.style.color = deadCount ? 'var(--red)' : '';
+  if (lbl) {
+    lbl.textContent = '(' + locations.length + (deadCount ? ', ' + deadCount + ' dead' : '') + ')';
+    lbl.style.color = deadCount ? 'var(--red)' : '';
   }
 
   if (!locations.length) {
@@ -581,33 +621,97 @@ function renderLocations(watchId, locationCol, locations) {
       pillText  = loc.is_dead ? 'DEAD' : 'LIVE';
     }
     const rowClass = loc.monitoring ? (loc.is_dead ? 'dead' : 'live') : '';
-    const areaTxt = (loc.area_count !== null && loc.area_count !== undefined)
-      ? loc.area_count + ' area' + (loc.area_count === 1 ? '' : 's') + ' &bull; ' : '';
+    const areas = loc.areas || [];
+    const areaDeadCount = areas.filter(a => a.monitoring && a.is_dead).length;
+    const areaTxt = areas.length
+      ? areas.length + ' area' + (areas.length === 1 ? '' : 's') +
+        (areaDeadCount ? ' (' + areaDeadCount + ' dead)' : '') + ' &bull; '
+      : '';
 
     let toggles = '';
     if (IS_ADMIN) {
       toggles = `
         <div class="wloc-toggles">
           <button class="wloc-tog ${loc.monitoring ? 'on-monitor' : ''}"
-                  onclick="toggleLocMonitor(${watchId}, ${loc.id})">
+                  onclick="event.stopPropagation(); toggleLocMonitor(${watchId}, ${loc.id})">
             ${loc.monitoring ? '● MONITOR' : '○ MONITOR'}
           </button>
           <button class="wloc-tog ${loc.alerts_enabled ? 'on-alert' : ''}"
-                  onclick="toggleLocAlert(${watchId}, ${loc.id})">
+                  onclick="event.stopPropagation(); toggleLocAlert(${watchId}, ${loc.id})">
             ${loc.alerts_enabled ? '🔔 ALERT' : '🔕 ALERT'}
           </button>
         </div>`;
     }
 
+    // Click the location NAME to expand/collapse its areas (only if it has any)
+    const nameId  = `wloc-name-${watchId}-${loc.id}`;
+    const clickAttr = areas.length ? ` onclick="toggleAreaPanel(${watchId}, ${loc.id})"` : '';
+    const chev = areas.length ? '<span class="chev">▸</span>' : '';
+
+    const areaPanel = areas.length
+      ? `<div class="warea-panel" id="warea-panel-${watchId}-${loc.id}">
+           ${renderAreas(watchId, areas)}
+         </div>`
+      : '';
+
     return `
       <div class="wloc-row ${rowClass}">
-        <div class="wloc-name">${escapeHtml(loc.location)}
-          <div class="wloc-sub">${areaTxt}last seen: ${fmtTime(loc.last_seen)}</div>
+        <div class="wloc-row-top">
+          <div class="wloc-info">
+            <div class="wloc-name-click ${areas.length ? 'clickable' : ''}" id="${nameId}"${clickAttr}>
+              ${chev}${escapeHtml(loc.location)}
+            </div>
+            <div class="wloc-sub">${areaTxt}last seen: ${fmtTime(loc.last_seen)}</div>
+          </div>
+          <span class="wloc-pill ${pillClass}">${pillText}</span>
+          ${toggles}
         </div>
-        <span class="wloc-pill ${pillClass}">${pillText}</span>
+        ${areaPanel}
+      </div>`;
+  }).join('');
+}
+
+function renderAreas(watchId, areas) {
+  return areas.map(a => {
+    let pillClass = 'paused', pillText = 'OFF';
+    if (a.monitoring) {
+      pillClass = a.is_dead ? 'dead' : 'live';
+      pillText  = a.is_dead ? 'DEAD' : 'LIVE';
+    }
+    const rowClass = (a.monitoring && a.is_dead) ? 'dead' : '';
+
+    let toggles = '';
+    if (IS_ADMIN) {
+      toggles = `
+        <button class="warea-tog ${a.monitoring ? 'on-monitor' : ''}"
+                onclick="toggleAreaMonitor(${watchId}, ${a.id})">
+          ${a.monitoring ? '● MONITOR' : '○ MONITOR'}
+        </button>
+        <button class="warea-tog ${a.alerts_enabled ? 'on-alert' : ''}"
+                onclick="toggleAreaAlert(${watchId}, ${a.id})">
+          ${a.alerts_enabled ? '🔔 ALERT' : '🔕 ALERT'}
+        </button>`;
+    }
+
+    return `
+      <div class="warea-row ${rowClass}">
+        <div class="warea-name">${escapeHtml(a.area)}
+          <div class="warea-sub">last seen: ${fmtTime(a.last_seen)}</div>
+        </div>
+        <span class="warea-pill ${pillClass}">${pillText}</span>
         ${toggles}
       </div>`;
   }).join('');
+}
+
+// Click a location name → toggle its areas open/closed (accordion "sink back")
+function toggleAreaPanel(watchId, locId) {
+  const panel  = document.getElementById('warea-panel-' + watchId + '-' + locId);
+  const nameEl = document.getElementById('wloc-name-' + watchId + '-' + locId);
+  if (!panel) return;
+  const nowOpen = !panel.classList.contains('open');
+  panel.classList.toggle('open', nowOpen);
+  if (nameEl) nameEl.classList.toggle('open', nowOpen);
 }
 
 function escapeHtml(s) {
@@ -623,6 +727,16 @@ async function toggleLocMonitor(watchId, locId) {
 
 async function toggleLocAlert(watchId, locId) {
   await fetch('/dbmonitor/watch/' + watchId + '/location/' + locId + '/toggle-alerts', { method: 'POST' });
+  loadStatus(watchId);
+}
+
+async function toggleAreaMonitor(watchId, areaId) {
+  await fetch('/dbmonitor/watch/' + watchId + '/area/' + areaId + '/toggle-monitoring', { method: 'POST' });
+  loadStatus(watchId);
+}
+
+async function toggleAreaAlert(watchId, areaId) {
+  await fetch('/dbmonitor/watch/' + watchId + '/area/' + areaId + '/toggle-alerts', { method: 'POST' });
   loadStatus(watchId);
 }
 
