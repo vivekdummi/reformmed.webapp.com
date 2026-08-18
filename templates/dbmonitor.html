@@ -494,7 +494,8 @@
 <script>
 const WATCH_IDS = {{ watches | map(attribute='id') | list | tojson }};
 const IS_ADMIN  = {{ current_user.is_admin | tojson }};
-const OPEN_PANELS = new Set();  // watch ids whose location panel is expanded
+const OPEN_PANELS = new Set();       // watch ids whose location panel is expanded
+const OPEN_AREA_PANELS = new Set();  // "watchId-locId" keys whose area panel is expanded
 
 // Format timestamp → precise human string showing exact time
 function fmtTime(iso) {
@@ -648,8 +649,13 @@ function renderLocations(watchId, locationCol, locations) {
     const clickAttr = areas.length ? ` onclick="toggleAreaPanel(${watchId}, ${loc.id})"` : '';
     const chev = areas.length ? '<span class="chev">▸</span>' : '';
 
+    // Preserve open/closed state across the 10s auto-refresh re-render
+    const isOpen = OPEN_AREA_PANELS.has(watchId + '-' + loc.id);
+    const nameOpenClass  = isOpen ? 'open' : '';
+    const panelOpenClass = isOpen ? 'open' : '';
+
     const areaPanel = areas.length
-      ? `<div class="warea-panel" id="warea-panel-${watchId}-${loc.id}">
+      ? `<div class="warea-panel ${panelOpenClass}" id="warea-panel-${watchId}-${loc.id}">
            ${renderAreas(watchId, areas)}
          </div>`
       : '';
@@ -658,7 +664,7 @@ function renderLocations(watchId, locationCol, locations) {
       <div class="wloc-row ${rowClass}">
         <div class="wloc-row-top">
           <div class="wloc-info">
-            <div class="wloc-name-click ${areas.length ? 'clickable' : ''}" id="${nameId}"${clickAttr}>
+            <div class="wloc-name-click ${areas.length ? 'clickable' : ''} ${nameOpenClass}" id="${nameId}"${clickAttr}>
               ${chev}${escapeHtml(loc.location)}
             </div>
             <div class="wloc-sub">${areaTxt}last seen: ${fmtTime(loc.last_seen)}</div>
@@ -712,6 +718,8 @@ function toggleAreaPanel(watchId, locId) {
   const nowOpen = !panel.classList.contains('open');
   panel.classList.toggle('open', nowOpen);
   if (nameEl) nameEl.classList.toggle('open', nowOpen);
+  const key = watchId + '-' + locId;
+  if (nowOpen) OPEN_AREA_PANELS.add(key); else OPEN_AREA_PANELS.delete(key);
 }
 
 function escapeHtml(s) {
