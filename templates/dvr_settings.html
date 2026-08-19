@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_macros.html" as macros %}
 {% block title %}DVR Settings — REFORMMED{% endblock %}
 {% block page_title %}DVR Settings{% endblock %}
 {% block content %}
@@ -6,7 +7,7 @@
   <div><h1>DVR Settings</h1><p>Configure ping interval and alert emails</p></div>
   <a href="{{ url_for('dvr.index') }}" class="btn btn-ghost btn-sm">← Back</a>
 </div>
-<div class="card" style="max-width:500px;">
+<div class="card" style="max-width:560px;">
   <form method="POST">
     <div class="form-group">
       <label>Ping Interval (seconds)</label>
@@ -22,9 +23,11 @@
       </select>
     </div>
     <div class="form-group">
-      <label>Alert Email Recipients</label>
-      <input type="text" name="alert_emails" value="{{ settings.alert_emails }}" placeholder="admin@company.com, ops@company.com">
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Comma-separated. Leave blank to use ALERT_TO from .env</div>
+      <label>Alert Recipients</label>
+      {{ macros.recipient_picker('recipient_emails', recipients, settings.alert_emails) }}
+      <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">
+        Manage the list itself in <a href="{{ url_for('settings.index') }}#recipients" style="color:var(--accent);">Settings → Alert Recipients</a>.
+      </div>
     </div>
     <button type="submit" class="btn btn-primary" style="margin-top:8px;">Save Settings</button>
   </form>

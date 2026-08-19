@@ -8,7 +8,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort
 from flask_login import login_required, current_user
-from db import get_db
+from db import get_db, list_alert_recipients
 
 dvr_bp = Blueprint("dvr", __name__, url_prefix="/dvr")
 
@@ -300,9 +300,13 @@ def settings():
     if request.method == "POST":
         with get_db() as conn:
             cur = conn.cursor()
-            for key in ["ping_interval_sec","alert_emails","alerts_enabled"]:
-                val = request.form.get(key,"").strip()
-                cur.execute("UPDATE dvr_settings SET value=%s WHERE key=%s", (val, key))
+            cur.execute("UPDATE dvr_settings SET value=%s WHERE key=%s",
+                        (request.form.get("ping_interval_sec","").strip(), "ping_interval_sec"))
+            cur.execute("UPDATE dvr_settings SET value=%s WHERE key=%s",
+                        (request.form.get("alerts_enabled","").strip(), "alerts_enabled"))
+            emails = ", ".join(request.form.getlist("recipient_emails"))
+            cur.execute("UPDATE dvr_settings SET value=%s WHERE key=%s",
+                        (emails, "alert_emails"))
         flash("Settings saved.", "success")
         return redirect(url_for("dvr.settings"))
     settings_data = {
@@ -310,7 +314,7 @@ def settings():
         "alert_emails": get_setting("alert_emails",""),
         "alerts_enabled": get_setting("alerts_enabled","1"),
     }
-    return render_template("dvr_settings.html", settings=settings_data)
+    return render_template("dvr_settings.html", settings=settings_data, recipients=list_alert_recipients())
 
 
 # ── CRUD ───────────────────────────────────────────────────────────────────

@@ -1,0 +1,22 @@
+{# Shared macros used across settings/alerts/dbmonitor/dvr templates #}
+
+{% macro recipient_picker(field_name, recipients, selected_csv, form_id=None) %}
+  {% set selected = (selected_csv or '').split(',') | map('trim') | select | list %}
+  {% if recipients %}
+  <div class="recipient-picker">
+    {% for r in recipients %}
+    <label class="recipient-chip{% if r.email in selected %} checked{% endif %}">
+      <input type="checkbox" name="{{ field_name }}" value="{{ r.email }}"
+             {% if form_id %}form="{{ form_id }}"{% endif %}
+             {% if r.email in selected %}checked{% endif %}>
+      <span>{{ r.label or r.email }}</span>
+    </label>
+    {% endfor %}
+  </div>
+  {% else %}
+  <span class="recipient-picker-empty">
+    No alert recipients yet — add some in
+    <a href="{{ url_for('settings.index') }}#recipients">Settings → Alert Recipients</a>.
+  </span>
+  {% endif %}
+{% endmacro %}

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_macros.html" as macros %}
 {% block title %}Alerts — REFORMMED Monitor{% endblock %}
 {% block page_title %}Alerts{% endblock %}
 
@@ -80,10 +81,8 @@
                 <input type="number" name="cooldown_{{ c.id }}" value="{{ c.cooldown_minutes }}"
                        min="1" max="1440" style="width:70px"> min
               </td>
-              <td>
-                <input type="text" name="emails_{{ c.id }}" value="{{ c.notify_emails }}"
-                       placeholder="email@x.com, ..."
-                       style="min-width:200px;max-width:300px">
+              <td style="min-width:220px;">
+                {{ macros.recipient_picker('emails_' ~ c.id, recipients, c.notify_emails) }}
               </td>
               <td class="text-muted hide-mobile" style="font-size:12px">
                 {{ c.updated_at.strftime('%m-%d %H:%M') if c.updated_at else '—' }}
@@ -144,9 +143,11 @@
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px">How often to ping each DVR. Default: 30s</div>
       </div>
       <div class="form-group">
-        <label>Alert Email Recipients</label>
-        <input type="text" name="alert_emails" value="{{ dvr_settings.get('alert_emails','') }}" placeholder="admin@company.com, ops@company.com">
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Comma-separated. Overrides .env ALERT_TO</div>
+        <label>Alert Recipients</label>
+        {{ macros.recipient_picker('recipient_emails', recipients, dvr_settings.get('alert_emails','')) }}
+        <div style="font-size:11px;color:var(--text-muted);margin-top:8px">
+          Manage the list itself in <a href="{{ url_for('settings.index') }}#recipients" style="color:var(--accent)">Settings → Alert Recipients</a>.
+        </div>
       </div>
       <button type="submit" class="btn btn-primary">Save DVR Alert Settings</button>
     </form>
@@ -209,10 +210,9 @@
               <span class="badge badge-{{ 'online' if w.alerts_enabled else 'offline' }}">{{ 'On' if w.alerts_enabled else 'Off' }}</span>
               {% endif %}
             </td>
-            <td>
+            <td style="min-width:200px;">
               {% if current_user.is_admin %}
-              <input form="dbmon-form-{{ w.id }}" type="text" name="alert_emails" value="{{ w.alert_emails }}"
-                     placeholder="email@x.com" style="min-width:180px;max-width:260px">
+              {{ macros.recipient_picker('recipient_emails', recipients, w.alert_emails, form_id='dbmon-form-' ~ w.id) }}
               {% else %}
               <span class="text-muted" style="font-size:12px">{{ w.alert_emails or '—' }}</span>
               {% endif %}

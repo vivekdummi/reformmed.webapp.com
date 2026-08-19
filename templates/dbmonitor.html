@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_macros.html" as macros %}
 {% block title %}DB Monitor — REFORMMED{% endblock %}
 {% block page_title %}DB Monitor{% endblock %}
 {% block extra_css %}
@@ -414,12 +415,10 @@
 
   <!-- Email config row (admin only) -->
   {% if current_user.is_admin %}
-  <div class="wcard-emails">
-    <label>Alert emails</label>
-    <form method="POST" action="{{ url_for('dbmonitor.update_emails', watch_id=w.id) }}" style="display:flex;flex:1;gap:8px;align-items:center;flex-wrap:wrap;">
-      <input type="text" name="alert_emails"
-             value="{{ w.alert_emails or '' }}"
-             placeholder="ops@example.com, team@example.com">
+  <div class="wcard-emails" style="align-items:flex-start;">
+    <label style="padding-top:6px;">Alert to</label>
+    <form method="POST" action="{{ url_for('dbmonitor.update_emails', watch_id=w.id) }}" style="display:flex;flex:1;gap:10px;align-items:center;flex-wrap:wrap;">
+      {{ macros.recipient_picker('recipient_emails', recipients, w.alert_emails) }}
       <button type="submit" class="btn-save">Save</button>
     </form>
     {% if not w.alerts_enabled %}
@@ -561,8 +560,8 @@
                placeholder="e.g. Bharath Oncology" style="display:none;margin-top:8px;">
       </div>
       <div class="form-group">
-        <label>Alert Emails (comma-separated)</label>
-        <input type="text" name="alert_emails" placeholder="ops@example.com, team@example.com">
+        <label>Alert To</label>
+        {{ macros.recipient_picker('recipient_emails', recipients, '') }}
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-watch').classList.remove('open')">Cancel</button>

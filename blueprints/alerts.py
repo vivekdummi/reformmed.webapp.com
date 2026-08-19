@@ -3,7 +3,7 @@ Alerts blueprint — unified system + DVR + DB monitor alerts.
 """
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, jsonify
 from flask_login import login_required, current_user
-from db import get_db
+from db import get_db, list_alert_recipients
 
 alerts_bp = Blueprint("alerts", __name__, url_prefix="/alerts")
 
@@ -36,7 +36,8 @@ def index():
                            configs=configs,
                            logs=logs,
                            dvr_settings=dvr_settings,
-                           dbmon_watches=dbmon_watches)
+                           dbmon_watches=dbmon_watches,
+                           recipients=list_alert_recipients())
 
 
 @alerts_bp.route("/config/update", methods=["POST"])
@@ -54,7 +55,7 @@ def update_config():
             enabled  = request.form.get(f"enabled_{aid}") == "1"
             threshold = request.form.get(f"threshold_{aid}", "").strip() or None
             cooldown  = request.form.get(f"cooldown_{aid}", "10").strip()
-            emails    = request.form.get(f"emails_{aid}", "").strip()
+            emails    = ", ".join(request.form.getlist(f"emails_{aid}"))
             try:
                 thresh_val   = float(threshold) if threshold else None
                 cooldown_val = int(cooldown)
@@ -78,13 +79,18 @@ def update_dvr():
         abort(403)
     with get_db() as conn:
         cur = conn.cursor()
-        for k in ("ping_interval_sec", "alert_emails", "alerts_enabled"):
+        for k in ("ping_interval_sec", "alerts_enabled"):
             v = request.form.get(k, "").strip()
             if v is not None:
                 cur.execute("""
                     INSERT INTO dvr_settings (key, value) VALUES (%s, %s)
                     ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value
                 """, (k, v))
+        emails = ", ".join(request.form.getlist("recipient_emails"))
+        cur.execute("""
+            INSERT INTO dvr_settings (key, value) VALUES ('alert_emails', %s)
+            ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value
+        """, (emails,))
     flash("DVR alert settings saved.", "success")
     return redirect(url_for("alerts.index") + "#dvr")
 
@@ -96,7 +102,7 @@ def update_dbmon_watch(watch_id):
         abort(403)
     alerts_enabled = request.form.get("alerts_enabled") == "1"
     monitoring     = request.form.get("monitoring") == "1"
-    alert_emails   = request.form.get("alert_emails", "").strip()
+    alert_emails   = ", ".join(request.form.getlist("recipient_emails"))
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute("""

@@ -14,6 +14,7 @@
   <button class="tab-btn active" data-tabgroup="settings" data-tabid="general" onclick="showTab('settings','general')">General</button>
   <button class="tab-btn" data-tabgroup="settings" data-tabid="data" onclick="showTab('settings','data')">Data Retention</button>
   <button class="tab-btn" data-tabgroup="settings" data-tabid="email" onclick="showTab('settings','email')">Email / SMTP</button>
+  <button class="tab-btn" data-tabgroup="settings" data-tabid="recipients" onclick="showTab('settings','recipients')">Alert Recipients</button>
 </div>
 
 <!-- ── GENERAL ── -->
@@ -116,6 +117,50 @@
       <input type="hidden" name="data_retention_days" value="{{ s.get('data_retention_days','7') }}">
       <button type="submit" class="btn btn-primary mt-2">Save Email Settings</button>
     </form>
+  </div>
+</div>
+
+<!-- ── ALERT RECIPIENTS ── -->
+<div class="tab-panel" data-tabpanel="settings" data-panelid="recipients">
+  <div class="card" style="max-width:640px">
+    <div class="card-title">Alert Recipients</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">
+      This is the master address book. Add or remove people here once — every
+      alert email picker across the app (Servers, DVR Monitor, DB Monitor,
+      Alerts) reads from this list, so you assign "send to this person: yes/no"
+      instead of retyping addresses each time.
+    </div>
+
+    <form method="POST" action="{{ url_for('settings.add_recipient') }}"
+          style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;align-items:flex-end;">
+      <div class="form-group" style="flex:1;min-width:160px;margin-bottom:0;">
+        <label>Name (optional)</label>
+        <input type="text" name="label" placeholder="Ops Team">
+      </div>
+      <div class="form-group" style="flex:1;min-width:200px;margin-bottom:0;">
+        <label>Email</label>
+        <input type="email" name="email" placeholder="ops@example.com" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Add Recipient</button>
+    </form>
+
+    <div style="max-height:320px;overflow-y:auto;">
+      {% for r in recipients %}
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;
+                  border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg3);">
+        <div style="flex:1;min-width:0;">
+          {% if r.label %}<div style="font-weight:600;font-size:13px;">{{ r.label }}</div>{% endif %}
+          <div class="mono text-muted" style="font-size:12px;">{{ r.email }}</div>
+        </div>
+        <form method="POST" action="{{ url_for('settings.delete_recipient', recipient_id=r.id) }}"
+              onsubmit="return confirm('Remove {{ r.email }} from the recipient list?')">
+          <button type="submit" class="btn btn-danger btn-sm">✕</button>
+        </form>
+      </div>
+      {% else %}
+      <span class="text-muted" style="font-size:13px;">No recipients added yet.</span>
+      {% endfor %}
+    </div>
   </div>
 </div>
 {% endblock %}

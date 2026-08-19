@@ -141,6 +141,20 @@ def init_db():
                 value TEXT NOT NULL
             )
         """)
+
+        # ── Centralized alert recipients ────────────────────────────────────
+        # A single address book of who *can* receive alerts. Every alert-email
+        # field across the app (DB Monitor tables, DVR settings, ...) picks
+        # from this list instead of retyping raw addresses each time — add or
+        # remove someone here once and every assignment picker reflects it.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS alert_recipients (
+                id         SERIAL PRIMARY KEY,
+                email      TEXT UNIQUE NOT NULL,
+                label      TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """)
         default_settings = [
             ("data_retention_days", "7"),
             ("home_refresh_secs",   "2"),
@@ -191,6 +205,14 @@ def get_setting(key, default=""):
         cur.execute("SELECT value FROM app_settings WHERE key=%s", (key,))
         row = cur.fetchone()
     return row["value"] if row else default
+
+
+def list_alert_recipients():
+    """All registered alert recipients, for the recipient_picker macro."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM alert_recipients ORDER BY label, email")
+        return cur.fetchall()
 
 
 def purge_old_data():

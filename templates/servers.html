@@ -3,6 +3,10 @@
 {% block page_title %}Servers{% endblock %}
 
 {% block content %}
+<style>
+.server-name-link { transition: color .15s; }
+tr.machine-row:hover .server-name-link { color: var(--accent); text-decoration: underline; }
+</style>
 <div class="page-header">
   <div>
     <h1>Registered Servers</h1>
@@ -37,7 +41,6 @@
           <th>Last Seen</th>
           <th>Registered</th>
           <th>Alerts</th>
-          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -45,10 +48,11 @@
         <tr class="machine-row" data-name="{{ m.system_name }}" data-status="{{ m.status }}"
             data-hostname="{{ m.hostname or '' }}" data-ip="{{ m.public_ip or '' }}">
           <td>
-            <div style="display:flex;align-items:center;gap:8px">
+            <a href="{{ url_for('servers.detail', table_name=m.table_name) }}"
+               style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;">
               <span class="status-dot {{ m.status }}"></span>
-              <span class="mono" style="font-weight:600">{{ m.system_name }}</span>
-            </div>
+              <span class="mono server-name-link" style="font-weight:600">{{ m.system_name }}</span>
+            </a>
           </td>
           <td class="text-muted">{{ m.location }}</td>
           <td>
@@ -78,14 +82,10 @@
             <span class="text-muted" style="font-size:12px">{{ 'On' if m.alerts_enabled else 'Muted' }}</span>
             {% endif %}
           </td>
-          <td>
-            <a href="{{ url_for('servers.detail', table_name=m.table_name) }}"
-               class="btn btn-primary btn-sm">Details →</a>
-          </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="10" style="text-align:center;color:var(--text-muted);padding:48px">
+          <td colspan="9" style="text-align:center;color:var(--text-muted);padding:48px">
             No machines registered yet.
           </td>
         </tr>

@@ -266,6 +266,21 @@
       .btn{padding:7px 10px;font-size:12px;}
       .modal{padding:16px;}
     }
+
+    /* ── Shared: centralized alert-recipient picker (chips of checkboxes) ── */
+    .recipient-picker { display:flex; flex-wrap:wrap; gap:6px; }
+    .recipient-chip {
+      display:flex; align-items:center; gap:6px; padding:5px 10px;
+      border:1px solid var(--border); border-radius:99px; cursor:pointer;
+      font-size:12px; color:var(--text-muted); background:var(--bg3);
+      transition:.15s;
+    }
+    .recipient-chip input { width:auto; margin:0; accent-color:var(--accent); }
+    .recipient-chip:has(input:checked), .recipient-chip.checked {
+      color:var(--text); border-color:var(--accent); background:rgba(56,189,248,.08);
+    }
+    .recipient-picker-empty { font-size:12px; color:var(--text-muted); }
+    .recipient-picker-empty a { color:var(--accent); }
   </style>
   {% block extra_css %}{% endblock %}
 </head>
@@ -453,6 +468,16 @@ function showTab(groupId, tabId){
     if(btn){var grp=btn.dataset.tabgroup;if(grp)showTab(grp,hash);}
   }
 })();
+
+// ── Recipient-picker chip styling (works without :has() support too) ──
+function _refreshRecipientChip(checkbox){
+  var chip = checkbox.closest('.recipient-chip');
+  if (chip) chip.classList.toggle('checked', checkbox.checked);
+}
+document.querySelectorAll('.recipient-chip input[type="checkbox"]').forEach(function(cb){
+  _refreshRecipientChip(cb);
+  cb.addEventListener('change', function(){ _refreshRecipientChip(cb); });
+});
 </script>
 {% block extra_js %}{% endblock %}
 

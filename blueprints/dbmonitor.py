@@ -18,7 +18,7 @@ from email.mime.text import MIMEText
 from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort
 from flask_login import login_required, current_user
-from db import get_db
+from db import get_db, list_alert_recipients
 import psycopg2
 import psycopg2.extras
 
@@ -308,6 +308,7 @@ def index():
         "dbmonitor.html", connections=connections, watches=watches,
         groups=groups, group_watch_ids=group_watch_ids,
         existing_group_names=existing_group_names,
+        recipients=list_alert_recipients(),
     )
 
 
@@ -375,7 +376,7 @@ def add_watch():
     table_name   = request.form.get("table_name", "").strip()
     display_name = request.form.get("display_name", "").strip()
     group_name   = _resolve_group_name(request.form)
-    alert_emails = request.form.get("alert_emails", "").strip()
+    alert_emails = ", ".join(request.form.getlist("recipient_emails"))
     if not all([conn_id, schema_name, table_name]):
         flash("Connection, schema and table are required.", "danger")
         return redirect(url_for("dbmonitor.index"))
@@ -478,11 +479,11 @@ def toggle_alerts(watch_id):
 @login_required
 def update_emails(watch_id):
     _admin_required()
-    emails = request.form.get("alert_emails", "").strip()
+    emails = ", ".join(request.form.getlist("recipient_emails"))
     with get_db() as conn:
         conn.cursor().execute("UPDATE dbmon_watches SET alert_emails=%s WHERE id=%s",
                               (emails, watch_id))
-    flash("Alert emails updated.", "success")
+    flash("Alert recipients updated.", "success")
     return redirect(url_for("dbmonitor.index"))
 
 
