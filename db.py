@@ -93,6 +93,15 @@ def init_db():
             )
         """)
 
+        # ── User ↔ DVR hospital permissions (same idea, scoped to dvr_hospitals) ──
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS user_hospital_access (
+                user_id     INTEGER REFERENCES webapp_users(id) ON DELETE CASCADE,
+                hospital_id INTEGER NOT NULL,
+                PRIMARY KEY (user_id, hospital_id)
+            )
+        """)
+
         # ── Alert configuration ──────────────────────────────────────────────
         cur.execute("""
             CREATE TABLE IF NOT EXISTS alert_config (

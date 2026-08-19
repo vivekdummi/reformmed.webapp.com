@@ -256,6 +256,35 @@
 }
 .warea-tog.on-monitor { color: var(--accent); border-color: var(--accent); }
 .warea-tog.on-alert   { color: var(--yellow); border-color: var(--yellow); }
+
+/* ── Hospital group card (wraps multiple table watches together) ── */
+.wgroup-card {
+  border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px;
+  background: var(--bg2, rgba(255,255,255,.02)); overflow: hidden;
+}
+.wgroup-header {
+  display: flex; align-items: center; gap: 12px; padding: 14px 20px;
+  cursor: pointer; user-select: none; background: var(--bg3, rgba(255,255,255,.03));
+}
+.wgroup-header:hover { background: var(--bg4, rgba(255,255,255,.05)); }
+.wgroup-header .chev {
+  transition: transform .15s; display: inline-block; font-size: 12px; color: var(--text-muted);
+}
+.wgroup-header.open .chev { transform: rotate(90deg); }
+.wgroup-name { font-weight: 700; font-size: 15px; flex: 1; }
+.wgroup-sub  { font-size: 12px; color: var(--text-muted); }
+.wgroup-pill {
+  display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+  background: rgba(148,163,184,.12); color: var(--text-muted);
+}
+.wgroup-pill .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.wgroup-pill.live { background: rgba(34,197,94,.12); color: var(--green); }
+.wgroup-pill.dead { background: rgba(239,68,68,.12); color: var(--red); }
+.wgroup-body { display: none; padding: 14px; padding-top: 4px; }
+.wgroup-body.open { display: block; }
+.wgroup-body .wcard { margin-bottom: 10px; }
+.wgroup-body .wcard:last-child { margin-bottom: 0; }
 </style>
 {% endblock %}
 
@@ -300,7 +329,7 @@
 </div>
 {% else %}
 
-{% for w in watches %}
+{% macro render_watch_card(w) %}
 <div class="wcard" id="wcard-{{ w.id }}">
   <div class="wcard-main">
 
@@ -397,9 +426,52 @@
     <span style="font-size:11px;color:var(--yellow);">⚠ Alerts disabled for this table</span>
     {% endif %}
   </div>
+  <div class="wcard-emails">
+    <label>Hospital group</label>
+    <form method="POST" action="{{ url_for('dbmonitor.update_group', watch_id=w.id) }}" style="display:flex;flex:1;gap:8px;align-items:center;flex-wrap:wrap;">
+      <select name="group_name" id="grp-{{ w.id }}-group-select" onchange="toggleNewGroupInput('grp-{{ w.id }}')" style="flex:1;min-width:180px;">
+        <option value="" {% if not w.group_name %}selected{% endif %}>— No group (standalone table) —</option>
+        {% for gname in existing_group_names %}
+        <option value="{{ gname }}" {% if w.group_name == gname %}selected{% endif %}>{{ gname }}</option>
+        {% endfor %}
+        <option value="__new__">+ New hospital group…</option>
+      </select>
+      <input type="text" name="new_group_name" id="grp-{{ w.id }}-new-group-input"
+             placeholder="e.g. Bharath Oncology" style="display:none;flex:1;min-width:180px;">
+      <button type="submit" class="btn-save">Save</button>
+    </form>
+    <span style="font-size:11px;color:var(--text-muted);">Tables sharing the same group name are shown together</span>
+  </div>
   {% endif %}
 
 </div>
+{% endmacro %}
+
+{% for grp in groups %}
+  {% if grp.name %}
+  <div class="wgroup-card">
+    <div class="wgroup-header open" id="wgroup-header-{{ grp.idx }}"
+         onclick="toggleGroupPanel({{ grp.idx }})">
+      <span class="wgroup-pill loading" id="wgroup-pill-{{ grp.idx }}">
+        <span class="status-dot"></span>
+      </span>
+      <span class="chev" id="wgroup-chev-{{ grp.idx }}">▸</span>
+      <span class="wgroup-name">{{ grp.name }}</span>
+      <span class="wgroup-sub" id="wgroup-sub-{{ grp.idx }}">
+        {{ grp.watches|length }} table{{ 's' if grp.watches|length != 1 else '' }}
+      </span>
+    </div>
+    <div class="wgroup-body open" id="wgroup-body-{{ grp.idx }}">
+      {% for w in grp.watches %}
+        {{ render_watch_card(w) }}
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+    {% for w in grp.watches %}
+      {{ render_watch_card(w) }}
+    {% endfor %}
+  {% endif %}
 {% endfor %}
 {% endif %}
 
@@ -477,6 +549,18 @@
       </div>
       <div class="form-group"><label>Display Name (optional)</label><input type="text" name="display_name" placeholder="Sensor Readings"></div>
       <div class="form-group">
+        <label>Hospital Group (optional)</label>
+        <select name="group_name" id="add-group-select" onchange="toggleNewGroupInput('add')">
+          <option value="">— No group (standalone table) —</option>
+          {% for gname in existing_group_names %}
+          <option value="{{ gname }}">{{ gname }}</option>
+          {% endfor %}
+          <option value="__new__">+ New hospital group…</option>
+        </select>
+        <input type="text" name="new_group_name" id="add-new-group-input"
+               placeholder="e.g. Bharath Oncology" style="display:none;margin-top:8px;">
+      </div>
+      <div class="form-group">
         <label>Alert Emails (comma-separated)</label>
         <input type="text" name="alert_emails" placeholder="ops@example.com, team@example.com">
       </div>
@@ -496,6 +580,15 @@ const WATCH_IDS = {{ watches | map(attribute='id') | list | tojson }};
 const IS_ADMIN  = {{ current_user.is_admin | tojson }};
 const OPEN_PANELS = new Set();       // watch ids whose location panel is expanded
 const OPEN_AREA_PANELS = new Set();  // "watchId-locId" keys whose area panel is expanded
+
+// { groupIdx: [watchId, ...] } — for hospital groups with 2+ tables
+const GROUP_WATCH_IDS = {{ group_watch_ids | tojson }};
+const WATCH_TO_GROUP = {};
+Object.keys(GROUP_WATCH_IDS).forEach(gi => {
+  GROUP_WATCH_IDS[gi].forEach(wid => { WATCH_TO_GROUP[wid] = gi; });
+});
+const WATCH_STATE = {};  // watchId -> {monitoring, is_dead}
+const OPEN_GROUP_PANELS = new Set(Object.keys(GROUP_WATCH_IDS).map(Number)); // groups start open
 
 // Format timestamp → precise human string showing exact time
 function fmtTime(iso) {
@@ -521,6 +614,20 @@ function fmtNum(n) {
   return Number(n).toLocaleString();
 }
 
+// Shared by the "+ Watch Table" modal and each card's "Hospital group" row.
+// Reveals the free-text input only when "+ New hospital group…" is picked,
+// so adding a table to an existing hospital is just a dropdown pick — no
+// retyping, no risk of a typo splitting one hospital into two cards.
+function toggleNewGroupInput(prefix) {
+  const select = document.getElementById(prefix + '-group-select');
+  const input  = document.getElementById(prefix + '-new-group-input');
+  if (!select || !input) return;
+  const isNew = select.value === '__new__';
+  input.style.display = isNew ? '' : 'none';
+  if (isNew) input.focus();
+  else input.value = '';
+}
+
 async function loadStatus(id) {
   try {
     const r = await fetch('/dbmonitor/watch/' + id + '/status');
@@ -535,6 +642,8 @@ async function loadStatus(id) {
       ptxt.textContent = 'ERROR';
       if (card) card.className = 'wcard dead';
       document.getElementById('stat-last-' + id).textContent = d.error.slice(0, 40);
+      WATCH_STATE[id] = { monitoring: true, is_dead: true };
+      updateGroupPillFor(id);
       return;
     }
 
@@ -547,6 +656,8 @@ async function loadStatus(id) {
       const rpmEl2 = document.getElementById('stat-rpm-' + id);
       if (rpmEl2) rpmEl2.textContent = '—';
       document.getElementById('stat-dead-wrap-' + id).style.display = 'none';
+      WATCH_STATE[id] = { monitoring: false, is_dead: false };
+      updateGroupPillFor(id);
       return;
     }
 
@@ -563,6 +674,8 @@ async function loadStatus(id) {
       if (card) card.className = 'wcard live';
       document.getElementById('stat-dead-wrap-' + id).style.display = 'none';
     }
+    WATCH_STATE[id] = { monitoring: true, is_dead: !!d.is_dead };
+    updateGroupPillFor(id);
 
     document.getElementById('stat-rows-' + id).textContent = fmtNum(d.total_rows);
     document.getElementById('stat-last-' + id).textContent = fmtTime(d.last_row_time);
@@ -577,6 +690,54 @@ async function loadStatus(id) {
 
   } catch(e) {
     console.error('status fetch failed for watch', id, e);
+  }
+}
+
+// ── Hospital group rollup ───────────────────────────────────────────────
+
+function toggleGroupPanel(groupIdx) {
+  const header = document.getElementById('wgroup-header-' + groupIdx);
+  const body   = document.getElementById('wgroup-body-' + groupIdx);
+  if (!body) return;
+  const nowOpen = !body.classList.contains('open');
+  body.classList.toggle('open', nowOpen);
+  if (header) header.classList.toggle('open', nowOpen);
+  if (nowOpen) OPEN_GROUP_PANELS.add(groupIdx); else OPEN_GROUP_PANELS.delete(groupIdx);
+}
+
+function updateGroupPillFor(watchId) {
+  const gi = WATCH_TO_GROUP[watchId];
+  if (gi === undefined) return;  // not part of a group
+  const ids = GROUP_WATCH_IDS[gi] || [];
+  const pill = document.getElementById('wgroup-pill-' + gi);
+  const sub  = document.getElementById('wgroup-sub-' + gi);
+  if (!pill) return;
+
+  let anyDead = false, anyLive = false, deadCount = 0, monitoredCount = 0;
+  for (const id of ids) {
+    const s = WATCH_STATE[id];
+    if (!s) continue;          // status hasn't loaded yet for this table
+    if (!s.monitoring) continue;
+    monitoredCount++;
+    if (s.is_dead) { anyDead = true; deadCount++; } else { anyLive = true; }
+  }
+
+  let cls = 'wgroup-pill', label;
+  if (monitoredCount === 0) {
+    label = 'OFF';
+  } else if (anyDead) {
+    cls += ' dead';
+    label = deadCount + '/' + monitoredCount + ' DEAD';
+  } else {
+    cls += ' live';
+    label = 'LIVE';
+  }
+  pill.className = cls;
+  pill.innerHTML = '<span class="status-dot"></span>' + label;
+
+  if (sub) {
+    sub.textContent = ids.length + ' table' + (ids.length === 1 ? '' : 's') +
+      (deadCount ? ' — ' + deadCount + ' dead' : '');
   }
 }
 

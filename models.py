@@ -137,3 +137,27 @@ class User(UserMixin):
                     "INSERT INTO user_server_access (user_id, table_name) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                     (user_id, tn)
                 )
+
+    # ── DVR hospital access ─────────────────────────────────────────────────
+
+    def allowed_hospitals(self):
+        """Returns set of dvr_hospitals.id this user is allowed to view. None = all."""
+        if self.is_admin:
+            return None
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT hospital_id FROM user_hospital_access WHERE user_id=%s", (self.id,)
+            )
+            return {r["hospital_id"] for r in cur.fetchall()}
+
+    @staticmethod
+    def set_hospital_access(user_id, hospital_ids):
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM user_hospital_access WHERE user_id=%s", (user_id,))
+            for hid in hospital_ids:
+                cur.execute(
+                    "INSERT INTO user_hospital_access (user_id, hospital_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                    (user_id, hid)
+                )

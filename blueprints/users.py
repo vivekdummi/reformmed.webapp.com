@@ -23,7 +23,9 @@ def index():
         cur = conn.cursor()
         cur.execute("SELECT table_name, system_name, location FROM machine_registry ORDER BY system_name")
         servers = cur.fetchall()
-    return render_template("users.html", users=users, servers=servers)
+        cur.execute("SELECT id, name FROM dvr_hospitals ORDER BY name")
+        hospitals = cur.fetchall()
+    return render_template("users.html", users=users, servers=servers, hospitals=hospitals)
 
 
 @users_bp.route("/create", methods=["POST"])
@@ -55,6 +57,8 @@ def create():
         if role == "user":
             selected = request.form.getlist("server_access")
             User.set_server_access(user_id, selected)
+            hosp_selected = [int(h) for h in request.form.getlist("hospital_access")]
+            User.set_hospital_access(user_id, hosp_selected)
         flash(f"User '{username}' created.", "success")
     except Exception as e:
         if "unique" in str(e).lower():
@@ -77,6 +81,10 @@ def edit(user_id):
         servers = cur.fetchall()
         cur.execute("SELECT table_name FROM user_server_access WHERE user_id=%s", (user_id,))
         current_access = {r["table_name"] for r in cur.fetchall()}
+        cur.execute("SELECT id, name FROM dvr_hospitals ORDER BY name")
+        hospitals = cur.fetchall()
+        cur.execute("SELECT hospital_id FROM user_hospital_access WHERE user_id=%s", (user_id,))
+        current_hospital_access = {r["hospital_id"] for r in cur.fetchall()}
 
     if request.method == "POST":
         updates = {}
@@ -112,12 +120,17 @@ def edit(user_id):
             User.update(user_id, **updates)
             selected = request.form.getlist("server_access")
             User.set_server_access(user_id, selected)
+            hosp_selected = [int(h) for h in request.form.getlist("hospital_access")]
+            User.set_hospital_access(user_id, hosp_selected)
             flash("User updated.", "success")
         except Exception as e:
             flash(f"Error: {e}", "danger")
         return redirect(url_for("users.index"))
 
-    return render_template("user_edit.html", user=user, servers=servers, current_access=current_access)
+    return render_template(
+        "user_edit.html", user=user, servers=servers, current_access=current_access,
+        hospitals=hospitals, current_hospital_access=current_hospital_access,
+    )
 
 
 @users_bp.route("/<int:user_id>/delete", methods=["POST"])

@@ -76,6 +76,7 @@ def init_dbmonitor_tables():
             "ALTER TABLE dbmon_watches ADD COLUMN IF NOT EXISTS alert_emails TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE dbmon_watches ADD COLUMN IF NOT EXISTS last_alert_sent TIMESTAMPTZ",
             "ALTER TABLE dbmon_watches ADD COLUMN IF NOT EXISTS was_dead BOOLEAN NOT NULL DEFAULT FALSE",
+            "ALTER TABLE dbmon_watches ADD COLUMN IF NOT EXISTS group_name TEXT",
         ]:
             try:
                 cur.execute(col_sql)
@@ -280,7 +281,34 @@ def index():
             ORDER BY c.name, w.schema_name, w.table_name
         """)
         watches = cur.fetchall()
-    return render_template("dbmonitor.html", connections=connections, watches=watches)
+
+    # Group watches sharing the same group_name (e.g. one hospital with
+    # several tables) under a single card. Ungrouped watches (group_name
+    # is NULL/empty) each become their own singleton group, so the template
+    # can treat every entry uniformly.
+    groups = []
+    group_lookup = {}
+    for w in watches:
+        key = w.get("group_name") or None
+        if key:
+            if key not in group_lookup:
+                group_lookup[key] = {"name": key, "watches": [], "idx": len(groups)}
+                groups.append(group_lookup[key])
+            group_lookup[key]["watches"].append(w)
+        else:
+            groups.append({"name": None, "watches": [w], "idx": len(groups)})
+
+    # {group_idx: [watch_id, ...]} for named groups only — lets the frontend
+    # roll up each child watch's live/dead status into one group-level pill.
+    group_watch_ids = {g["idx"]: [w["id"] for w in g["watches"]] for g in groups if g["name"]}
+
+    existing_group_names = sorted({g["name"] for g in groups if g["name"]})
+
+    return render_template(
+        "dbmonitor.html", connections=connections, watches=watches,
+        groups=groups, group_watch_ids=group_watch_ids,
+        existing_group_names=existing_group_names,
+    )
 
 
 @dbmonitor_bp.route("/connection/add", methods=["POST"])
@@ -346,6 +374,7 @@ def add_watch():
     schema_name  = request.form.get("schema_name", "").strip()
     table_name   = request.form.get("table_name", "").strip()
     display_name = request.form.get("display_name", "").strip()
+    group_name   = _resolve_group_name(request.form)
     alert_emails = request.form.get("alert_emails", "").strip()
     if not all([conn_id, schema_name, table_name]):
         flash("Connection, schema and table are required.", "danger")
@@ -353,16 +382,57 @@ def add_watch():
     try:
         with get_db() as conn:
             conn.cursor().execute("""
-                INSERT INTO dbmon_watches (conn_id, schema_name, table_name, display_name, alert_emails)
-                VALUES (%s,%s,%s,%s,%s)
+                INSERT INTO dbmon_watches (conn_id, schema_name, table_name, display_name, group_name, alert_emails)
+                VALUES (%s,%s,%s,%s,%s,%s)
             """, (conn_id, schema_name, table_name,
-                  display_name or f"{schema_name}.{table_name}", alert_emails))
+                  display_name or f"{schema_name}.{table_name}",
+                  group_name or None, alert_emails))
         flash(f"Now watching {schema_name}.{table_name}.", "success")
     except Exception as e:
         if "unique" in str(e).lower():
             flash("Already watching this table.", "warning")
         else:
             flash(f"Error: {e}", "danger")
+    return redirect(url_for("dbmonitor.index"))
+
+
+def _resolve_group_name(form):
+    """
+    The group picker is a <select> of existing hospital names plus a
+    "+ New group..." option that reveals a text input. Whichever one the
+    user actually used wins: a typed new name always takes priority over
+    the dropdown value (which would just be the sentinel "__new__").
+    """
+    new_name = (form.get("new_group_name") or "").strip()
+    if new_name:
+        return new_name
+    picked = (form.get("group_name") or "").strip()
+    if picked == "__new__":
+        return ""
+    return picked
+
+
+@dbmonitor_bp.route("/watch/<int:watch_id>/update-group", methods=["POST"])
+@login_required
+def update_group(watch_id):
+    """
+    Assign/rename/clear the hospital group a watch belongs to. Any watches
+    sharing the same (case-sensitive) group_name get rendered together under
+    one collapsible card instead of as separate top-level cards — useful when
+    one hospital has multiple tables (e.g. camera events + a separate billing
+    table).
+    """
+    _admin_required()
+    src = request.get_json(silent=True) or request.form
+    group_name = _resolve_group_name(src)
+    with get_db() as conn:
+        conn.cursor().execute(
+            "UPDATE dbmon_watches SET group_name=%s WHERE id=%s",
+            (group_name or None, watch_id)
+        )
+    if request.is_json:
+        return jsonify({"ok": True})
+    flash("Group updated.", "success")
     return redirect(url_for("dbmonitor.index"))
 
 

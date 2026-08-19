@@ -140,6 +140,19 @@
           <span class="text-muted" style="font-size:13px">No servers registered yet.</span>
           {% endfor %}
         </div>
+
+        <hr class="divider">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">DVR Hospital Access <span style="text-transform:none;font-weight:400;">(only used when "DVR Monitor" is checked above; leave all unchecked to block DVR entirely)</span></div>
+        <div style="max-height:160px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px">
+          {% for hosp in hospitals %}
+          <label style="display:flex;align-items:center;gap:8px;margin-bottom:7px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
+            <input type="checkbox" name="hospital_access" value="{{ hosp.id }}" style="width:auto;margin:0">
+            <span>{{ hosp.name }}</span>
+          </label>
+          {% else %}
+          <span class="text-muted" style="font-size:13px">No hospitals registered yet.</span>
+          {% endfor %}
+        </div>
       </div>
 
       <div class="modal-footer">

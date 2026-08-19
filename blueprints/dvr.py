@@ -4,6 +4,8 @@ Ping-based online/offline detection with email alerts.
 """
 import os, ssl, smtplib, asyncio, subprocess
 from datetime import datetime, timezone
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort
 from flask_login import login_required, current_user
 from db import get_db
@@ -12,6 +14,27 @@ dvr_bp = Blueprint("dvr", __name__, url_prefix="/dvr")
 
 def _admin_required():
     if not current_user.is_admin:
+        abort(403)
+
+
+@dvr_bp.before_request
+def _require_dvr_feature():
+    """
+    can_view_dvr previously only hid the nav link — a logged-in user without
+    it could still hit /dvr/... directly. Enforce it here so 'give a user
+    access to only DVR Monitor' (or the reverse: block DVR entirely) actually
+    works at the route level, not just in the sidebar.
+    """
+    if current_user.is_authenticated and not (current_user.is_admin or current_user.can_view_dvr):
+        abort(403)
+
+
+def _check_hospital_access(hospital_id):
+    """Abort 403 if the current user isn't allowed to view this hospital."""
+    if current_user.is_admin:
+        return
+    allowed = current_user.allowed_hospitals()
+    if allowed is not None and hospital_id not in allowed:
         abort(403)
 
 def init_dvr_tables():
@@ -80,24 +103,83 @@ def _ping(ip, port, timeout=3):
         return False
 
 
-def _send_alert(subject, body, machine_key="dvr"):
-    emails = get_setting("alert_emails","")
-    gmail_user = os.getenv("GMAIL_USER","")
-    gmail_pass = os.getenv("GMAIL_APP_PASS","")
+# Same accent-color / icon scheme as the server offline_checker alert cards,
+# so DVR emails look like siblings of the server alerts instead of a
+# different, plain-text system.
+_ALERT_STYLE = {
+    "offline": ("#e5484d", "🔴", "DVR OFFLINE"),
+    "online":  ("#2fb344", "🟢", "DVR ONLINE"),
+}
+
+
+def _render_dvr_alert(kind, hospital, location, dvr_name, ip, port, rows, now=None):
+    """
+    Build (subject, plain_text, html) for a DVR alert — mirrors
+    offline_checker.py's _render_alert() card layout (colored header,
+    icon, key/value table, footer) so DVR and server alerts look alike.
+    rows: extra ordered (label, value) pairs, e.g. [("Last seen", "...")]
+    """
+    color, icon, label = _ALERT_STYLE.get(kind, ("#6b7280", "⚠️", kind.upper()))
+    now = now or datetime.now(timezone.utc)
+    subject = f"{icon} {label} — {dvr_name} ({hospital})"
+
+    all_rows = [
+        ("Hospital", hospital),
+        ("Location", location),
+        ("DVR", dvr_name),
+        ("Address", f"{ip}:{port}"),
+    ] + rows + [("Time", now.strftime("%d %b %Y, %I:%M %p"))]
+
+    plain_lines = [f"{label} — {dvr_name} ({hospital})", ""]
+    plain_lines += [f"{lbl}: {val}" for lbl, val in all_rows]
+    plain = "\n".join(plain_lines)
+
+    html_rows = "".join(
+        f'<tr>'
+        f'<td style="padding:7px 0;color:#8a8f98;font-size:13px;width:120px;">{lbl}</td>'
+        f'<td style="padding:7px 0;color:#1c1e21;font-size:13px;font-weight:600;">{val}</td>'
+        f'</tr>'
+        for lbl, val in all_rows
+    )
+    html = f"""\
+<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:480px;margin:0 auto;
+            border:1px solid #e6e6e9;border-radius:10px;overflow:hidden;">
+  <div style="background:{color};padding:16px 22px;">
+    <span style="color:#ffffff;font-size:15px;font-weight:700;letter-spacing:.2px;">
+      {icon}&nbsp; {label}
+    </span>
+  </div>
+  <div style="padding:20px 22px;background:#ffffff;">
+    <table style="width:100%;border-collapse:collapse;">{html_rows}</table>
+  </div>
+  <div style="background:#f7f7f9;padding:10px 22px;border-top:1px solid #eee;">
+    <span style="font-size:11px;color:#a0a4ab;">REFORMMED Monitor · automated alert</span>
+  </div>
+</div>
+"""
+    return subject, plain, html
+
+
+def _send_alert(kind, hospital, location, dvr_name, ip, port, rows=None, machine_key="dvr"):
+    """Send the styled DVR alert email and log it to the unified alert_log."""
+    subject, plain, html = _render_dvr_alert(kind, hospital, location, dvr_name, ip, port, rows or [])
+
+    emails = get_setting("alert_emails", "")
+    gmail_user = os.getenv("GMAIL_USER", "")
+    gmail_pass = os.getenv("GMAIL_APP_PASS", "")
     recipients = [e.strip() for e in emails.split(",") if e.strip()]
     ok = False
     if gmail_user and gmail_pass and recipients:
         try:
-            from email.mime.text import MIMEText
-            from email.mime.multipart import MIMEMultipart
-            msg = MIMEMultipart()
-            msg["Subject"] = f"[REFORMMED DVR] {subject}"
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = f"[REFORMMED] {subject}"
             msg["From"] = gmail_user
             msg["To"] = ", ".join(recipients)
-            msg.attach(MIMEText(body, "plain"))
+            msg.attach(MIMEText(plain, "plain"))
+            msg.attach(MIMEText(html, "html"))
             ctx = ssl.create_default_context()
-            with smtplib.SMTP_SSL(os.getenv("SMTP_HOST","smtp.gmail.com"),
-                                   int(os.getenv("SMTP_PORT","465")), context=ctx) as srv:
+            with smtplib.SMTP_SSL(os.getenv("SMTP_HOST", "smtp.gmail.com"),
+                                   int(os.getenv("SMTP_PORT", "465")), context=ctx) as srv:
                 srv.login(gmail_user, gmail_pass)
                 srv.sendmail(gmail_user, recipients, msg.as_string())
             ok = True
@@ -109,7 +191,7 @@ def _send_alert(subject, body, machine_key="dvr"):
             conn.cursor().execute("""
                 INSERT INTO alert_log (alert_type, source, machine_key, subject, body, success)
                 VALUES ('dvr_offline', 'dvr', %s, %s, %s, %s)
-            """, (machine_key, subject, body, ok))
+            """, (machine_key, subject, plain, ok))
     except Exception as e:
         print(f"DVR alert_log write failed: {e}")
     return ok
@@ -120,10 +202,11 @@ def _send_alert(subject, body, machine_key="dvr"):
 @dvr_bp.route("/")
 @login_required
 def index():
-    """Hospital list with summary counts."""
+    """Hospital list with summary counts — scoped to this user's allowed hospitals."""
+    allowed = current_user.allowed_hospitals()  # None = admin sees all
     with get_db() as conn:
         cur = conn.cursor()
-        cur.execute("""
+        base_sql = """
             SELECT h.*,
                 COUNT(DISTINCT l.id) as loc_count,
                 COUNT(DISTINCT d.id) as dvr_total,
@@ -132,19 +215,43 @@ def index():
             FROM dvr_hospitals h
             LEFT JOIN dvr_locations l ON l.hospital_id=h.id
             LEFT JOIN dvr_devices d ON d.location_id=l.id
-            GROUP BY h.id ORDER BY h.name
-        """)
-        hospitals = cur.fetchall()
-        # Overall summary
-        cur.execute("""
-            SELECT
-                COUNT(*) as total,
-                SUM(CASE WHEN status='online'  THEN 1 ELSE 0 END) as online,
-                SUM(CASE WHEN status='offline' THEN 1 ELSE 0 END) as offline,
-                SUM(CASE WHEN status='unknown' THEN 1 ELSE 0 END) as unknown
-            FROM dvr_devices
-        """)
-        summary = cur.fetchone()
+        """
+        if allowed is None:
+            cur.execute(base_sql + " GROUP BY h.id ORDER BY h.name")
+            hospitals = cur.fetchall()
+        elif not allowed:
+            hospitals = []
+        else:
+            cur.execute(base_sql + " WHERE h.id = ANY(%s) GROUP BY h.id ORDER BY h.name",
+                        (list(allowed),))
+            hospitals = cur.fetchall()
+
+        # Overall summary — scoped the same way, so a restricted user's
+        # totals reflect only the hospitals they're allowed to see.
+        if allowed is None:
+            cur.execute("""
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status='online'  THEN 1 ELSE 0 END) as online,
+                    SUM(CASE WHEN status='offline' THEN 1 ELSE 0 END) as offline,
+                    SUM(CASE WHEN status='unknown' THEN 1 ELSE 0 END) as unknown
+                FROM dvr_devices
+            """)
+            summary = cur.fetchone()
+        elif not allowed:
+            summary = {"total": 0, "online": 0, "offline": 0, "unknown": 0}
+        else:
+            cur.execute("""
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN d.status='online'  THEN 1 ELSE 0 END) as online,
+                    SUM(CASE WHEN d.status='offline' THEN 1 ELSE 0 END) as offline,
+                    SUM(CASE WHEN d.status='unknown' THEN 1 ELSE 0 END) as unknown
+                FROM dvr_devices d
+                JOIN dvr_locations l ON l.id=d.location_id
+                WHERE l.hospital_id = ANY(%s)
+            """, (list(allowed),))
+            summary = cur.fetchone()
     settings = {
         "ping_interval_sec": get_setting("ping_interval_sec","30"),
         "alert_emails": get_setting("alert_emails",""),
@@ -157,6 +264,7 @@ def index():
 @login_required
 def hospital(hid):
     """Hospital dashboard — locations + DVR status."""
+    _check_hospital_access(hid)
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute("SELECT * FROM dvr_hospitals WHERE id=%s", (hid,))
@@ -306,12 +414,16 @@ def ping_dvr(did):
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute("""
-            SELECT d.*, l.hospital_id FROM dvr_devices d
-            JOIN dvr_locations l ON l.id=d.location_id WHERE d.id=%s
+            SELECT d.*, l.hospital_id, l.name as loc_name, h.name as hosp_name
+            FROM dvr_devices d
+            JOIN dvr_locations l ON l.id=d.location_id
+            JOIN dvr_hospitals h ON h.id=l.hospital_id
+            WHERE d.id=%s
         """, (did,))
         dev = cur.fetchone()
     if not dev:
         return jsonify({"error":"not found"}), 404
+    _check_hospital_access(dev["hospital_id"])
 
     now    = datetime.now(timezone.utc)
     online = _ping(dev["ip"], dev["port"])
@@ -329,19 +441,22 @@ def ping_dvr(did):
             alert_sent   = False
 
         if status == "online" and prev_status == "offline":
+            offline_since = went_offline  # capture before we clear it below
             went_offline = None
             alert_sent   = False
             if alerts_enabled:
                 _send_alert(
-                    f"DVR RECOVERED — {dev['name']}",
-                    f"DVR '{dev['name']}' ({dev['ip']}:{dev['port']}) is back ONLINE.",
+                    "online", dev["hosp_name"], dev["loc_name"], dev["name"],
+                    dev["ip"], dev["port"],
+                    rows=[("Was offline since", offline_since.strftime("%d %b %Y, %I:%M %p") if offline_since else "unknown")],
                     machine_key=f"{dev['name']}@{dev['ip']}"
                 )
 
         if status == "offline" and not alert_sent and alerts_enabled:
             ok = _send_alert(
-                f"DVR OFFLINE — {dev['name']}",
-                f"DVR '{dev['name']}' ({dev['ip']}:{dev['port']}) went OFFLINE.\nTime: {now.isoformat()}",
+                "offline", dev["hosp_name"], dev["loc_name"], dev["name"],
+                dev["ip"], dev["port"],
+                rows=[("Last seen", dev["last_seen"].strftime("%d %b %Y, %I:%M %p") if dev["last_seen"] else "never")],
                 machine_key=f"{dev['name']}@{dev['ip']}"
             )
             if ok:
@@ -369,10 +484,20 @@ def ping_dvr(did):
 @dvr_bp.route("/ping/all")
 @login_required
 def ping_all_ids():
-    """Return list of all device IDs for frontend to ping."""
+    """Return device IDs for the frontend to ping — scoped to allowed hospitals."""
+    allowed = current_user.allowed_hospitals()
     with get_db() as conn:
         cur = conn.cursor()
-        cur.execute("SELECT id FROM dvr_devices ORDER BY id")
+        if allowed is None:
+            cur.execute("SELECT id FROM dvr_devices ORDER BY id")
+        elif not allowed:
+            cur.execute("SELECT id FROM dvr_devices WHERE FALSE")
+        else:
+            cur.execute("""
+                SELECT d.id FROM dvr_devices d
+                JOIN dvr_locations l ON l.id=d.location_id
+                WHERE l.hospital_id = ANY(%s) ORDER BY d.id
+            """, (list(allowed),))
         ids = [r["id"] for r in cur.fetchall()]
     interval = int(get_setting("ping_interval_sec","30"))
     return jsonify({"ids": ids, "interval": interval})
