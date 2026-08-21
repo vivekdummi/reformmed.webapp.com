@@ -81,9 +81,10 @@
 /* ── Info + Alerts ── */
 .info-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px;}
 .card-section-title{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:14px;}
-.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;}
-.info-item .lbl{font-size:10px;color:var(--text-muted);margin-bottom:2px;}
-.info-item .val{font-family:'JetBrains Mono',monospace;font-size:12px;}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px 18px;}
+.info-item{min-width:0;}
+.info-item .lbl{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;display:flex;align-items:center;gap:5px;}
+.info-item .val{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;overflow-wrap:anywhere;line-height:1.4;}
 .bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 @media(max-width:700px){.bottom-grid{grid-template-columns:1fr;}}
 .pair-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
@@ -161,7 +162,8 @@
 }
 .hist-preset-btn:hover{border-color:var(--accent);color:var(--text);}
 .hist-preset-btn.active{background:rgba(56,189,248,.12);border-color:var(--accent);color:var(--accent);font-weight:600;}
-.history-bar-row{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;}
+.history-bar-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.history-custom-range{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;}
 .history-field{display:flex;flex-direction:column;gap:5px;}
 .history-field label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;}
 .history-field input{padding:8px 12px;font-size:12.5px;min-width:200px;}
@@ -242,14 +244,14 @@ function toggleAlerts() {
 <div class="info-card" style="margin-bottom:14px;">
   <div class="card-section-title">Machine Info</div>
   <div class="info-grid">
-    <div class="info-item"><div class="lbl">System Name</div><div class="val">{{ machine.system_name }}</div></div>
-    <div class="info-item"><div class="lbl">Location</div><div class="val">{{ machine.location }}</div></div>
-    <div class="info-item"><div class="lbl">Hostname</div><div class="val">{{ machine.hostname or '—' }}</div></div>
-    <div class="info-item"><div class="lbl">Public IP</div><div class="val">{{ machine.public_ip or '—' }}</div></div>
-    <div class="info-item"><div class="lbl">OS Type</div><div class="val">{{ machine.os_type or '—' }}</div></div>
-    <div class="info-item"><div class="lbl">OS Version</div><div class="val" style="font-size:10px;">{{ latest.os_version if latest and latest.os_version else '—' }}</div></div>
-    <div class="info-item"><div class="lbl">Table</div><div class="val">{{ machine.table_name }}</div></div>
-    <div class="info-item"><div class="lbl">Registered</div><div class="val">{{ machine.registered_at.strftime('%Y-%m-%d') if machine.registered_at else '—' }}</div></div>
+    <div class="info-item"><div class="lbl">🖥️ System Name</div><div class="val">{{ machine.system_name }}</div></div>
+    <div class="info-item"><div class="lbl">📍 Location</div><div class="val">{{ machine.location }}</div></div>
+    <div class="info-item"><div class="lbl">🏷️ Hostname</div><div class="val">{{ machine.hostname or '—' }}</div></div>
+    <div class="info-item"><div class="lbl">🌐 Public IP</div><div class="val">{{ machine.public_ip or '—' }}</div></div>
+    <div class="info-item"><div class="lbl">💿 OS Type</div><div class="val">{{ machine.os_type or '—' }}</div></div>
+    <div class="info-item"><div class="lbl">🧬 OS Version</div><div class="val">{{ latest.os_version if latest and latest.os_version else '—' }}</div></div>
+    <div class="info-item"><div class="lbl">🗄️ Table</div><div class="val" style="color:var(--text-muted);font-size:11px;">{{ machine.table_name }}</div></div>
+    <div class="info-item"><div class="lbl">📅 Registered</div><div class="val">{{ machine.registered_at.strftime('%Y-%m-%d') if machine.registered_at else '—' }}</div></div>
   </div>
 </div>
 
@@ -269,16 +271,18 @@ function toggleAlerts() {
         <button type="button" class="hist-preset-btn" data-mins="10080">Last 7d</button>
       </div>
       <div class="history-divider"></div>
-      <div class="history-field">
-        <label>From</label>
-        <input type="datetime-local" id="hist-from">
+      <div class="history-custom-range">
+        <div class="history-field">
+          <label>From</label>
+          <input type="datetime-local" id="hist-from">
+        </div>
+        <div class="history-field">
+          <label>To</label>
+          <input type="datetime-local" id="hist-to">
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" onclick="loadHistory()">View Range</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="hist-live-btn" onclick="backToLive()" style="display:none;">← Back to Live</button>
       </div>
-      <div class="history-field">
-        <label>To</label>
-        <input type="datetime-local" id="hist-to">
-      </div>
-      <button type="button" class="btn btn-primary btn-sm" onclick="loadHistory()">View Range</button>
-      <button type="button" class="btn btn-ghost btn-sm" id="hist-live-btn" onclick="backToLive()" style="display:none;">← Back to Live</button>
     </div>
   </div>
 </div>
@@ -694,10 +698,12 @@ function toggleAlerts() {
         <button type="button" class="hist-preset-btn" data-mins="10080">Last 7d</button>
       </div>
       <div class="history-divider"></div>
-      <div class="history-field"><label>From</label><input type="datetime-local" id="modal-hist-from"></div>
-      <div class="history-field"><label>To</label><input type="datetime-local" id="modal-hist-to"></div>
-      <button type="button" class="btn btn-primary btn-sm" onclick="loadModalHistory()">View Range</button>
-      <button type="button" class="btn btn-ghost btn-sm" id="modal-hist-live-btn" onclick="modalBackToLive()" style="display:none;">← Back to Live</button>
+      <div class="history-custom-range">
+        <div class="history-field"><label>From</label><input type="datetime-local" id="modal-hist-from"></div>
+        <div class="history-field"><label>To</label><input type="datetime-local" id="modal-hist-to"></div>
+        <button type="button" class="btn btn-primary btn-sm" onclick="loadModalHistory()">View Range</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="modal-hist-live-btn" onclick="modalBackToLive()" style="display:none;">← Back to Live</button>
+      </div>
       <span class="history-status" id="modal-hist-status"></span>
     </div>
     <div id="chart-modal-note" style="font-size:12px;color:var(--text-muted);margin-bottom:12px;display:none;"></div>
