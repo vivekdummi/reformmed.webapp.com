@@ -81,6 +81,56 @@
 @media(max-width:700px){.pair-row{grid-template-columns:1fr;}}
 .mini-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 20px;}
 
+/* ── Dashboard grid (new overview widgets) ── */
+.stat-cards-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 18px;min-width:0;}
+.stat-card-top{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.stat-icon{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:7px;font-size:13px;flex-shrink:0;}
+.stat-label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.stat-card-val{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;display:flex;align-items:baseline;gap:8px;margin-bottom:8px;}
+.stat-trend{font-size:11px;font-weight:600;color:#22c55e;}
+.stat-trend.neg{color:#ef4444;}
+.stat-progress{height:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden;margin-bottom:8px;}
+.stat-progress-fill{height:100%;border-radius:2px;transition:width .4s ease;}
+.stat-progress-fill.cyan{background:#00d4ff;} .stat-progress-fill.purple{background:#a78bfa;}
+.stat-progress-fill.green{background:#22c55e;} .stat-progress-fill.pink{background:#e879f9;}
+.stat-sub{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.stat-card-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.stat-status-ok{font-size:11px;font-weight:600;color:#22c55e;}
+
+.dash-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;}
+.dash-grid-3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;margin-bottom:14px;}
+@media(max-width:1100px){.dash-grid-4{grid-template-columns:repeat(2,1fr);} .dash-grid-3{grid-template-columns:1fr;}}
+@media(max-width:600px){.dash-grid-4{grid-template-columns:1fr;}}
+.dash-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 18px;min-width:0;}
+.dash-card-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.dash-card-title{font-size:12px;font-weight:700;color:var(--text);}
+.dash-card-sub-note{font-size:10px;color:var(--text-muted);}
+.dash-card-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;}
+
+.donut-row{display:flex;align-items:center;gap:16px;}
+.donut-legend{display:flex;flex-direction:column;gap:7px;font-size:12px;flex:1;min-width:0;}
+.donut-legend-item{display:flex;align-items:center;gap:6px;color:var(--text-muted);}
+.donut-legend-item b{color:var(--text);font-weight:600;margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;}
+.donut-legend-item.total{border-top:1px solid var(--border);padding-top:6px;margin-top:2px;color:var(--text);font-weight:600;}
+.donut-legend .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.donut-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;pointer-events:none;}
+
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;}
+.gauge-val{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;margin-top:-24px;}
+.gauge-status{font-size:11px;font-weight:600;color:#22c55e;}
+
+.rings-row{display:flex;gap:14px;flex-wrap:wrap;justify-content:space-around;}
+.ring-item{display:flex;flex-direction:column;align-items:center;gap:6px;}
+.ring-val{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;}
+.ring-lbl{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;}
+
+.alerts-list{display:flex;flex-direction:column;gap:8px;max-height:180px;overflow-y:auto;}
+.alert-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;}
+.alert-row-left{display:flex;align-items:center;gap:8px;min-width:0;}
+.alert-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.alert-time{color:var(--text-muted);font-size:11px;white-space:nowrap;flex-shrink:0;}
+
 /* ── History range filter bar ── */
 .history-bar{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:0;margin-bottom:14px;overflow:hidden;}
 .history-bar-header{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--border);}
@@ -204,102 +254,282 @@ function toggleAlerts() {
   </div>
 </div>
 
-<!-- ═══ CPU ═══ -->
-<div class="metric-row">
-  <div class="metric-row-left mrl-cpu">
-    <div class="metric-label">
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="2" x2="9" y2="4"/><line x1="15" y1="2" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="22"/><line x1="15" y1="20" x2="15" y2="22"/><line x1="2" y1="9" x2="4" y2="9"/><line x1="2" y1="15" x2="4" y2="15"/><line x1="20" y1="9" x2="22" y2="9"/><line x1="20" y1="15" x2="22" y2="15"/></svg>
-      CPU Usage
+<!-- ═══════════════════════════════════════════════════════════
+     ROW 1 — Stat cards
+     ═══════════════════════════════════════════════════════════ -->
+<div class="stat-cards-row">
+
+  <div class="stat-card">
+    <div class="stat-card-top">
+      <span class="stat-icon" style="background:rgba(0,212,255,.12);color:#00d4ff;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+      </span>
+      <span class="stat-label">CPU Usage</span>
     </div>
-    <div class="metric-val" id="val-cpu" style="color:#00d4ff">{{ '%.1f'%latest.cpu_percent if latest and latest.cpu_percent else '—' }}%</div>
-    <div class="progress-bar"><div class="progress-fill cyan" id="bar-cpu" style="width:{{ latest.cpu_percent or 0 }}%"></div></div>
-    <div class="metric-sub" id="val-freq">{{ '%.0f'%latest.cpu_freq_mhz if latest and latest.cpu_freq_mhz else '' }} MHz</div>
+    <div class="stat-card-val">
+      <span id="stat-cpu-val" style="color:#00d4ff">{{ '%.1f'%latest.cpu_percent if latest and latest.cpu_percent else '0.0' }}%</span>
+      <span class="stat-trend" id="stat-cpu-trend">{{ '%+.1f%%'|format(trend_cpu) if trend_cpu }}</span>
+    </div>
+    <div class="stat-progress"><div class="stat-progress-fill cyan" id="stat-cpu-bar" style="width:{{ latest.cpu_percent or 0 }}%"></div></div>
+    <div class="stat-sub" id="stat-cpu-freq">{{ '%.0f'%latest.cpu_freq_mhz if latest and latest.cpu_freq_mhz else '—' }} MHz</div>
   </div>
-  <div class="metric-row-right">
-    <div class="chart-label">CPU % — last 60 readings</div>
-    <div style="height:120px;position:relative;"><canvas id="chart-cpu"></canvas></div>
+
+  <div class="stat-card">
+    <div class="stat-card-top">
+      <span class="stat-icon" style="background:rgba(167,139,250,.12);color:#a78bfa;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="7" width="20" height="10" rx="1"/><line x1="6" y1="7" x2="6" y2="17"/><line x1="10" y1="7" x2="10" y2="17"/><line x1="14" y1="7" x2="14" y2="17"/><line x1="18" y1="7" x2="18" y2="17"/></svg>
+      </span>
+      <span class="stat-label">RAM Usage</span>
+    </div>
+    <div class="stat-card-val">
+      <span id="stat-ram-val" style="color:#a78bfa">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '0.0' }}%</span>
+      <span class="stat-trend" id="stat-ram-trend">{{ '%+.1f%%'|format(trend_ram) if trend_ram }}</span>
+    </div>
+    <div class="stat-progress"><div class="stat-progress-fill purple" id="stat-ram-bar" style="width:{{ latest.ram_percent or 0 }}%"></div></div>
+    <div class="stat-sub" id="stat-ram-detail">{{ '%.1f'%latest.ram_used_gb if latest and latest.ram_used_gb else '0' }} / {{ '%.1f'%latest.ram_total_gb if latest and latest.ram_total_gb else '0' }} GB</div>
   </div>
+
+  {% if gpu_primary %}
+  <div class="stat-card">
+    <div class="stat-card-top">
+      <span class="stat-icon" style="background:rgba(34,197,94,.12);color:#22c55e;">🎮</span>
+      <span class="stat-label">GPU Load</span>
+    </div>
+    <div class="stat-card-val">
+      <span id="stat-gpu-val" style="color:#22c55e">{{ '%.0f'%gpu_load_pct if gpu_load_pct is not none else '0' }}%</span>
+    </div>
+    <div class="stat-progress"><div class="stat-progress-fill green" id="stat-gpu-bar" style="width:{{ gpu_load_pct or 0 }}%"></div></div>
+    <div class="stat-sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ gpu_primary.name or gpu_primary.device_name or 'GPU' }}</div>
+  </div>
+
+  {% if gpu_vram_pct is not none %}
+  <div class="stat-card">
+    <div class="stat-card-top">
+      <span class="stat-icon" style="background:rgba(232,121,249,.12);color:#e879f9;">📶</span>
+      <span class="stat-label">GPU VRAM</span>
+    </div>
+    <div class="stat-card-val">
+      <span id="stat-vram-val" style="color:#e879f9">{{ '%.0f'%gpu_vram_pct }}%</span>
+    </div>
+    <div class="stat-progress"><div class="stat-progress-fill pink" id="stat-vram-bar" style="width:{{ gpu_vram_pct }}%"></div></div>
+    <div class="stat-sub" id="stat-vram-detail">{{ '%.1f'%(gpu_vram_used_mb/1024) }} / {{ '%.1f'%(gpu_vram_total_mb/1024) }} GB</div>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <div class="stat-card">
+    <div class="stat-card-top">
+      <span class="stat-icon" style="background:rgba(245,158,11,.12);color:#f59e0b;">🌡️</span>
+      <span class="stat-label">CPU Temperature</span>
+    </div>
+    <div class="stat-card-val">
+      <span id="stat-temp-val" style="color:#f59e0b">{% if latest and latest.cpu_temp %}{{ '%.0f'%latest.cpu_temp }}°C{% else %}—{% endif %}</span>
+    </div>
+    <div class="stat-card-row">
+      <span class="stat-status-ok" id="stat-temp-status">Normal</span>
+      <div style="width:70px;height:24px;"><canvas id="stat-temp-spark"></canvas></div>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-card-top">
+      <span class="stat-icon" style="background:rgba(56,189,248,.12);color:var(--accent);">⏱</span>
+      <span class="stat-label">Uptime</span>
+    </div>
+    <div class="stat-card-val">
+      <span id="val-uptime" style="font-size:19px;">
+        {% if latest and latest.uptime_seconds %}
+          {% set u=latest.uptime_seconds|int %}{{ u//86400 }}d {{ (u%86400)//3600 }}h {{ (u%3600)//60 }}m
+        {% else %}—{% endif %}
+      </span>
+    </div>
+    <div class="stat-status-ok">{{ machine.status|upper if machine.status == 'online' else machine.status }}</div>
+  </div>
+
 </div>
 
-<!-- ═══ RAM ═══ -->
-<div class="metric-row">
-  <div class="metric-row-left mrl-ram">
-    <div class="metric-label">
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="7" width="20" height="10" rx="1"/><line x1="6" y1="7" x2="6" y2="17"/><line x1="10" y1="7" x2="10" y2="17"/><line x1="14" y1="7" x2="14" y2="17"/><line x1="18" y1="7" x2="18" y2="17"/></svg>
-      RAM
+<!-- ═══════════════════════════════════════════════════════════
+     ROW 2 — CPU area / RAM donut / Net traffic bar / Disk donut
+     ═══════════════════════════════════════════════════════════ -->
+<div class="dash-grid-4">
+
+  <div class="dash-card">
+    <div class="dash-card-header">
+      <span class="dash-card-title">CPU Usage %</span>
+      <span class="dash-card-val" id="cpuarea-val" style="color:#00d4ff">{{ '%.1f'%latest.cpu_percent if latest and latest.cpu_percent else '0.0' }}%</span>
     </div>
-    <div class="metric-val" id="val-ram" style="color:#a78bfa">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '—' }}%</div>
-    <div class="progress-bar"><div class="progress-fill blue" id="bar-ram" style="width:{{ latest.ram_percent or 0 }}%"></div></div>
-    <div class="metric-sub" id="val-ram-detail">{{ '%.1f'%latest.ram_used_gb if latest and latest.ram_used_gb else '' }} / {{ '%.1f'%latest.ram_total_gb if latest and latest.ram_total_gb else '' }} GB</div>
+    <div style="height:150px;position:relative;"><canvas id="chart-cpu-area"></canvas></div>
   </div>
-  <div class="metric-row-right">
-    <div class="chart-label">RAM % — last 60 readings</div>
-    <div style="height:120px;position:relative;"><canvas id="chart-ram"></canvas></div>
+
+  <div class="dash-card">
+    <div class="dash-card-header">
+      <span class="dash-card-title">RAM Usage</span>
+      <span class="dash-card-val" style="color:#a78bfa">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '0.0' }}%</span>
+    </div>
+    <div class="donut-row">
+      <div style="height:130px;width:130px;position:relative;flex-shrink:0;"><canvas id="chart-ram-donut"></canvas><div class="donut-center" id="ram-donut-center">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '0.0' }}%</div></div>
+      <div class="donut-legend">
+        <div class="donut-legend-item"><span class="dot" style="background:#a78bfa;"></span>Used <b id="ram-legend-used">{{ '%.1f'%latest.ram_used_gb if latest and latest.ram_used_gb else '0' }} GB</b></div>
+        <div class="donut-legend-item"><span class="dot" style="background:#3a3f52;"></span>Free <b id="ram-legend-free">{{ '%.1f'%((latest.ram_total_gb or 0) - (latest.ram_used_gb or 0)) if latest else '0' }} GB</b></div>
+        <div class="donut-legend-item total">Total <b>{{ '%.1f'%latest.ram_total_gb if latest and latest.ram_total_gb else '0' }} GB</b></div>
+      </div>
+    </div>
   </div>
+
+  <div class="dash-card">
+    <div class="dash-card-header">
+      <span class="dash-card-title">Net Traffic (KB/s)</span>
+      <div style="text-align:right;font-size:11px;">
+        <div style="color:#22c55e;">↑ <span id="net-up-val">0</span> KB/s</div>
+        <div style="color:#00d4ff;">↓ <span id="net-down-val">0</span> KB/s</div>
+      </div>
+    </div>
+    <div style="height:150px;position:relative;"><canvas id="chart-net-bar"></canvas></div>
+  </div>
+
+  <div class="dash-card">
+    <div class="dash-card-header">
+      <span class="dash-card-title">Disk Usage</span>
+      {% if disk_primary %}<span class="dash-card-val" style="color:#f59e0b;font-size:16px;">{{ '%.1f'%(disk_primary.percent|float) }}%</span>{% endif %}
+    </div>
+    {% if disk_primary %}
+    {% set d_used = disk_primary.used_gb if disk_primary.used_gb is defined else 0 %}
+    {% set d_total = disk_primary.total_gb if disk_primary.total_gb is defined else 0 %}
+    {% set d_free = disk_primary.free_gb if disk_primary.free_gb is defined else (d_total - d_used) %}
+    <div class="donut-row">
+      <div style="height:130px;width:130px;position:relative;flex-shrink:0;"><canvas id="chart-disk-donut"></canvas><div class="donut-center">{{ '%.1f'%(disk_primary.percent|float) }}%</div></div>
+      <div class="donut-legend">
+        <div class="donut-legend-item"><span class="dot" style="background:#f59e0b;"></span>Used <b>{{ '%.1f'%d_used }} GB</b></div>
+        <div class="donut-legend-item"><span class="dot" style="background:#3a3f52;"></span>Free <b>{{ '%.1f'%d_free }} GB</b></div>
+        <div class="donut-legend-item total">Total <b>{{ '%.1f'%d_total }} GB</b></div>
+      </div>
+    </div>
+    {% else %}
+    <p style="font-size:13px;color:var(--text-muted);padding:20px;">No disk data.</p>
+    {% endif %}
+  </div>
+
 </div>
 
-<!-- ═══ CPU TEMP ═══ -->
-<div class="metric-row">
-  <div class="metric-row-left mrl-temp">
-    <div class="metric-label">🌡️ CPU Temperature</div>
-    <div class="metric-val" id="val-temp" style="color:#f59e0b">
-      {% if latest and latest.cpu_temp %}{{ '%.0f'%latest.cpu_temp }}°C{% else %}—{% endif %}
+<!-- ═══════════════════════════════════════════════════════════
+     ROW 3 — Per-core CPU / Temp gauge / GPU load area / Swap donut
+     ═══════════════════════════════════════════════════════════ -->
+<div class="dash-grid-4">
+
+  <div class="dash-card">
+    <div class="dash-card-header">
+      <span class="dash-card-title">CPU Per-Core Usage</span>
     </div>
-    <div class="metric-sub">Thermal sensor</div>
+    {% if chart_cores and chart_cores != '[]' %}
+    <div style="height:150px;position:relative;"><canvas id="chart-cores"></canvas></div>
+    {% else %}
+    <p style="font-size:12px;color:var(--text-muted);padding:20px;">Per-core data not reported by this agent yet.</p>
+    {% endif %}
   </div>
-  <div class="metric-row-right">
-    <div class="chart-label">Temperature °C — last 60 readings</div>
-    <div style="height:120px;position:relative;"><canvas id="chart-temp"></canvas></div>
+
+  <div class="dash-card">
+    <div class="dash-card-header">
+      <span class="dash-card-title">Temperature (°C)</span>
+    </div>
+    <div class="gauge-wrap">
+      <div style="height:110px;width:100%;position:relative;"><canvas id="chart-temp-gauge"></canvas></div>
+      <div class="gauge-val" id="gauge-temp-val" style="color:#f59e0b;">{% if latest and latest.cpu_temp %}{{ '%.0f'%latest.cpu_temp }}°C{% else %}—{% endif %}</div>
+      <div class="gauge-status" id="gauge-temp-status">Normal</div>
+    </div>
   </div>
+
+  {% if gpu_primary %}
+  <div class="dash-card">
+    <div class="dash-card-header">
+      <span class="dash-card-title">GPU Load %</span>
+      <span class="dash-card-val" id="gpuarea-val" style="color:#22c55e">{{ '%.0f'%gpu_load_pct if gpu_load_pct is not none else '0' }}%</span>
+    </div>
+    <div style="height:150px;position:relative;"><canvas id="chart-gpu-area"></canvas></div>
+  </div>
+  {% else %}
+  <div class="dash-card">
+    <div class="dash-card-header"><span class="dash-card-title">GPU Load %</span></div>
+    <p style="font-size:12px;color:var(--text-muted);padding:20px;">No GPU detected on this machine.</p>
+  </div>
+  {% endif %}
+
+  <div class="dash-card">
+    <div class="dash-card-header">
+      <span class="dash-card-title">Swap Usage</span>
+      <span class="dash-card-val" style="color:#c084fc;font-size:16px;">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</span>
+    </div>
+    <div class="donut-row">
+      <div style="height:130px;width:130px;position:relative;flex-shrink:0;"><canvas id="chart-swap-donut"></canvas><div class="donut-center" id="swap-donut-center">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</div></div>
+      <div class="donut-legend">
+        <div class="donut-legend-item"><span class="dot" style="background:#c084fc;"></span>Used <b id="swap-legend-used">{{ '%.1f'%latest.swap_used_gb if latest and latest.swap_used_gb else '0' }} GB</b></div>
+        <div class="donut-legend-item"><span class="dot" style="background:#3a3f52;"></span>Free <b id="swap-legend-free">{{ '%.1f'%((latest.swap_total_gb or 0) - (latest.swap_used_gb or 0)) if latest else '0' }} GB</b></div>
+        <div class="donut-legend-item total">Total <b>{{ '%.1f'%latest.swap_total_gb if latest and latest.swap_total_gb else '0' }} GB</b></div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
-<!-- ═══ SWAP ═══ -->
-<div class="metric-row">
-  <div class="metric-row-left mrl-swap">
-    <div class="metric-label">💾 Swap</div>
-    <div class="metric-val" id="val-swap" style="color:#c084fc">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</div>
-    <div class="progress-bar"><div class="progress-fill yellow" id="bar-swap" style="width:{{ latest.swap_percent or 0 }}%"></div></div>
-    <div class="metric-sub" id="val-swap-detail">
-      {{ '%.1f'%latest.swap_used_gb if latest and latest.swap_used_gb else '0' }} /
-      {{ '%.1f'%latest.swap_total_gb if latest and latest.swap_total_gb else '0' }} GB
-    </div>
-  </div>
-  <div class="metric-row-right">
-    <div class="chart-label">Swap % — last 60 readings</div>
-    <div style="height:120px;position:relative;"><canvas id="chart-swap"></canvas></div>
-  </div>
-</div>
+<!-- ═══════════════════════════════════════════════════════════
+     ROW 4 — System overview rings / Recent alerts / Process status
+     ═══════════════════════════════════════════════════════════ -->
+<div class="dash-grid-3">
 
-<!-- ═══ NET UPLOAD ═══ -->
-<div class="metric-row">
-  <div class="metric-row-left mrl-net-up">
-    <div class="metric-label">
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
-      Net Upload
+  <div class="dash-card">
+    <div class="dash-card-header"><span class="dash-card-title">System Overview</span></div>
+    <div class="rings-row">
+      <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-cpu"></canvas><div class="ring-val" id="ring-cpu-val">0%</div></div><div class="ring-lbl">CPU</div></div>
+      <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-ram"></canvas><div class="ring-val" id="ring-ram-val">0%</div></div><div class="ring-lbl">RAM</div></div>
+      {% if gpu_primary %}
+      <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-gpu"></canvas><div class="ring-val" id="ring-gpu-val">0%</div></div><div class="ring-lbl">GPU Load</div></div>
+      {% endif %}
+      {% if gpu_vram_pct is not none %}
+      <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-vram"></canvas><div class="ring-val" id="ring-vram-val">0%</div></div><div class="ring-lbl">VRAM</div></div>
+      {% endif %}
+      <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-swap"></canvas><div class="ring-val" id="ring-swap-val">0%</div></div><div class="ring-lbl">Swap</div></div>
+      {% if disk_primary %}
+      <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-disk"></canvas><div class="ring-val" id="ring-disk-val">0%</div></div><div class="ring-lbl">Disk</div></div>
+      {% endif %}
     </div>
-    <div class="metric-val" id="val-net-sent" style="color:#22c55e">—</div>
-    <div class="metric-sub">KB/s  <span id="val-net-sent-total" style="font-size:10px;"></span></div>
   </div>
-  <div class="metric-row-right">
-    <div class="chart-label">Upload KB/s — last 60 readings</div>
-    <div style="height:120px;position:relative;"><canvas id="chart-net-up"></canvas></div>
-  </div>
-</div>
 
-<!-- ═══ NET DOWNLOAD ═══ -->
-<div class="metric-row">
-  <div class="metric-row-left mrl-net-down">
-    <div class="metric-label">
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
-      Net Download
+  <div class="dash-card">
+    <div class="dash-card-header"><span class="dash-card-title">Recent Alerts</span></div>
+    <div class="alerts-list">
+      {% for a in alert_history[:6] %}
+      <div class="alert-row">
+        <div class="alert-row-left">
+          <span class="{{ 'alert-ok' if a.success else 'alert-warn' }}">{{ '✅' if a.success else '⚠️' }}</span>
+          <span class="alert-text">{{ a.subject }}</span>
+        </div>
+        <span class="alert-time">{{ a.sent_at.strftime('%m-%d %H:%M') if a.sent_at else '—' }}</span>
+      </div>
+      {% else %}
+      <p style="font-size:13px;color:var(--text-muted);">No alerts for this machine.</p>
+      {% endfor %}
     </div>
-    <div class="metric-val" id="val-net-recv" style="color:#00d4ff">—</div>
-    <div class="metric-sub">KB/s  <span id="val-net-recv-total" style="font-size:10px;"></span></div>
   </div>
-  <div class="metric-row-right">
-    <div class="chart-label">Download KB/s — last 60 readings</div>
-    <div style="height:120px;position:relative;"><canvas id="chart-net-down"></canvas></div>
+
+  <div class="dash-card">
+    <div class="dash-card-header">
+      <span class="dash-card-title">Process Status</span>
+      <span class="dash-card-sub-note">(sampled top processes only)</span>
+    </div>
+    <div class="donut-row">
+      <div style="height:120px;width:120px;position:relative;flex-shrink:0;"><canvas id="chart-proc-donut"></canvas><div class="donut-center" id="proc-donut-center">{{ procs|length }}</div></div>
+      <div class="donut-legend">
+        {% for status, count in proc_status_counts.items() %}
+        <div class="donut-legend-item">
+          <span class="dot" style="background:{{ '#22c55e' if status=='running' else ('#00d4ff' if status=='sleeping' else ('#ef4444' if status=='stopped' else '#64748b')) }};"></span>
+          {{ status|capitalize }} <b>{{ count }}</b>
+        </div>
+        {% else %}
+        <span class="text-muted" style="font-size:12px;">No process data.</span>
+        {% endfor %}
+      </div>
+    </div>
   </div>
+
 </div>
 
 <!-- ═══ GPU SECTION — supports Intel, Nvidia, multiple GPUs ═══ -->
@@ -459,23 +689,11 @@ function toggleAlerts() {
 </div>
 {% endif %}
 
-<!-- ═══ Uptime + Hostname ═══ -->
-<div class="pair-row">
-  <div class="mini-card">
-    <div class="metric-label">⏱ Uptime</div>
-    <div class="metric-val" id="val-uptime" style="font-size:20px;color:var(--text)">
-      {% if latest and latest.uptime_seconds %}
-        {% set u=latest.uptime_seconds|int %}
-        {{ u//86400 }}d {{ (u%86400)//3600 }}h {{ (u%3600)//60 }}m
-      {% else %}—{% endif %}
-    </div>
-    <div class="metric-sub">System uptime</div>
-  </div>
-  <div class="mini-card">
-    <div class="metric-label">🖥 Hostname</div>
-    <div class="mono" style="font-size:13px;font-weight:600;margin-top:4px;">{{ machine.hostname or '—' }}</div>
-    <div class="metric-sub" style="margin-top:4px;">{{ machine.public_ip or '' }}</div>
-  </div>
+<!-- ═══ Hostname ═══ -->
+<div class="mini-card" style="margin-bottom:14px;">
+  <div class="metric-label">🖥 Hostname</div>
+  <div class="mono" style="font-size:13px;font-weight:600;margin-top:4px;">{{ machine.hostname or '—' }}</div>
+  <div class="metric-sub" style="margin-top:4px;">{{ machine.public_ip or '' }}</div>
 </div>
 
 <!-- ═══ DISK PARTITIONS ═══ -->
@@ -655,7 +873,172 @@ Object.keys(gpuMeta).forEach(function(idx) {
   gpuVramHist[idx] = Array(MAX_POINTS).fill(m.initVramPct);
 });
 
-// ── Chart.js globals ──
+// ── New dashboard widget helpers: donut, ring, gauge-needle, bar, multi-line ──
+
+function makeDonut(canvasId, usedVal, totalVal, color) {
+  var el = document.getElementById(canvasId);
+  if (!el) return null;
+  var free = Math.max(0, (totalVal || 0) - (usedVal || 0));
+  return new Chart(el, {
+    type: 'doughnut',
+    data: { datasets: [{ data: [usedVal || 0, free], backgroundColor: [color, '#2a2f42'], borderWidth: 0 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '72%', animation: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } }
+    }
+  });
+}
+
+function updateDonut(chart, usedVal, totalVal) {
+  if (!chart) return;
+  var free = Math.max(0, (totalVal || 0) - (usedVal || 0));
+  chart.data.datasets[0].data = [usedVal || 0, free];
+  chart.update('none');
+}
+
+function makeRing(canvasId, pct, color) {
+  var el = document.getElementById(canvasId);
+  if (!el) return null;
+  return new Chart(el, {
+    type: 'doughnut',
+    data: { datasets: [{ data: [pct || 0, Math.max(0, 100 - (pct || 0))], backgroundColor: [color, '#2a2f42'], borderWidth: 0 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '68%', animation: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } }
+    }
+  });
+}
+
+function updateRing(chart, pct, labelId) {
+  if (chart) {
+    chart.data.datasets[0].data = [pct || 0, Math.max(0, 100 - (pct || 0))];
+    chart.update('none');
+  }
+  if (labelId) setText(labelId, (pct || 0).toFixed(0) + '%');
+}
+
+function makeNetBar(canvasId, sentArr, recvArr) {
+  var el = document.getElementById(canvasId);
+  if (!el) return null;
+  return new Chart(el, {
+    type: 'bar',
+    data: {
+      labels: labels.slice(),
+      datasets: [
+        { data: sentArr.slice(), backgroundColor: '#22c55e', borderRadius: 2, barPercentage: 0.7, categoryPercentage: 0.85 },
+        { data: recvArr.slice(), backgroundColor: '#00d4ff', borderRadius: 2, barPercentage: 0.7, categoryPercentage: 0.85 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: 'rgba(15,18,28,.95)', padding: 8, cornerRadius: 6, displayColors: false },
+      },
+      scales: {
+        x: { display: false },
+        y: { grid: { color: 'rgba(37,42,58,.6)', borderDash: [3, 4] }, border: { display: false }, ticks: { font: { size: 8 }, maxTicksLimit: 4 } }
+      }
+    }
+  });
+}
+
+var CORE_COLORS = ['#00d4ff', '#a78bfa', '#22c55e', '#f59e0b', '#e879f9', '#ef4444', '#38bdf8', '#c084fc', '#fb923c', '#4ade80'];
+
+function makeCoresChart(canvasId, coresArr) {
+  var el = document.getElementById(canvasId);
+  if (!el || !coresArr || !coresArr.length) return null;
+  var datasets = coresArr.map(function(coreData, i) {
+    return {
+      data: coreData.slice(),
+      borderColor: CORE_COLORS[i % CORE_COLORS.length],
+      backgroundColor: 'transparent',
+      borderWidth: 1.3,
+      tension: 0.35,
+      cubicInterpolationMode: 'monotone',
+      pointRadius: 0,
+      fill: false,
+    };
+  });
+  return new Chart(el, {
+    type: 'line',
+    data: { labels: labels.slice(), datasets: datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: 'rgba(15,18,28,.95)', padding: 8, cornerRadius: 6, displayColors: false },
+      },
+      scales: {
+        x: { display: false },
+        y: { min: 0, max: 100, grid: { color: 'rgba(37,42,58,.6)', borderDash: [3, 4] }, border: { display: false }, ticks: { font: { size: 8 }, maxTicksLimit: 4 } }
+      }
+    }
+  });
+}
+
+function makeSparkline(canvasId, dataArr, color) {
+  var el = document.getElementById(canvasId);
+  if (!el) return null;
+  return new Chart(el, {
+    type: 'line',
+    data: { labels: labels.slice(), datasets: [{ data: dataArr.slice(), borderColor: color, backgroundColor: 'transparent', borderWidth: 1.5, tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 0, fill: false }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: { x: { display: false }, y: { display: false } }
+    }
+  });
+}
+
+// Draws a needle on top of a semicircle gauge doughnut. chart.$gaugeValue
+// (0-100) must be set before calling chart.update().
+var gaugeNeedlePlugin = {
+  id: 'gaugeNeedle',
+  afterDatasetsDraw: function(chart) {
+    var val = chart.$gaugeValue;
+    if (val === undefined) return;
+    var meta = chart.getDatasetMeta(0);
+    var arc = meta && meta.data && meta.data[0];
+    if (!arc) return;
+    var ctx = chart.ctx;
+    var cx = arc.x, cy = arc.y;
+    var r = arc.outerRadius * 0.72;
+    var clamped = Math.min(Math.max(val, 0), 100);
+    var angle = Math.PI + (clamped / 100) * Math.PI;  // sweeps west -> north -> east
+    var x2 = cx + Math.cos(angle) * r;
+    var y2 = cy + Math.sin(angle) * r;
+    ctx.save();
+    ctx.strokeStyle = '#e6e8ee';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#e6e8ee';
+    ctx.fill();
+    ctx.restore();
+  }
+};
+
+function tempStatusLabel(t) {
+  if (t >= 80) return { text: 'Critical', color: '#ef4444' };
+  if (t >= 65) return { text: 'Warning',  color: '#f59e0b' };
+  return { text: 'Normal', color: '#22c55e' };
+}
+
+function pickPrimaryDisk(disks) {
+  var real = (disks || []).filter(function(d) { return (d.fstype || '') !== 'squashfs'; });
+  if (!real.length) return null;
+  return real.find(function(d) { return d.mountpoint === '/'; }) || real[0];
+}
+
+
 Chart.defaults.color = '#64748b';
 Chart.defaults.font.family = "'JetBrains Mono',monospace";
 Chart.defaults.font.size   = 9;
@@ -748,15 +1131,83 @@ function makeChart(canvasId, dataArr, color, yMax) {
   });
 }
 
-// ── Init base metric charts ──
-var charts = {
-  cpu:     makeChart('chart-cpu',      cpuData,  '#00d4ff', 100),
-  ram:     makeChart('chart-ram',      ramData,  '#7c3aed', 100),
-  temp:    makeChart('chart-temp',     tempData, '#f59e0b'),
-  swap:    makeChart('chart-swap',     swapData, '#a855f7', 100),
-  netUp:   makeChart('chart-net-up',   sentData, '#22c55e'),
-  netDown: makeChart('chart-net-down', recvData, '#00d4ff')
-};
+// ── Init new dashboard widgets ──
+var charts = {};
+
+// CPU area chart + tiny temperature sparkline in the stat card
+charts.cpuArea   = makeChart('chart-cpu-area', cpuData, '#00d4ff', 100);
+charts.tempSpark = makeSparkline('stat-temp-spark', tempData, '#22c55e');
+
+// RAM / Swap / Disk donuts (values in GB — only the ratio matters)
+charts.ramDonut  = makeDonut('chart-ram-donut',  {{ (latest.ram_used_gb or 0) if latest else 0 }},  {{ (latest.ram_total_gb or 0) if latest else 0 }},  '#a78bfa');
+charts.swapDonut = makeDonut('chart-swap-donut', {{ (latest.swap_used_gb or 0) if latest else 0 }}, {{ (latest.swap_total_gb or 0) if latest else 0 }}, '#c084fc');
+{% if disk_primary %}
+charts.diskDonut = makeDonut(
+  'chart-disk-donut',
+  {{ (disk_primary.used_gb if disk_primary.used_gb is defined else 0) }},
+  {{ (disk_primary.total_gb if disk_primary.total_gb is defined else 0) }},
+  '#f59e0b'
+);
+{% endif %}
+
+// Net traffic grouped bar chart (upload/download KB/s)
+charts.netBar = makeNetBar('chart-net-bar', sentData, recvData);
+
+// Per-core CPU multi-line chart (real data from cpu_per_core — replaces the
+// "Load Average" widget from the reference image, since this agent doesn't
+// collect Unix load averages)
+var coresData = {{ chart_cores | safe }};
+coresData = coresData.map(function(arr) { return padArr(arr.slice()); });
+charts.cores = makeCoresChart('chart-cores', coresData);
+
+// Temperature gauge (semicircle zones + needle)
+charts.tempGauge = new Chart(document.getElementById('chart-temp-gauge'), {
+  type: 'doughnut',
+  data: { datasets: [{ data: [60, 20, 20], backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'], borderWidth: 0 }] },
+  options: {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    rotation: -180, circumference: 180, cutout: '75%',
+    plugins: { legend: { display: false }, tooltip: { enabled: false } }
+  },
+  plugins: [gaugeNeedlePlugin]
+});
+charts.tempGauge.$gaugeValue = {{ (latest.cpu_temp or 0) if latest else 0 }};
+charts.tempGauge.update();
+
+// System Overview rings
+charts.ringCpu  = makeRing('ring-cpu',  {{ (latest.cpu_percent or 0) if latest else 0 }},  '#00d4ff');
+charts.ringRam  = makeRing('ring-ram',  {{ (latest.ram_percent or 0) if latest else 0 }},  '#a78bfa');
+{% if gpu_primary %}charts.ringGpu  = makeRing('ring-gpu',  {{ gpu_load_pct or 0 }}, '#22c55e');{% endif %}
+{% if gpu_vram_pct is not none %}charts.ringVram = makeRing('ring-vram', {{ gpu_vram_pct or 0 }}, '#e879f9');{% endif %}
+charts.ringSwap = makeRing('ring-swap', {{ (latest.swap_percent or 0) if latest else 0 }}, '#c084fc');
+{% if disk_primary %}charts.ringDisk = makeRing('ring-disk', {{ '%.1f'%(disk_primary.percent|float) }}, '#f59e0b');{% endif %}
+setText('ring-cpu-val', '{{ '%.0f'%(latest.cpu_percent or 0) if latest else 0 }}%');
+setText('ring-ram-val', '{{ '%.0f'%(latest.ram_percent or 0) if latest else 0 }}%');
+{% if gpu_primary %}setText('ring-gpu-val', '{{ '%.0f'%(gpu_load_pct or 0) }}%');{% endif %}
+{% if gpu_vram_pct is not none %}setText('ring-vram-val', '{{ '%.0f'%(gpu_vram_pct or 0) }}%');{% endif %}
+setText('ring-swap-val', '{{ '%.0f'%(latest.swap_percent or 0) if latest else 0 }}%');
+{% if disk_primary %}setText('ring-disk-val', '{{ '%.0f'%(disk_primary.percent|float) }}%');{% endif %}
+
+// Process status donut — counts within the sampled top_processes list only
+{% if proc_status_counts %}
+(function() {
+  var statusColors = { running: '#22c55e', sleeping: '#00d4ff', stopped: '#ef4444' };
+  var procLabels = {{ proc_status_counts.keys() | list | tojson }};
+  var procValues = {{ proc_status_counts.values() | list | tojson }};
+  var procColors = procLabels.map(function(s) { return statusColors[s] || '#64748b'; });
+  charts.procDonut = new Chart(document.getElementById('chart-proc-donut'), {
+    type: 'doughnut',
+    data: { datasets: [{ data: procValues, backgroundColor: procColors, borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '68%', animation: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+  });
+})();
+{% endif %}
+
+// GPU Load area chart (primary GPU, over time) — built after gpuLoadHist above
+{% if gpu_primary %}
+charts.gpuArea = makeChart('chart-gpu-area', gpuLoadHist[1] || Array(MAX_POINTS).fill(0), '#22c55e', 100);
+{% endif %}
 
 // ── Init GPU charts — canvas IDs now use 'chart-gpu-load-N' ──
 var gpuLoadChart = {};   // chart objects, keyed by GPU index
@@ -918,67 +1369,136 @@ async function pollLive() {
     var recv = d.net_recv_kbs || 0;
     var now  = new Date().toLocaleTimeString();
 
-    // Scalars
-    setText('val-cpu',      cpu.toFixed(1) + '%');
-    setText('val-ram',      ram.toFixed(1) + '%');
-    setText('val-swap',     swap.toFixed(1) + '%');
-    setText('val-temp',     temp ? temp.toFixed(0) + '°C' : '—');
-    setText('val-net-sent', sent);
-    setText('val-net-recv', recv);
+    setText('last-seen', d.last_seen || '—');
+    var liveStatusEl = document.getElementById('live-status');
+    if (liveStatusEl) {
+      liveStatusEl.innerHTML =
+        '<span class="status-dot ' + d.status + '"></span>' +
+        '<span class="badge badge-' + (d.status === 'online' ? 'online' : 'offline') + '">' + d.status + '</span>';
+    }
 
-    document.getElementById('val-cpu').style.color  = colorByPct(cpu);
-    document.getElementById('val-ram').style.color  = colorByPct(ram);
-    document.getElementById('val-temp').style.color =
-      temp > 80 ? 'var(--red)' : temp > 60 ? '#f59e0b' : '#22c55e';
-
-    if (d.cpu_freq_mhz)
-      setText('val-freq', Math.round(d.cpu_freq_mhz) + ' MHz');
-    if (d.ram_used_gb && d.ram_total_gb)
-      setText('val-ram-detail', d.ram_used_gb.toFixed(1) + ' / ' + d.ram_total_gb.toFixed(1) + ' GB');
-    if (d.net_bytes_sent)
-      setText('val-net-sent-total', '(total ' + fmtBytes(d.net_bytes_sent) + ')');
-    if (d.net_bytes_recv)
-      setText('val-net-recv-total', '(total ' + fmtBytes(d.net_bytes_recv) + ')');
     if (d.uptime_seconds) {
       var u = Math.round(d.uptime_seconds);
       setText('val-uptime',
-        Math.floor(u/86400) + 'd ' +
-        Math.floor((u%86400)/3600) + 'h ' +
-        Math.floor((u%3600)/60) + 'm');
+        Math.floor(u / 86400) + 'd ' +
+        Math.floor((u % 86400) / 3600) + 'h ' +
+        Math.floor((u % 3600) / 60) + 'm');
     }
-    if (d.swap_used_gb !== undefined && d.swap_total_gb !== undefined)
-      setText('val-swap-detail',
-        d.swap_used_gb.toFixed(1) + ' / ' + d.swap_total_gb.toFixed(1) + ' GB');
 
-    // Disk + processes — these don't change every 2s in reality, but the
-    // page is labeled "Live · 2s refresh" so they should track /live too
-    // instead of freezing at whatever was on the page at load time.
+    // ── Stat cards (row 1) ──
+    setText('stat-cpu-val', cpu.toFixed(1) + '%');
+    setWidth('stat-cpu-bar', cpu);
+    if (d.cpu_freq_mhz) setText('stat-cpu-freq', Math.round(d.cpu_freq_mhz) + ' MHz');
+
+    setText('stat-ram-val', ram.toFixed(1) + '%');
+    setWidth('stat-ram-bar', ram);
+    if (d.ram_used_gb !== undefined && d.ram_total_gb !== undefined)
+      setText('stat-ram-detail', d.ram_used_gb.toFixed(1) + ' / ' + d.ram_total_gb.toFixed(1) + ' GB');
+
+    setText('stat-temp-val', temp ? temp.toFixed(0) + '°C' : '—');
+    var tempEl = document.getElementById('stat-temp-val');
+    var ts = tempStatusLabel(temp);
+    if (tempEl) tempEl.style.color = ts.color;
+    var tsEl = document.getElementById('stat-temp-status');
+    if (tsEl) { tsEl.textContent = ts.text; tsEl.style.color = ts.color; }
+
+    // ── CPU area chart + header value ──
+    setText('cpuarea-val', cpu.toFixed(1) + '%');
+    pushPoint(charts.cpuArea, cpu, now);
+    pushPoint(charts.tempSpark, temp, now);
+
+    // ── RAM donut ──
+    if (d.ram_used_gb !== undefined && d.ram_total_gb !== undefined) {
+      updateDonut(charts.ramDonut, d.ram_used_gb, d.ram_total_gb);
+      setText('ram-donut-center', ram.toFixed(1) + '%');
+      setText('ram-legend-used', d.ram_used_gb.toFixed(1) + ' GB');
+      setText('ram-legend-free', Math.max(0, d.ram_total_gb - d.ram_used_gb).toFixed(1) + ' GB');
+    }
+
+    // ── Swap donut ──
+    if (d.swap_used_gb !== undefined && d.swap_total_gb !== undefined) {
+      updateDonut(charts.swapDonut, d.swap_used_gb, d.swap_total_gb);
+      setText('swap-donut-center', swap.toFixed(1) + '%');
+      setText('swap-legend-used', d.swap_used_gb.toFixed(1) + ' GB');
+      setText('swap-legend-free', Math.max(0, d.swap_total_gb - d.swap_used_gb).toFixed(1) + ' GB');
+    }
+
+    // ── Net traffic ──
+    setText('net-up-val', sent);
+    setText('net-down-val', recv);
+    if (charts.netBar) {
+      charts.netBar.data.labels.push(now); charts.netBar.data.labels.shift();
+      charts.netBar.data.datasets[0].data.push(sent); charts.netBar.data.datasets[0].data.shift();
+      charts.netBar.data.datasets[1].data.push(recv); charts.netBar.data.datasets[1].data.shift();
+      charts.netBar.update('none');
+    }
+
+    // ── Disk donut (re-picks the primary partition from live data) ──
+    if (d.disk_partitions) {
+      var primary = pickPrimaryDisk(d.disk_partitions);
+      if (primary && charts.diskDonut) {
+        var pct   = parseFloat(primary.percent || 0);
+        var used  = primary.used_gb  !== undefined ? parseFloat(primary.used_gb)  : 0;
+        var total = primary.total_gb !== undefined ? parseFloat(primary.total_gb) : 0;
+        updateDonut(charts.diskDonut, used, total);
+        setText('ring-disk-val', pct.toFixed(0) + '%');
+        updateRing(charts.ringDisk, pct);
+      }
+    }
+
+    // ── Per-core CPU chart ──
+    if (d.cpu_per_core && Array.isArray(d.cpu_per_core) && charts.cores) {
+      charts.cores.data.labels.push(now); charts.cores.data.labels.shift();
+      d.cpu_per_core.forEach(function(coreVal, i) {
+        var ds = charts.cores.data.datasets[i];
+        if (!ds) return;
+        ds.data.push(coreVal); ds.data.shift();
+      });
+      charts.cores.update('none');
+    }
+
+    // ── Temperature gauge ──
+    if (charts.tempGauge) {
+      charts.tempGauge.$gaugeValue = temp;
+      charts.tempGauge.update('none');
+    }
+    setText('gauge-temp-val', temp ? temp.toFixed(0) + '°C' : '—');
+    var gEl = document.getElementById('gauge-temp-val');
+    if (gEl) gEl.style.color = ts.color;
+    var gsEl = document.getElementById('gauge-temp-status');
+    if (gsEl) { gsEl.textContent = ts.text; gsEl.style.color = ts.color; }
+
+    // ── System Overview rings (CPU / RAM / Swap) ──
+    updateRing(charts.ringCpu,  cpu,  'ring-cpu-val');
+    updateRing(charts.ringRam,  ram,  'ring-ram-val');
+    updateRing(charts.ringSwap, swap, 'ring-swap-val');
+
+    // ── Process status donut — sampled top_processes only ──
+    if (d.top_processes && Array.isArray(d.top_processes) && charts.procDonut) {
+      var counts = {};
+      d.top_processes.forEach(function(p) {
+        var st = (p.status || 'unknown').toLowerCase();
+        counts[st] = (counts[st] || 0) + 1;
+      });
+      var labelsInOrder = Object.keys(counts);
+      charts.procDonut.data.datasets[0].data = labelsInOrder.map(function(k) { return counts[k]; });
+      var statusColors = { running: '#22c55e', sleeping: '#00d4ff', stopped: '#ef4444' };
+      charts.procDonut.data.datasets[0].backgroundColor = labelsInOrder.map(function(k) { return statusColors[k] || '#64748b'; });
+      charts.procDonut.update('none');
+      setText('proc-donut-center', String(d.top_processes.length));
+    }
+
+    // Disk + processes detail sections further down the page
     if (d.disk_partitions) renderDisks(d.disk_partitions);
     if (d.top_processes)   renderProcs(d.top_processes);
 
-    setBar('bar-cpu',  cpu);
-    setBar('bar-ram',  ram);
-    setBar('bar-swap', swap);
-
-    setText('last-seen', d.last_seen || '—');
-    document.getElementById('live-status').innerHTML =
-      '<span class="status-dot ' + d.status + '"></span>' +
-      '<span class="badge badge-' + (d.status === 'online' ? 'online' : 'offline') + '">' + d.status + '</span>';
-
-    // Base chart push
-    pushPoint(charts.cpu,     cpu,  now);
-    pushPoint(charts.ram,     ram,  now);
-    pushPoint(charts.temp,    temp, now);
-    pushPoint(charts.swap,    swap, now);
-    pushPoint(charts.netUp,   sent, now);
-    pushPoint(charts.netDown, recv, now);
-
-    // ── GPU live update ──
+    // ── GPU live update (primary GPU feeds the dashboard cards + rings too) ──
     // /live must return: d.gpus = list from gpu_info jsonb column
     if (d.gpus && Array.isArray(d.gpus)) {
       d.gpus.forEach(function(gpu, i) {
         var idx   = i + 1;                            // 1-based, matches Jinja gi
         var gtype = (gpu.type || '').toLowerCase();
+        var isPrimary = (i === 0);
 
         if (gtype === 'intel') {
           // ── Intel ──
@@ -1004,6 +1524,14 @@ async function pollLive() {
           pushPoint(gpuLoadChart[idx], load,   now);
           pushPoint(gpuPwrChart[idx],  pwrPkg, now);
 
+          if (isPrimary) {
+            setText('stat-gpu-val', load.toFixed(0) + '%');
+            setWidth('stat-gpu-bar', load);
+            setText('gpuarea-val', load.toFixed(0) + '%');
+            pushPoint(charts.gpuArea, load, now);
+            updateRing(charts.ringGpu, load, 'ring-gpu-val');
+          }
+
         } else {
           // ── Nvidia (handles both old & new field names) ──
           var load   = parseFloat(gpu.load_percent    || gpu.gpu_percent  || 0);
@@ -1014,8 +1542,9 @@ async function pollLive() {
           setText('val-gpu-load-' + idx, load.toFixed(0) + '%');
           setWidth('bar-gpu-load-' + idx, load);
 
+          var vPct = 0;
           if (vTotal > 0) {
-            var vPct = (vUsed / vTotal) * 100;
+            vPct = (vUsed / vTotal) * 100;
             setWidth('bar-gpu-vram-'    + idx, vPct);
             setText('val-gpu-vrampct-'  + idx, vPct.toFixed(0) + '%');
             setText('val-gpu-vram-'     + idx,
@@ -1027,6 +1556,20 @@ async function pollLive() {
             setText('val-gpu-temp-' + idx, '🌡️ ' + temp_g.toFixed(0) + '°C');
 
           pushPoint(gpuLoadChart[idx], load, now);
+
+          if (isPrimary) {
+            setText('stat-gpu-val', load.toFixed(0) + '%');
+            setWidth('stat-gpu-bar', load);
+            setText('gpuarea-val', load.toFixed(0) + '%');
+            pushPoint(charts.gpuArea, load, now);
+            updateRing(charts.ringGpu, load, 'ring-gpu-val');
+            if (vTotal > 0) {
+              setText('stat-vram-val', vPct.toFixed(0) + '%');
+              setWidth('stat-vram-bar', vPct);
+              setText('stat-vram-detail', (vUsed/1024).toFixed(1) + ' / ' + (vTotal/1024).toFixed(1) + ' GB');
+              updateRing(charts.ringVram, vPct, 'ring-vram-val');
+            }
+          }
         }
       });
     }
@@ -1054,8 +1597,7 @@ var histBaseState = null;  // snapshot of live-mode chart data, for "Back to Liv
 function snapshotLiveState() {
   return {
     labels: labels.slice(),
-    cpu: cpuData.slice(), ram: ramData.slice(), swap: swapData.slice(),
-    temp: tempData.slice(), sent: sentData.slice(), recv: recvData.slice(),
+    cpu: cpuData.slice(), sent: sentData.slice(), recv: recvData.slice(),
   };
 }
 
@@ -1063,6 +1605,14 @@ function setChartData(chart, lbls, data) {
   if (!chart) return;
   chart.data.labels = lbls;
   chart.data.datasets[0].data = data;
+  chart.update('none');
+}
+
+function setNetBarData(chart, lbls, sentArr, recvArr) {
+  if (!chart) return;
+  chart.data.labels = lbls;
+  chart.data.datasets[0].data = sentArr;
+  chart.data.datasets[1].data = recvArr;
   chart.update('none');
 }
 
@@ -1112,12 +1662,8 @@ async function loadHistory() {
     }
 
     var lbls = d.labels.map(fmtHistLabel);
-    setChartData(charts.cpu,     lbls, d.cpu);
-    setChartData(charts.ram,     lbls, d.ram);
-    setChartData(charts.swap,    lbls, d.swap);
-    setChartData(charts.temp,    lbls, d.temp);
-    setChartData(charts.netUp,   lbls, d.net_sent);
-    setChartData(charts.netDown, lbls, d.net_recv);
+    setChartData(charts.cpuArea, lbls, d.cpu);
+    setNetBarData(charts.netBar, lbls, d.net_sent, d.net_recv);
 
     status.textContent = d.count + ' points loaded for that range.';
     status.className = 'history-bar-title-sub history-status ok';
@@ -1130,12 +1676,8 @@ async function loadHistory() {
 
 function backToLive() {
   if (!histBaseState) return;
-  setChartData(charts.cpu,     histBaseState.labels, histBaseState.cpu);
-  setChartData(charts.ram,     histBaseState.labels, histBaseState.ram);
-  setChartData(charts.swap,    histBaseState.labels, histBaseState.swap);
-  setChartData(charts.temp,    histBaseState.labels, histBaseState.temp);
-  setChartData(charts.netUp,   histBaseState.labels, histBaseState.sent);
-  setChartData(charts.netDown, histBaseState.labels, histBaseState.recv);
+  setChartData(charts.cpuArea, histBaseState.labels, histBaseState.cpu);
+  setNetBarData(charts.netBar, histBaseState.labels, histBaseState.sent, histBaseState.recv);
   histBaseState = null;
 
   document.getElementById('hist-live-btn').style.display = 'none';

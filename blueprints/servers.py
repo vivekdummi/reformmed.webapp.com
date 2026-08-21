@@ -63,7 +63,7 @@ def detail(table_name):
         # Last 60 data points for charts
         cur.execute(f"""
             SELECT ts, cpu_percent, ram_percent, swap_percent,
-                   net_bytes_sent, net_bytes_recv, cpu_temp
+                   net_bytes_sent, net_bytes_recv, cpu_temp, cpu_per_core
             FROM {table_name} ORDER BY ts DESC LIMIT 60
         """)
         history_rows = list(reversed(cur.fetchall()))
@@ -112,6 +112,69 @@ def detail(table_name):
             chart_net_sent.append(max(0, (r["net_bytes_sent"] or 0) - (prev["net_bytes_sent"] or 0)) // 1024)
             chart_net_recv.append(max(0, (r["net_bytes_recv"] or 0) - (prev["net_bytes_recv"] or 0)) // 1024)
 
+    # ── Per-core CPU history — each row's cpu_per_core JSONB is an array of
+    # core percentages at that instant; transpose into one series per core.
+    core_count = 0
+    chart_cores = []  # list of arrays, one per core, aligned with chart_labels
+    for r in history_rows:
+        raw = r.get("cpu_per_core")
+        if raw:
+            arr = json.loads(raw) if isinstance(raw, str) else raw
+            core_count = max(core_count, len(arr))
+    if core_count:
+        chart_cores = [[] for _ in range(core_count)]
+        for r in history_rows:
+            raw = r.get("cpu_per_core")
+            arr = (json.loads(raw) if isinstance(raw, str) else raw) if raw else []
+            for ci in range(core_count):
+                chart_cores[ci].append(arr[ci] if ci < len(arr) else 0)
+
+    # ── Trend deltas for the top stat cards — current value vs the average
+    # over the loaded window, so "↑8.4%" means "8.4 points above the recent
+    # average", not a fabricated number.
+    def _trend(series, current):
+        vals = [v for v in series if v is not None]
+        if len(vals) < 2 or current is None:
+            return 0.0
+        avg = sum(vals) / len(vals)
+        return round(current - avg, 1)
+
+    cur_cpu  = latest.get("cpu_percent")  if latest else None
+    cur_ram  = latest.get("ram_percent")  if latest else None
+    trend_cpu = _trend(chart_cpu, cur_cpu)
+    trend_ram = _trend(chart_ram, cur_ram)
+
+    # ── Primary GPU (first one reported) for the two GPU stat cards ──
+    gpu_primary = gpus[0] if gpus else None
+    gpu_load_pct = None
+    gpu_vram_pct = None
+    gpu_vram_used_mb = gpu_vram_total_mb = 0
+    if gpu_primary:
+        gtype = (gpu_primary.get("type") or "").lower()
+        if gtype == "intel":
+            gpu_load_pct = float(gpu_primary.get("gpu_percent") or 0)
+        else:
+            gpu_load_pct = float(gpu_primary.get("load_percent") or gpu_primary.get("gpu_percent") or 0)
+            gpu_vram_used_mb  = float(gpu_primary.get("memory_used_mb")  or gpu_primary.get("mem_used_mb")  or 0)
+            gpu_vram_total_mb = float(gpu_primary.get("memory_total_mb") or gpu_primary.get("mem_total_mb") or 0)
+            if gpu_vram_total_mb > 0:
+                gpu_vram_pct = round(gpu_vram_used_mb / gpu_vram_total_mb * 100, 1)
+
+    # ── Primary disk for the Disk Usage donut — root filesystem if present,
+    # else the first non-squashfs partition. The full per-partition
+    # breakdown remains in the Disk Partitions section further down.
+    real_disks = [d for d in disks if d.get("fstype") != "squashfs"]
+    disk_primary = next((d for d in real_disks if d.get("mountpoint") == "/"), None) \
+                   or (real_disks[0] if real_disks else None)
+
+    # ── Process status tally — counts within the sampled top_processes list
+    # only (your agent reports a "top N by usage" sample, not every process
+    # on the machine), so this is NOT a full system census.
+    proc_status_counts = {}
+    for p in procs:
+        st = (p.get("status") or "unknown").lower()
+        proc_status_counts[st] = proc_status_counts.get(st, 0) + 1
+
     return render_template("server_detail.html",
         machine=machine,
         latest=latest,
@@ -126,6 +189,16 @@ def detail(table_name):
         chart_temp=json.dumps(chart_temp),
         chart_net_sent=json.dumps(chart_net_sent),
         chart_net_recv=json.dumps(chart_net_recv),
+        chart_cores=json.dumps(chart_cores),
+        trend_cpu=trend_cpu,
+        trend_ram=trend_ram,
+        gpu_primary=gpu_primary,
+        gpu_load_pct=gpu_load_pct,
+        gpu_vram_pct=gpu_vram_pct,
+        gpu_vram_used_mb=gpu_vram_used_mb,
+        gpu_vram_total_mb=gpu_vram_total_mb,
+        disk_primary=disk_primary,
+        proc_status_counts=proc_status_counts,
     )
 
 
@@ -235,7 +308,7 @@ def live(table_name):
                    swap_used_gb, swap_total_gb,
                    net_bytes_sent, net_bytes_recv, cpu_temp, cpu_freq_mhz,
                    ram_used_gb, ram_total_gb, uptime_seconds,
-                   disk_partitions, gpu_info, top_processes
+                   disk_partitions, gpu_info, top_processes, cpu_per_core
             FROM {table_name} ORDER BY ts DESC LIMIT 2
         """)
         rows = cur.fetchall()
@@ -257,6 +330,11 @@ def live(table_name):
     raw_procs = latest.pop("top_processes", None)
     if raw_procs:
         latest["top_processes"] = json.loads(raw_procs) if isinstance(raw_procs, str) else raw_procs
+
+    # Per-core CPU
+    raw_cores = latest.pop("cpu_per_core", None)
+    if raw_cores:
+        latest["cpu_per_core"] = json.loads(raw_cores) if isinstance(raw_cores, str) else raw_cores
 
     # Network KB/s
     if len(rows) >= 2:
