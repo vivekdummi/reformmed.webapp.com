@@ -190,6 +190,8 @@ def detail(table_name):
         chart_net_sent=json.dumps(chart_net_sent),
         chart_net_recv=json.dumps(chart_net_recv),
         chart_cores=json.dumps(chart_cores),
+        last_net_sent=(chart_net_sent[-1] if chart_net_sent else 0),
+        last_net_recv=(chart_net_recv[-1] if chart_net_recv else 0),
         trend_cpu=trend_cpu,
         trend_ram=trend_ram,
         gpu_primary=gpu_primary,

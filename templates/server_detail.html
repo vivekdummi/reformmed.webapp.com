@@ -99,14 +99,20 @@
 .stat-status-ok{font-size:11px;font-weight:600;color:#22c55e;}
 
 .dash-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;}
+.dash-grid-3-eq{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px;}
 .dash-grid-3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;margin-bottom:14px;}
-@media(max-width:1100px){.dash-grid-4{grid-template-columns:repeat(2,1fr);} .dash-grid-3{grid-template-columns:1fr;}}
-@media(max-width:600px){.dash-grid-4{grid-template-columns:1fr;}}
+@media(max-width:1100px){.dash-grid-4{grid-template-columns:repeat(2,1fr);} .dash-grid-3-eq{grid-template-columns:repeat(2,1fr);} .dash-grid-3{grid-template-columns:1fr;}}
+@media(max-width:600px){.dash-grid-4{grid-template-columns:1fr;} .dash-grid-3-eq{grid-template-columns:1fr;}}
 .dash-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 18px;min-width:0;}
 .dash-card-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .dash-card-title{font-size:12px;font-weight:700;color:var(--text);}
 .dash-card-sub-note{font-size:10px;color:var(--text-muted);}
 .dash-card-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;}
+.chart-expand-btn{
+  background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-muted);
+  font-size:13px;line-height:1;padding:4px 6px;cursor:pointer;transition:.15s;
+}
+.chart-expand-btn:hover{border-color:var(--accent);color:var(--accent);}
 
 .donut-row{display:flex;align-items:center;gap:16px;}
 .donut-legend{display:flex;flex-direction:column;gap:7px;font-size:12px;flex:1;min-width:0;}
@@ -224,6 +230,21 @@ function toggleAlerts() {
 }
 </script>
 
+<!-- ═══ Machine Info ═══ -->
+<div class="info-card" style="margin-bottom:14px;">
+  <div class="card-section-title">Machine Info</div>
+  <div class="info-grid">
+    <div class="info-item"><div class="lbl">System Name</div><div class="val">{{ machine.system_name }}</div></div>
+    <div class="info-item"><div class="lbl">Location</div><div class="val">{{ machine.location }}</div></div>
+    <div class="info-item"><div class="lbl">Hostname</div><div class="val">{{ machine.hostname or '—' }}</div></div>
+    <div class="info-item"><div class="lbl">Public IP</div><div class="val">{{ machine.public_ip or '—' }}</div></div>
+    <div class="info-item"><div class="lbl">OS Type</div><div class="val">{{ machine.os_type or '—' }}</div></div>
+    <div class="info-item"><div class="lbl">OS Version</div><div class="val" style="font-size:10px;">{{ latest.os_version if latest and latest.os_version else '—' }}</div></div>
+    <div class="info-item"><div class="lbl">Table</div><div class="val">{{ machine.table_name }}</div></div>
+    <div class="info-item"><div class="lbl">Registered</div><div class="val">{{ machine.registered_at.strftime('%Y-%m-%d') if machine.registered_at else '—' }}</div></div>
+  </div>
+</div>
+
 <!-- ═══ History range filter ═══ -->
 <div class="history-bar" id="history-bar">
   <div class="history-bar-header">
@@ -232,13 +253,14 @@ function toggleAlerts() {
     <span class="history-bar-title-sub" id="hist-status">Showing live data — last 60 readings</span>
   </div>
   <div class="history-bar-body">
-    <div class="history-presets" id="hist-presets">
-      <button type="button" class="hist-preset-btn" data-mins="60">Last 1h</button>
-      <button type="button" class="hist-preset-btn" data-mins="360">Last 6h</button>
-      <button type="button" class="hist-preset-btn" data-mins="1440">Last 24h</button>
-      <button type="button" class="hist-preset-btn" data-mins="10080">Last 7d</button>
-    </div>
     <div class="history-bar-row">
+      <div class="history-presets" id="hist-presets">
+        <button type="button" class="hist-preset-btn" data-mins="60">Last 1h</button>
+        <button type="button" class="hist-preset-btn" data-mins="360">Last 6h</button>
+        <button type="button" class="hist-preset-btn" data-mins="1440">Last 24h</button>
+        <button type="button" class="hist-preset-btn" data-mins="10080">Last 7d</button>
+      </div>
+      <div class="history-divider"></div>
       <div class="history-field">
         <label>From</label>
         <input type="datetime-local" id="hist-from">
@@ -247,7 +269,6 @@ function toggleAlerts() {
         <label>To</label>
         <input type="datetime-local" id="hist-to">
       </div>
-      <div class="history-divider"></div>
       <button type="button" class="btn btn-primary btn-sm" onclick="loadHistory()">View Range</button>
       <button type="button" class="btn btn-ghost btn-sm" id="hist-live-btn" onclick="backToLive()" style="display:none;">← Back to Live</button>
     </div>
@@ -289,32 +310,18 @@ function toggleAlerts() {
     <div class="stat-sub" id="stat-ram-detail">{{ '%.1f'%latest.ram_used_gb if latest and latest.ram_used_gb else '0' }} / {{ '%.1f'%latest.ram_total_gb if latest and latest.ram_total_gb else '0' }} GB</div>
   </div>
 
-  {% if gpu_primary %}
+  {% if latest and latest.swap_total_gb %}
   <div class="stat-card">
     <div class="stat-card-top">
-      <span class="stat-icon" style="background:rgba(34,197,94,.12);color:#22c55e;">🎮</span>
-      <span class="stat-label">GPU Load</span>
+      <span class="stat-icon" style="background:rgba(192,132,252,.12);color:#c084fc;">💾</span>
+      <span class="stat-label">Swap Usage</span>
     </div>
     <div class="stat-card-val">
-      <span id="stat-gpu-val" style="color:#22c55e">{{ '%.0f'%gpu_load_pct if gpu_load_pct is not none else '0' }}%</span>
+      <span id="stat-swap-val" style="color:#c084fc">{{ '%.1f'%latest.swap_percent if latest.swap_percent else '0.0' }}%</span>
     </div>
-    <div class="stat-progress"><div class="stat-progress-fill green" id="stat-gpu-bar" style="width:{{ gpu_load_pct or 0 }}%"></div></div>
-    <div class="stat-sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ gpu_primary.name or gpu_primary.device_name or 'GPU' }}</div>
+    <div class="stat-progress"><div class="stat-progress-fill" id="stat-swap-bar" style="width:{{ latest.swap_percent or 0 }}%;background:#c084fc;"></div></div>
+    <div class="stat-sub" id="stat-swap-detail">{{ '%.1f'%(latest.swap_used_gb or 0) }} / {{ '%.1f'%(latest.swap_total_gb or 0) }} GB</div>
   </div>
-
-  {% if gpu_vram_pct is not none %}
-  <div class="stat-card">
-    <div class="stat-card-top">
-      <span class="stat-icon" style="background:rgba(232,121,249,.12);color:#e879f9;">📶</span>
-      <span class="stat-label">GPU VRAM</span>
-    </div>
-    <div class="stat-card-val">
-      <span id="stat-vram-val" style="color:#e879f9">{{ '%.0f'%gpu_vram_pct }}%</span>
-    </div>
-    <div class="stat-progress"><div class="stat-progress-fill pink" id="stat-vram-bar" style="width:{{ gpu_vram_pct }}%"></div></div>
-    <div class="stat-sub" id="stat-vram-detail">{{ '%.1f'%(gpu_vram_used_mb/1024) }} / {{ '%.1f'%(gpu_vram_total_mb/1024) }} GB</div>
-  </div>
-  {% endif %}
   {% endif %}
 
   <div class="stat-card">
@@ -349,14 +356,17 @@ function toggleAlerts() {
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
-     ROW 2 — CPU area / RAM donut / Net traffic bar / Disk donut
+     ROW 2 — CPU area / RAM donut / Swap donut / Disk donut
      ═══════════════════════════════════════════════════════════ -->
 <div class="dash-grid-4">
 
   <div class="dash-card">
     <div class="dash-card-header">
       <span class="dash-card-title">CPU Usage %</span>
-      <span class="dash-card-val" id="cpuarea-val" style="color:#00d4ff">{{ '%.1f'%latest.cpu_percent if latest and latest.cpu_percent else '0.0' }}%</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="dash-card-val" id="cpuarea-val" style="color:#00d4ff">{{ '%.1f'%latest.cpu_percent if latest and latest.cpu_percent else '0.0' }}%</span>
+        <button type="button" class="chart-expand-btn" onclick="openChartModal('cpu')" title="Expand">⤢</button>
+      </div>
     </div>
     <div style="height:150px;position:relative;"><canvas id="chart-cpu-area"></canvas></div>
   </div>
@@ -364,7 +374,10 @@ function toggleAlerts() {
   <div class="dash-card">
     <div class="dash-card-header">
       <span class="dash-card-title">RAM Usage</span>
-      <span class="dash-card-val" style="color:#a78bfa">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '0.0' }}%</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="dash-card-val" style="color:#a78bfa">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '0.0' }}%</span>
+        <button type="button" class="chart-expand-btn" onclick="openChartModal('ram')" title="Expand">⤢</button>
+      </div>
     </div>
     <div class="donut-row">
       <div style="height:130px;width:130px;position:relative;flex-shrink:0;"><canvas id="chart-ram-donut"></canvas><div class="donut-center" id="ram-donut-center">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '0.0' }}%</div></div>
@@ -378,19 +391,29 @@ function toggleAlerts() {
 
   <div class="dash-card">
     <div class="dash-card-header">
-      <span class="dash-card-title">Net Traffic (KB/s)</span>
-      <div style="text-align:right;font-size:11px;">
-        <div style="color:#22c55e;">↑ <span id="net-up-val">0</span> KB/s</div>
-        <div style="color:#00d4ff;">↓ <span id="net-down-val">0</span> KB/s</div>
+      <span class="dash-card-title">Swap Usage</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="dash-card-val" style="color:#c084fc;font-size:16px;">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</span>
+        <button type="button" class="chart-expand-btn" onclick="openChartModal('swap')" title="Expand">⤢</button>
       </div>
     </div>
-    <div style="height:150px;position:relative;"><canvas id="chart-net-bar"></canvas></div>
+    <div class="donut-row">
+      <div style="height:130px;width:130px;position:relative;flex-shrink:0;"><canvas id="chart-swap-donut"></canvas><div class="donut-center" id="swap-donut-center">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</div></div>
+      <div class="donut-legend">
+        <div class="donut-legend-item"><span class="dot" style="background:#c084fc;"></span>Used <b id="swap-legend-used">{{ '%.1f'%latest.swap_used_gb if latest and latest.swap_used_gb else '0' }} GB</b></div>
+        <div class="donut-legend-item"><span class="dot" style="background:#3a3f52;"></span>Free <b id="swap-legend-free">{{ '%.1f'%((latest.swap_total_gb or 0) - (latest.swap_used_gb or 0)) if latest else '0' }} GB</b></div>
+        <div class="donut-legend-item total">Total <b>{{ '%.1f'%latest.swap_total_gb if latest and latest.swap_total_gb else '0' }} GB</b></div>
+      </div>
+    </div>
   </div>
 
   <div class="dash-card">
     <div class="dash-card-header">
       <span class="dash-card-title">Disk Usage</span>
-      {% if disk_primary %}<span class="dash-card-val" style="color:#f59e0b;font-size:16px;">{{ '%.1f'%(disk_primary.percent|float) }}%</span>{% endif %}
+      <div style="display:flex;align-items:center;gap:8px;">
+        {% if disk_primary %}<span class="dash-card-val" style="color:#f59e0b;font-size:16px;">{{ '%.1f'%(disk_primary.percent|float) }}%</span>{% endif %}
+        <button type="button" class="chart-expand-btn" onclick="openChartModal('disk')" title="Expand">⤢</button>
+      </div>
     </div>
     {% if disk_primary %}
     {% set d_used = disk_primary.used_gb if disk_primary.used_gb is defined else 0 %}
@@ -412,13 +435,28 @@ function toggleAlerts() {
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
-     ROW 3 — Per-core CPU / Temp gauge / GPU load area / Swap donut
+     ROW 3 — Net traffic bar / Per-core CPU / Temp gauge
      ═══════════════════════════════════════════════════════════ -->
-<div class="dash-grid-4">
+<div class="dash-grid-3-eq">
+
+  <div class="dash-card">
+    <div class="dash-card-header">
+      <span class="dash-card-title">Net Traffic (KB/s)</span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="text-align:right;font-size:11px;">
+          <div style="color:#22c55e;">↑ <span id="net-up-val">{{ last_net_sent }}</span> KB/s</div>
+          <div style="color:#00d4ff;">↓ <span id="net-down-val">{{ last_net_recv }}</span> KB/s</div>
+        </div>
+        <button type="button" class="chart-expand-btn" onclick="openChartModal('net')" title="Expand">⤢</button>
+      </div>
+    </div>
+    <div style="height:150px;position:relative;"><canvas id="chart-net-bar"></canvas></div>
+  </div>
 
   <div class="dash-card">
     <div class="dash-card-header">
       <span class="dash-card-title">CPU Per-Core Usage</span>
+      <button type="button" class="chart-expand-btn" onclick="openChartModal('cores')" title="Expand">⤢</button>
     </div>
     {% if chart_cores and chart_cores != '[]' %}
     <div style="height:150px;position:relative;"><canvas id="chart-cores"></canvas></div>
@@ -430,41 +468,12 @@ function toggleAlerts() {
   <div class="dash-card">
     <div class="dash-card-header">
       <span class="dash-card-title">Temperature (°C)</span>
+      <button type="button" class="chart-expand-btn" onclick="openChartModal('temp')" title="Expand">⤢</button>
     </div>
     <div class="gauge-wrap">
       <div style="height:110px;width:100%;position:relative;"><canvas id="chart-temp-gauge"></canvas></div>
       <div class="gauge-val" id="gauge-temp-val" style="color:#f59e0b;">{% if latest and latest.cpu_temp %}{{ '%.0f'%latest.cpu_temp }}°C{% else %}—{% endif %}</div>
       <div class="gauge-status" id="gauge-temp-status">Normal</div>
-    </div>
-  </div>
-
-  {% if gpu_primary %}
-  <div class="dash-card">
-    <div class="dash-card-header">
-      <span class="dash-card-title">GPU Load %</span>
-      <span class="dash-card-val" id="gpuarea-val" style="color:#22c55e">{{ '%.0f'%gpu_load_pct if gpu_load_pct is not none else '0' }}%</span>
-    </div>
-    <div style="height:150px;position:relative;"><canvas id="chart-gpu-area"></canvas></div>
-  </div>
-  {% else %}
-  <div class="dash-card">
-    <div class="dash-card-header"><span class="dash-card-title">GPU Load %</span></div>
-    <p style="font-size:12px;color:var(--text-muted);padding:20px;">No GPU detected on this machine.</p>
-  </div>
-  {% endif %}
-
-  <div class="dash-card">
-    <div class="dash-card-header">
-      <span class="dash-card-title">Swap Usage</span>
-      <span class="dash-card-val" style="color:#c084fc;font-size:16px;">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</span>
-    </div>
-    <div class="donut-row">
-      <div style="height:130px;width:130px;position:relative;flex-shrink:0;"><canvas id="chart-swap-donut"></canvas><div class="donut-center" id="swap-donut-center">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</div></div>
-      <div class="donut-legend">
-        <div class="donut-legend-item"><span class="dot" style="background:#c084fc;"></span>Used <b id="swap-legend-used">{{ '%.1f'%latest.swap_used_gb if latest and latest.swap_used_gb else '0' }} GB</b></div>
-        <div class="donut-legend-item"><span class="dot" style="background:#3a3f52;"></span>Free <b id="swap-legend-free">{{ '%.1f'%((latest.swap_total_gb or 0) - (latest.swap_used_gb or 0)) if latest else '0' }} GB</b></div>
-        <div class="donut-legend-item total">Total <b>{{ '%.1f'%latest.swap_total_gb if latest and latest.swap_total_gb else '0' }} GB</b></div>
-      </div>
     </div>
   </div>
 
@@ -480,12 +489,6 @@ function toggleAlerts() {
     <div class="rings-row">
       <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-cpu"></canvas><div class="ring-val" id="ring-cpu-val">0%</div></div><div class="ring-lbl">CPU</div></div>
       <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-ram"></canvas><div class="ring-val" id="ring-ram-val">0%</div></div><div class="ring-lbl">RAM</div></div>
-      {% if gpu_primary %}
-      <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-gpu"></canvas><div class="ring-val" id="ring-gpu-val">0%</div></div><div class="ring-lbl">GPU Load</div></div>
-      {% endif %}
-      {% if gpu_vram_pct is not none %}
-      <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-vram"></canvas><div class="ring-val" id="ring-vram-val">0%</div></div><div class="ring-lbl">VRAM</div></div>
-      {% endif %}
       <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-swap"></canvas><div class="ring-val" id="ring-swap-val">0%</div></div><div class="ring-lbl">Swap</div></div>
       {% if disk_primary %}
       <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-disk"></canvas><div class="ring-val" id="ring-disk-val">0%</div></div><div class="ring-lbl">Disk</div></div>
@@ -496,7 +499,7 @@ function toggleAlerts() {
   <div class="dash-card">
     <div class="dash-card-header"><span class="dash-card-title">Recent Alerts</span></div>
     <div class="alerts-list">
-      {% for a in alert_history[:6] %}
+      {% for a in alert_history %}
       <div class="alert-row">
         <div class="alert-row-left">
           <span class="{{ 'alert-ok' if a.success else 'alert-warn' }}">{{ '✅' if a.success else '⚠️' }}</span>
@@ -689,13 +692,6 @@ function toggleAlerts() {
 </div>
 {% endif %}
 
-<!-- ═══ Hostname ═══ -->
-<div class="mini-card" style="margin-bottom:14px;">
-  <div class="metric-label">🖥 Hostname</div>
-  <div class="mono" style="font-size:13px;font-weight:600;margin-top:4px;">{{ machine.hostname or '—' }}</div>
-  <div class="metric-sub" style="margin-top:4px;">{{ machine.public_ip or '' }}</div>
-</div>
-
 <!-- ═══ DISK PARTITIONS ═══ -->
 <div class="disk-section">
   <div class="disk-section-title">
@@ -746,53 +742,54 @@ function toggleAlerts() {
   </div>
 </div>
 
-<!-- ═══ TOP PROCESSES ═══ -->
-<div class="procs-card">
-  <div class="card-section-title">
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline;vertical-align:middle;margin-right:4px;"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-    Top Processes
-  </div>
-  <div id="procs-list">
-  {% for p in procs %}
+<!-- ═══ ALERT HISTORY (full log) ═══ -->
+<div class="info-card">
+  <div class="card-section-title">Alert History</div>
+  {% for a in alert_history %}
   <div class="proc-row">
-    <span class="mono" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-      {{ p.get('name') or p.get('pid') or '?' }}
-    </span>
-    <span style="color:var(--text-muted);">
-      CPU {{ '%.1f'%(p.get('cpu_percent') or p.get('cpu') or 0) }}%
-      &nbsp; RAM {{ '%.1f'%(p.get('memory_percent') or p.get('mem') or p.get('memory') or 0) }}%
-    </span>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="badge badge-warning">{{ a.alert_type }}</span>
+      <span style="font-size:12px;">{{ a.subject }}</span>
+    </div>
+    <span style="font-size:11px;color:var(--text-muted);">{{ a.sent_at.strftime('%m-%d %H:%M') if a.sent_at else '—' }}</span>
   </div>
-  {% else %}<p style="font-size:13px;color:var(--text-muted)">No process data.</p>{% endfor %}
-  </div>
+  {% else %}<p style="font-size:13px;color:var(--text-muted)">No alerts for this machine.</p>{% endfor %}
 </div>
 
-<!-- ═══ MACHINE INFO + ALERTS ═══ -->
-<div class="bottom-grid">
-  <div class="info-card">
-    <div class="card-section-title">Machine Info</div>
-    <div class="info-grid">
-      <div class="info-item"><div class="lbl">System Name</div><div class="val">{{ machine.system_name }}</div></div>
-      <div class="info-item"><div class="lbl">Location</div><div class="val">{{ machine.location }}</div></div>
-      <div class="info-item"><div class="lbl">Hostname</div><div class="val">{{ machine.hostname or '—' }}</div></div>
-      <div class="info-item"><div class="lbl">Public IP</div><div class="val">{{ machine.public_ip or '—' }}</div></div>
-      <div class="info-item"><div class="lbl">OS Type</div><div class="val">{{ machine.os_type or '—' }}</div></div>
-      <div class="info-item"><div class="lbl">OS Version</div><div class="val" style="font-size:10px;">{{ latest.os_version if latest and latest.os_version else '—' }}</div></div>
-      <div class="info-item"><div class="lbl">Table</div><div class="val">{{ machine.table_name }}</div></div>
-      <div class="info-item"><div class="lbl">Registered</div><div class="val">{{ machine.registered_at.strftime('%Y-%m-%d') if machine.registered_at else '—' }}</div></div>
+<!-- ═══ Chart expand modal ═══ -->
+<div class="modal-backdrop" id="chart-modal-backdrop" onclick="if(event.target===this) closeChartModal()">
+  <div class="modal" style="width:820px;">
+    <div class="modal-title" id="chart-modal-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span id="chart-modal-title-text">Chart</span>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="closeChartModal()">✕</button>
     </div>
-  </div>
-  <div class="info-card">
-    <div class="card-section-title">Alert History</div>
-    {% for a in alert_history %}
-    <div class="proc-row">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span class="badge badge-warning">{{ a.alert_type }}</span>
-        <span style="font-size:12px;">{{ a.subject }}</span>
+    <div id="chart-modal-filter" class="history-bar-row" style="margin-bottom:14px;display:none;">
+      <div class="history-presets" id="modal-hist-presets">
+        <button type="button" class="hist-preset-btn" data-mins="60">Last 1h</button>
+        <button type="button" class="hist-preset-btn" data-mins="360">Last 6h</button>
+        <button type="button" class="hist-preset-btn" data-mins="1440">Last 24h</button>
+        <button type="button" class="hist-preset-btn" data-mins="10080">Last 7d</button>
       </div>
-      <span style="font-size:11px;color:var(--text-muted);">{{ a.sent_at.strftime('%m-%d %H:%M') if a.sent_at else '—' }}</span>
+      <div class="history-divider"></div>
+      <div class="history-field"><label>From</label><input type="datetime-local" id="modal-hist-from"></div>
+      <div class="history-field"><label>To</label><input type="datetime-local" id="modal-hist-to"></div>
+      <button type="button" class="btn btn-primary btn-sm" onclick="loadModalHistory()">View Range</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="modal-hist-live-btn" onclick="modalBackToLive()" style="display:none;">← Back to Live</button>
+      <span class="history-status" id="modal-hist-status"></span>
     </div>
-    {% else %}<p style="font-size:13px;color:var(--text-muted)">No alerts for this machine.</p>{% endfor %}
+    <div id="chart-modal-note" style="font-size:12px;color:var(--text-muted);margin-bottom:12px;display:none;"></div>
+    <div id="chart-modal-donut-wrap" class="donut-row" style="display:none;justify-content:center;">
+      <div style="height:260px;width:260px;position:relative;flex-shrink:0;"><canvas id="chart-modal-donut"></canvas><div class="donut-center" id="chart-modal-donut-center" style="font-size:32px;"></div></div>
+      <div class="donut-legend" id="chart-modal-donut-legend" style="font-size:14px;"></div>
+    </div>
+    <div id="chart-modal-gauge-wrap" class="gauge-wrap" style="display:none;">
+      <div style="height:220px;width:100%;position:relative;"><canvas id="chart-modal-gauge"></canvas></div>
+      <div class="gauge-val" id="chart-modal-gauge-val" style="font-size:34px;"></div>
+      <div class="gauge-status" id="chart-modal-gauge-status" style="font-size:14px;"></div>
+    </div>
+    <div id="chart-modal-canvas-wrap" style="height:360px;position:relative;">
+      <canvas id="chart-modal-canvas"></canvas>
+    </div>
   </div>
 </div>
 
@@ -1166,7 +1163,7 @@ charts.tempGauge = new Chart(document.getElementById('chart-temp-gauge'), {
   data: { datasets: [{ data: [60, 20, 20], backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'], borderWidth: 0 }] },
   options: {
     responsive: true, maintainAspectRatio: false, animation: false,
-    rotation: -180, circumference: 180, cutout: '75%',
+    rotation: -90, circumference: 180, cutout: '75%',
     plugins: { legend: { display: false }, tooltip: { enabled: false } }
   },
   plugins: [gaugeNeedlePlugin]
@@ -1177,14 +1174,10 @@ charts.tempGauge.update();
 // System Overview rings
 charts.ringCpu  = makeRing('ring-cpu',  {{ (latest.cpu_percent or 0) if latest else 0 }},  '#00d4ff');
 charts.ringRam  = makeRing('ring-ram',  {{ (latest.ram_percent or 0) if latest else 0 }},  '#a78bfa');
-{% if gpu_primary %}charts.ringGpu  = makeRing('ring-gpu',  {{ gpu_load_pct or 0 }}, '#22c55e');{% endif %}
-{% if gpu_vram_pct is not none %}charts.ringVram = makeRing('ring-vram', {{ gpu_vram_pct or 0 }}, '#e879f9');{% endif %}
 charts.ringSwap = makeRing('ring-swap', {{ (latest.swap_percent or 0) if latest else 0 }}, '#c084fc');
 {% if disk_primary %}charts.ringDisk = makeRing('ring-disk', {{ '%.1f'%(disk_primary.percent|float) }}, '#f59e0b');{% endif %}
 setText('ring-cpu-val', '{{ '%.0f'%(latest.cpu_percent or 0) if latest else 0 }}%');
 setText('ring-ram-val', '{{ '%.0f'%(latest.ram_percent or 0) if latest else 0 }}%');
-{% if gpu_primary %}setText('ring-gpu-val', '{{ '%.0f'%(gpu_load_pct or 0) }}%');{% endif %}
-{% if gpu_vram_pct is not none %}setText('ring-vram-val', '{{ '%.0f'%(gpu_vram_pct or 0) }}%');{% endif %}
 setText('ring-swap-val', '{{ '%.0f'%(latest.swap_percent or 0) if latest else 0 }}%');
 {% if disk_primary %}setText('ring-disk-val', '{{ '%.0f'%(disk_primary.percent|float) }}%');{% endif %}
 
@@ -1204,12 +1197,11 @@ setText('ring-swap-val', '{{ '%.0f'%(latest.swap_percent or 0) if latest else 0 
 })();
 {% endif %}
 
-// GPU Load area chart (primary GPU, over time) — built after gpuLoadHist above
-{% if gpu_primary %}
-charts.gpuArea = makeChart('chart-gpu-area', gpuLoadHist[1] || Array(MAX_POINTS).fill(0), '#22c55e', 100);
-{% endif %}
-
 // ── Init GPU charts — canvas IDs now use 'chart-gpu-load-N' ──
+// (The dashboard grid above intentionally does NOT duplicate per-GPU
+// metrics — the detailed GPU section below already auto-detects however
+// many GPUs are reported and shows each one's full metric set: Nvidia gets
+// load/VRAM/temp, Intel gets compute/render/video/RC6/power/freq.)
 var gpuLoadChart = {};   // chart objects, keyed by GPU index
 var gpuPwrChart  = {};
 var gpuVramChart = {};
@@ -1331,28 +1323,6 @@ function renderDisks(disks) {
   }).join('');
 }
 
-// Rebuilds the Top Processes list — mirrors the initial Jinja render
-// (same field fallbacks: name/pid, cpu_percent/cpu, memory_percent/mem/memory).
-function renderProcs(procs) {
-  var list = document.getElementById('procs-list');
-  if (!list || !Array.isArray(procs)) return;
-
-  if (!procs.length) {
-    list.innerHTML = '<p style="font-size:13px;color:var(--text-muted)">No process data.</p>';
-    return;
-  }
-
-  list.innerHTML = procs.map(function(p) {
-    var name = p.name || p.pid || '?';
-    var cpu  = parseFloat(p.cpu_percent !== undefined ? p.cpu_percent : (p.cpu || 0));
-    var ram  = parseFloat(p.memory_percent !== undefined ? p.memory_percent : (p.mem !== undefined ? p.mem : (p.memory || 0)));
-    return '<div class="proc-row">' +
-      '<span class="mono" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(name) + '</span>' +
-      '<span style="color:var(--text-muted);">CPU ' + cpu.toFixed(1) + '% &nbsp; RAM ' + ram.toFixed(1) + '%</span>' +
-    '</div>';
-  }).join('');
-}
-
 // ── Main poll ──
 async function pollLive() {
   if (typeof histBaseState !== 'undefined' && histBaseState) return;  // browsing history — don't overwrite it
@@ -1394,6 +1364,11 @@ async function pollLive() {
     setWidth('stat-ram-bar', ram);
     if (d.ram_used_gb !== undefined && d.ram_total_gb !== undefined)
       setText('stat-ram-detail', d.ram_used_gb.toFixed(1) + ' / ' + d.ram_total_gb.toFixed(1) + ' GB');
+
+    setText('stat-swap-val', swap.toFixed(1) + '%');
+    setWidth('stat-swap-bar', swap);
+    if (d.swap_used_gb !== undefined && d.swap_total_gb !== undefined)
+      setText('stat-swap-detail', d.swap_used_gb.toFixed(1) + ' / ' + d.swap_total_gb.toFixed(1) + ' GB');
 
     setText('stat-temp-val', temp ? temp.toFixed(0) + '°C' : '—');
     var tempEl = document.getElementById('stat-temp-val');
@@ -1488,17 +1463,17 @@ async function pollLive() {
       setText('proc-donut-center', String(d.top_processes.length));
     }
 
-    // Disk + processes detail sections further down the page
+    // Disk Partitions detail section further down the page still lives on
     if (d.disk_partitions) renderDisks(d.disk_partitions);
-    if (d.top_processes)   renderProcs(d.top_processes);
 
-    // ── GPU live update (primary GPU feeds the dashboard cards + rings too) ──
+    // ── GPU live update — detailed per-GPU section only (auto-detects
+    // however many GPUs are reported; no duplicate simplified widgets in
+    // the dashboard grid above) ──
     // /live must return: d.gpus = list from gpu_info jsonb column
     if (d.gpus && Array.isArray(d.gpus)) {
       d.gpus.forEach(function(gpu, i) {
         var idx   = i + 1;                            // 1-based, matches Jinja gi
         var gtype = (gpu.type || '').toLowerCase();
-        var isPrimary = (i === 0);
 
         if (gtype === 'intel') {
           // ── Intel ──
@@ -1524,14 +1499,6 @@ async function pollLive() {
           pushPoint(gpuLoadChart[idx], load,   now);
           pushPoint(gpuPwrChart[idx],  pwrPkg, now);
 
-          if (isPrimary) {
-            setText('stat-gpu-val', load.toFixed(0) + '%');
-            setWidth('stat-gpu-bar', load);
-            setText('gpuarea-val', load.toFixed(0) + '%');
-            pushPoint(charts.gpuArea, load, now);
-            updateRing(charts.ringGpu, load, 'ring-gpu-val');
-          }
-
         } else {
           // ── Nvidia (handles both old & new field names) ──
           var load   = parseFloat(gpu.load_percent    || gpu.gpu_percent  || 0);
@@ -1556,20 +1523,6 @@ async function pollLive() {
             setText('val-gpu-temp-' + idx, '🌡️ ' + temp_g.toFixed(0) + '°C');
 
           pushPoint(gpuLoadChart[idx], load, now);
-
-          if (isPrimary) {
-            setText('stat-gpu-val', load.toFixed(0) + '%');
-            setWidth('stat-gpu-bar', load);
-            setText('gpuarea-val', load.toFixed(0) + '%');
-            pushPoint(charts.gpuArea, load, now);
-            updateRing(charts.ringGpu, load, 'ring-gpu-val');
-            if (vTotal > 0) {
-              setText('stat-vram-val', vPct.toFixed(0) + '%');
-              setWidth('stat-vram-bar', vPct);
-              setText('stat-vram-detail', (vUsed/1024).toFixed(1) + ' / ' + (vTotal/1024).toFixed(1) + ' GB');
-              updateRing(charts.ringVram, vPct, 'ring-vram-val');
-            }
-          }
         }
       });
     }
@@ -1708,6 +1661,202 @@ document.querySelectorAll('#hist-presets .hist-preset-btn').forEach(function(btn
     document.getElementById('hist-from').value = toLocalInputValue(from);
     document.getElementById('hist-to').value   = toLocalInputValue(now);
     loadHistory();
+  });
+});
+
+// ── Chart expand modal ───────────────────────────────────────────────────
+// Click the ⤢ button on any dashboard card to see a bigger version. Time
+// series charts (CPU / Net / Per-core) get the same From/To + preset filter
+// as the main page; donut/gauge widgets are point-in-time snapshots, so the
+// modal shows a larger read-only view with a short note instead.
+var modalChart = null;
+var modalKind  = null;
+var modalHistBase = null;
+
+function closeChartModal() {
+  document.getElementById('chart-modal-backdrop').classList.remove('open');
+  if (modalChart) { modalChart.destroy(); modalChart = null; }
+  modalKind = null;
+  modalHistBase = null;
+}
+
+function openChartModal(kind) {
+  modalKind = kind;
+  modalHistBase = null;
+
+  var titleEl    = document.getElementById('chart-modal-title-text');
+  var filterEl   = document.getElementById('chart-modal-filter');
+  var noteEl     = document.getElementById('chart-modal-note');
+  var donutWrap  = document.getElementById('chart-modal-donut-wrap');
+  var gaugeWrap  = document.getElementById('chart-modal-gauge-wrap');
+  var canvasWrap = document.getElementById('chart-modal-canvas-wrap');
+
+  filterEl.style.display   = 'none';
+  noteEl.style.display     = 'none';
+  donutWrap.style.display  = 'none';
+  gaugeWrap.style.display  = 'none';
+  canvasWrap.style.display = 'none';
+  document.getElementById('modal-hist-live-btn').style.display = 'none';
+  document.getElementById('modal-hist-status').textContent = '';
+  document.querySelectorAll('#modal-hist-presets .hist-preset-btn').forEach(function(b) { b.classList.remove('active'); });
+
+  if (modalChart) { modalChart.destroy(); modalChart = null; }
+
+  if (kind === 'cpu') {
+    titleEl.textContent = 'CPU Usage %';
+    filterEl.style.display = 'flex';
+    canvasWrap.style.display = 'block';
+    modalChart = makeChart('chart-modal-canvas', charts.cpuArea ? charts.cpuArea.data.datasets[0].data : [], '#00d4ff', 100);
+    if (charts.cpuArea) { modalChart.data.labels = charts.cpuArea.data.labels.slice(); modalChart.update(); }
+
+  } else if (kind === 'net') {
+    titleEl.textContent = 'Net Traffic (KB/s)';
+    filterEl.style.display = 'flex';
+    canvasWrap.style.display = 'block';
+    if (charts.netBar) {
+      modalChart = makeNetBar('chart-modal-canvas', charts.netBar.data.datasets[0].data, charts.netBar.data.datasets[1].data);
+      modalChart.data.labels = charts.netBar.data.labels.slice();
+      modalChart.update();
+    }
+
+  } else if (kind === 'cores') {
+    titleEl.textContent = 'CPU Per-Core Usage';
+    noteEl.textContent = 'Historical range filtering isn\'t available for per-core data yet — showing the current live window.';
+    noteEl.style.display = 'block';
+    canvasWrap.style.display = 'block';
+    if (charts.cores) {
+      var coreArrs = charts.cores.data.datasets.map(function(ds) { return ds.data.slice(); });
+      modalChart = makeCoresChart('chart-modal-canvas', coreArrs);
+      modalChart.data.labels = charts.cores.data.labels.slice();
+      modalChart.update();
+    }
+
+  } else if (kind === 'ram' || kind === 'swap' || kind === 'disk') {
+    var cfg = {
+      ram:  { title: 'RAM Usage',  chart: charts.ramDonut,  color: '#a78bfa' },
+      swap: { title: 'Swap Usage', chart: charts.swapDonut, color: '#c084fc' },
+      disk: { title: 'Disk Usage', chart: charts.diskDonut, color: '#f59e0b' },
+    }[kind];
+    titleEl.textContent = cfg.title;
+    noteEl.textContent = 'This is a point-in-time snapshot — historical range filtering doesn\'t apply to a current usage breakdown.';
+    noteEl.style.display = 'block';
+    donutWrap.style.display = 'flex';
+    if (cfg.chart) {
+      var data = cfg.chart.data.datasets[0].data;
+      modalChart = new Chart(document.getElementById('chart-modal-donut'), {
+        type: 'doughnut',
+        data: { datasets: [{ data: data.slice(), backgroundColor: [cfg.color, '#2a2f42'], borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '72%', animation: false,
+          plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+      });
+      var total = (data[0] || 0) + (data[1] || 0);
+      var pct = total > 0 ? (data[0] / total * 100) : 0;
+      document.getElementById('chart-modal-donut-center').textContent = pct.toFixed(1) + '%';
+      document.getElementById('chart-modal-donut-legend').innerHTML =
+        '<div class="donut-legend-item"><span class="dot" style="background:' + cfg.color + ';"></span>Used <b>' + (data[0] || 0).toFixed(1) + ' GB</b></div>' +
+        '<div class="donut-legend-item"><span class="dot" style="background:#3a3f52;"></span>Free <b>' + (data[1] || 0).toFixed(1) + ' GB</b></div>' +
+        '<div class="donut-legend-item total">Total <b>' + total.toFixed(1) + ' GB</b></div>';
+    }
+
+  } else if (kind === 'temp') {
+    titleEl.textContent = 'Temperature (°C)';
+    noteEl.textContent = 'This is a point-in-time snapshot — historical range filtering doesn\'t apply to a gauge reading.';
+    noteEl.style.display = 'block';
+    gaugeWrap.style.display = 'flex';
+    var val = charts.tempGauge ? charts.tempGauge.$gaugeValue : 0;
+    modalChart = new Chart(document.getElementById('chart-modal-gauge'), {
+      type: 'doughnut',
+      data: { datasets: [{ data: [60, 20, 20], backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'], borderWidth: 0 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        rotation: -90, circumference: 180, cutout: '75%',
+        plugins: { legend: { display: false }, tooltip: { enabled: false } }
+      },
+      plugins: [gaugeNeedlePlugin]
+    });
+    modalChart.$gaugeValue = val;
+    modalChart.update();
+    var ts = tempStatusLabel(val);
+    var gv = document.getElementById('chart-modal-gauge-val');
+    var gs = document.getElementById('chart-modal-gauge-status');
+    gv.textContent = val.toFixed(0) + '°C'; gv.style.color = ts.color;
+    gs.textContent = ts.text; gs.style.color = ts.color;
+  }
+
+  document.getElementById('chart-modal-backdrop').classList.add('open');
+}
+
+async function loadModalHistory() {
+  var fromEl  = document.getElementById('modal-hist-from');
+  var toEl    = document.getElementById('modal-hist-to');
+  var status  = document.getElementById('modal-hist-status');
+  var liveBtn = document.getElementById('modal-hist-live-btn');
+  if (!modalChart) return;
+
+  if (!fromEl.value || !toEl.value) {
+    status.textContent = 'Pick both a From and To date/time.';
+    status.className = 'history-status warn';
+    return;
+  }
+  status.textContent = 'Loading…';
+  status.className = 'history-status';
+
+  try {
+    var url = '/servers/' + TABLE + '/history' +
+      '?start=' + encodeURIComponent(fromEl.value) +
+      '&end='   + encodeURIComponent(toEl.value);
+    var r = await fetch(url);
+    var d = await r.json();
+
+    if (d.error) { status.textContent = d.error; status.className = 'history-status err'; return; }
+    if (!d.count) { status.textContent = 'No data in that range.'; status.className = 'history-status warn'; return; }
+
+    if (!modalHistBase) {
+      modalHistBase = { labels: modalChart.data.labels.slice(), a: modalChart.data.datasets[0].data.slice() };
+      if (modalKind === 'net') modalHistBase.b = modalChart.data.datasets[1].data.slice();
+    }
+
+    var lbls = d.labels.map(fmtHistLabel);
+    modalChart.data.labels = lbls;
+    if (modalKind === 'cpu') {
+      modalChart.data.datasets[0].data = d.cpu;
+    } else if (modalKind === 'net') {
+      modalChart.data.datasets[0].data = d.net_sent;
+      modalChart.data.datasets[1].data = d.net_recv;
+    }
+    modalChart.update('none');
+
+    status.textContent = d.count + ' points loaded for that range.';
+    status.className = 'history-status ok';
+    liveBtn.style.display = '';
+  } catch (e) {
+    status.textContent = 'Failed to load history.';
+    status.className = 'history-status err';
+  }
+}
+
+function modalBackToLive() {
+  if (!modalHistBase || !modalChart) return;
+  modalChart.data.labels = modalHistBase.labels;
+  modalChart.data.datasets[0].data = modalHistBase.a;
+  if (modalKind === 'net' && modalHistBase.b) modalChart.data.datasets[1].data = modalHistBase.b;
+  modalChart.update('none');
+  modalHistBase = null;
+  document.getElementById('modal-hist-live-btn').style.display = 'none';
+  document.getElementById('modal-hist-status').textContent = '';
+  document.querySelectorAll('#modal-hist-presets .hist-preset-btn').forEach(function(b) { b.classList.remove('active'); });
+}
+
+document.querySelectorAll('#modal-hist-presets .hist-preset-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('#modal-hist-presets .hist-preset-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    var mins = parseInt(btn.dataset.mins, 10);
+    var now  = new Date();
+    var from = new Date(now.getTime() - mins * 60000);
+    document.getElementById('modal-hist-from').value = toLocalInputValue(from);
+    document.getElementById('modal-hist-to').value   = toLocalInputValue(now);
+    loadModalHistory();
   });
 });
 </script>
