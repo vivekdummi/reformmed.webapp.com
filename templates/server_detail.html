@@ -82,14 +82,29 @@
 .mini-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 20px;}
 
 /* ── History range filter bar ── */
-.history-bar{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px 18px;margin-bottom:14px;}
+.history-bar{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:0;margin-bottom:14px;overflow:hidden;}
+.history-bar-header{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--border);}
+.history-bar-header svg{color:var(--accent);flex-shrink:0;}
+.history-bar-title{font-size:13px;font-weight:600;}
+.history-bar-title-sub{font-size:11px;color:var(--text-muted);margin-left:6px;font-weight:400;}
+.history-bar-body{padding:16px 18px;display:flex;flex-direction:column;gap:14px;}
+.history-presets{display:flex;gap:8px;flex-wrap:wrap;}
+.hist-preset-btn{
+  background:var(--bg3);border:1px solid var(--border);border-radius:99px;
+  color:var(--text-muted);font-size:12px;padding:6px 14px;cursor:pointer;
+  transition:.15s;font-family:inherit;
+}
+.hist-preset-btn:hover{border-color:var(--accent);color:var(--text);}
+.hist-preset-btn.active{background:rgba(56,189,248,.12);border-color:var(--accent);color:var(--accent);font-weight:600;}
 .history-bar-row{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;}
-.history-field{display:flex;flex-direction:column;gap:4px;}
+.history-field{display:flex;flex-direction:column;gap:5px;}
 .history-field label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;}
-.history-field input{padding:6px 10px;font-size:12px;}
-.history-status{font-size:12px;color:var(--text-muted);margin-left:auto;}
+.history-field input{padding:8px 12px;font-size:12.5px;min-width:200px;}
+.history-divider{width:1px;align-self:stretch;background:var(--border);margin:0 2px;}
+.history-status{font-size:12px;color:var(--text-muted);}
 .history-status.warn{color:#f59e0b;}
 .history-status.err{color:#ef4444;}
+.history-status.ok{color:#22c55e;}
 </style>
 {% endblock %}
 
@@ -161,18 +176,31 @@ function toggleAlerts() {
 
 <!-- ═══ History range filter ═══ -->
 <div class="history-bar" id="history-bar">
-  <div class="history-bar-row">
-    <div class="history-field">
-      <label>From</label>
-      <input type="datetime-local" id="hist-from">
+  <div class="history-bar-header">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    <span class="history-bar-title">Historical View</span>
+    <span class="history-bar-title-sub" id="hist-status">Showing live data — last 60 readings</span>
+  </div>
+  <div class="history-bar-body">
+    <div class="history-presets" id="hist-presets">
+      <button type="button" class="hist-preset-btn" data-mins="60">Last 1h</button>
+      <button type="button" class="hist-preset-btn" data-mins="360">Last 6h</button>
+      <button type="button" class="hist-preset-btn" data-mins="1440">Last 24h</button>
+      <button type="button" class="hist-preset-btn" data-mins="10080">Last 7d</button>
     </div>
-    <div class="history-field">
-      <label>To</label>
-      <input type="datetime-local" id="hist-to">
+    <div class="history-bar-row">
+      <div class="history-field">
+        <label>From</label>
+        <input type="datetime-local" id="hist-from">
+      </div>
+      <div class="history-field">
+        <label>To</label>
+        <input type="datetime-local" id="hist-to">
+      </div>
+      <div class="history-divider"></div>
+      <button type="button" class="btn btn-primary btn-sm" onclick="loadHistory()">View Range</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="hist-live-btn" onclick="backToLive()" style="display:none;">← Back to Live</button>
     </div>
-    <button type="button" class="btn btn-primary btn-sm" onclick="loadHistory()">View Range</button>
-    <button type="button" class="btn btn-ghost btn-sm" id="hist-live-btn" onclick="backToLive()" style="display:none;">← Back to Live</button>
-    <span id="hist-status" class="history-status"></span>
   </div>
 </div>
 
@@ -675,8 +703,17 @@ function makeChart(canvasId, dataArr, color, yMax) {
         borderWidth: 2,
         borderCapStyle: 'round',
         borderJoinStyle: 'round',
-        pointRadius: 0,
-        pointHoverRadius: 3,
+        // Every point is invisible except the most recent one, which gets a
+        // small solid marker — the "current value" dot look from the
+        // reference dashboard, without cluttering 60 points with dots.
+        pointRadius: function(context) {
+          var arr = context.dataset.data;
+          return context.dataIndex === arr.length - 1 ? 4 : 0;
+        },
+        pointBackgroundColor: color,
+        pointBorderColor: '#0b0e14',
+        pointBorderWidth: 2,
+        pointHoverRadius: 5,
         pointHoverBackgroundColor: color,
         pointHitRadius: 8,
       }]
@@ -701,7 +738,8 @@ function makeChart(canvasId, dataArr, color, yMax) {
         y: {
           min: 0,
           max: yMax || undefined,
-          grid: { color: 'rgba(37,42,58,.8)' },
+          grid: { color: 'rgba(37,42,58,.6)', borderDash: [3, 4], drawTicks: false },
+          border: { display: false },
           ticks: { font: { size: 8 }, maxTicksLimit: 4 }
         }
       }
@@ -1041,12 +1079,12 @@ async function loadHistory() {
 
   if (!fromEl.value || !toEl.value) {
     status.textContent = 'Pick both a From and To date/time.';
-    status.className = 'history-status warn';
+    status.className = 'history-bar-title-sub history-status warn';
     return;
   }
 
   status.textContent = 'Loading…';
-  status.className = 'history-status';
+  status.className = 'history-bar-title-sub history-status';
 
   try {
     var url = '/servers/' + TABLE + '/history' +
@@ -1057,12 +1095,12 @@ async function loadHistory() {
 
     if (d.error) {
       status.textContent = d.error;
-      status.className = 'history-status err';
+      status.className = 'history-bar-title-sub history-status err';
       return;
     }
     if (!d.count) {
       status.textContent = 'No data in that range.';
-      status.className = 'history-status warn';
+      status.className = 'history-bar-title-sub history-status warn';
       return;
     }
 
@@ -1081,11 +1119,11 @@ async function loadHistory() {
     setChartData(charts.netDown, lbls, d.net_recv);
 
     status.textContent = d.count + ' points loaded for that range.';
-    status.className = 'history-status';
+    status.className = 'history-bar-title-sub history-status ok';
     liveBtn.style.display = '';
   } catch (e) {
     status.textContent = 'Failed to load history.';
-    status.className = 'history-status err';
+    status.className = 'history-bar-title-sub history-status err';
   }
 }
 
@@ -1100,11 +1138,34 @@ function backToLive() {
   histBaseState = null;
 
   document.getElementById('hist-live-btn').style.display = 'none';
-  document.getElementById('hist-status').textContent = '';
+  var status = document.getElementById('hist-status');
+  status.textContent = 'Showing live data — last 60 readings';
+  status.className = 'history-bar-title-sub';
+  document.querySelectorAll('#hist-presets .hist-preset-btn').forEach(function(b){ b.classList.remove('active'); });
 
   {% if machine.status != 'offline' %}
   if (!liveInterval) liveInterval = setInterval(pollLive, 2000);
   {% endif %}
 }
+
+// ── Quick-range presets ──
+function toLocalInputValue(d) {
+  var pad = function(n) { return String(n).padStart(2, '0'); };
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+    'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+document.querySelectorAll('#hist-presets .hist-preset-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('#hist-presets .hist-preset-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    var mins = parseInt(btn.dataset.mins, 10);
+    var now  = new Date();
+    var from = new Date(now.getTime() - mins * 60000);
+    document.getElementById('hist-from').value = toLocalInputValue(from);
+    document.getElementById('hist-to').value   = toLocalInputValue(now);
+    loadHistory();
+  });
+});
 </script>
 {% endblock %}
