@@ -85,7 +85,7 @@ def _gpu_history_stats(table_name, minutes=60):
                 FROM {table_name}
                 WHERE ts > NOW() - INTERVAL '{int(minutes)} minutes' AND gpu_info IS NOT NULL
             ) t
-            WHERE rn %% GREATEST(total / 200, 1) = 0
+            WHERE rn % GREATEST(total / 200, 1) = 0
             ORDER BY ts ASC
         """)
         rows = cur.fetchall()
