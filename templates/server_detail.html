@@ -39,25 +39,6 @@
 .metric-row-right{padding:10px 14px;display:flex;flex-direction:column;justify-content:center;}
 .chart-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
 
-/* ── Disk Section ── */
-.disk-section{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px;}
-.disk-section-title{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:14px;display:flex;align-items:center;gap:6px;}
-.disk-items-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
-.disk-item{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
-.disk-item-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
-.disk-mount{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;}
-.disk-pct-badge{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;}
-.disk-pct-green{background:rgba(34,197,94,.15);color:#22c55e;}
-.disk-pct-yellow{background:rgba(245,158,11,.15);color:#f59e0b;}
-.disk-pct-red{background:rgba(239,68,68,.15);color:#ef4444;}
-.storage-bar-wrap{margin:6px 0 8px;}
-.storage-bar{height:8px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden;display:flex;}
-.storage-bar-used{height:100%;border-radius:4px 0 0 4px;transition:width .4s ease;}
-.storage-legend{display:flex;gap:12px;margin-top:5px;}
-.storage-legend-item{font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:4px;}
-.storage-legend-dot{width:6px;height:6px;border-radius:50%;}
-.disk-fstype{font-size:10px;color:var(--text-muted);margin-top:2px;}
-
 /* ── Processes ── */
 .procs-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px;}
 .proc-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(37,42,58,.5);font-size:12px;}
@@ -67,6 +48,34 @@
 .gpu-unavail{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;display:flex;align-items:center;gap:12px;opacity:.6;}
 .gpu-unavail-icon{font-size:20px;}
 .gpu-unavail-text{font-size:12px;color:var(--text-muted);}
+
+/* ── GPU Load Overview (redesigned) ── */
+.gpu-overview-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
+.gpu-overview-title{font-size:16px;font-weight:700;}
+.gpu-overview-sub{font-size:12px;color:var(--text-muted);margin-top:2px;}
+.gpu-range-select{padding:8px 12px;font-size:12px;width:auto;}
+.gpu-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px;display:grid;grid-template-columns:240px 1fr;gap:24px;}
+@media(max-width:900px){.gpu-card{grid-template-columns:1fr;}}
+.gpu-card-left{display:flex;flex-direction:column;align-items:center;text-align:center;}
+.gpu-card-badge-row{display:flex;align-items:center;gap:8px;align-self:flex-start;margin-bottom:6px;}
+.gpu-vendor-badge{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;}
+.gpu-card-title-txt{font-weight:700;font-size:13px;}
+.gpu-card-name{font-size:10px;color:var(--text-muted);align-self:flex-start;margin-bottom:14px;line-height:1.3;word-break:break-word;}
+.gpu-ring-wrap{position:relative;width:170px;height:170px;margin-bottom:14px;}
+.gpu-ring-val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.gpu-ring-val .num{font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:800;}
+.gpu-ring-val .lbl{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.gpu-side-metric{width:100%;text-align:left;margin-top:6px;font-size:12px;}
+.gpu-side-metric-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+.gpu-side-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden;margin-bottom:10px;}
+.gpu-side-bar-fill{height:100%;border-radius:3px;transition:width .4s ease;}
+.gpu-intel-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;width:100%;text-align:left;margin-top:4px;font-size:11px;color:var(--text-muted);}
+.gpu-intel-grid b{color:var(--text);font-weight:600;}
+.gpu-stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;}
+@media(max-width:900px){.gpu-stats-row{grid-template-columns:repeat(2,1fr);}}
+.gpu-stat-pill{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-width:0;}
+.gpu-stat-pill-lbl{font-size:10px;color:var(--text-muted);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.gpu-stat-pill-val{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;}
 .gpu-unavail-text strong{color:var(--text);font-size:13px;display:block;margin-bottom:2px;}
 
 /* ── Info + Alerts ── */
@@ -172,9 +181,8 @@
   <span>This machine is <strong>offline</strong> — charts and metrics below show the <strong>last recorded data only</strong> and are not live.</span>
 </div>
 <style>
-  .metric-row { opacity: 0.55; filter: grayscale(50%); }
-  .metric-val { color: var(--text-muted) !important; }
-  .disk-section, .procs-card { opacity: 0.55; filter: grayscale(50%); }
+  .stat-card, .dash-card, .gpu-card { opacity: 0.55; filter: grayscale(50%); }
+  .stat-card-val, .dash-card-val { color: var(--text-muted) !important; }
 </style>
 {% endif %}
 
@@ -535,152 +543,105 @@ function toggleAlerts() {
 
 </div>
 
-<!-- ═══ GPU SECTION — supports Intel, Nvidia, multiple GPUs ═══ -->
+<!-- ═══ GPU LOAD OVERVIEW — supports Intel, Nvidia, multiple GPUs ═══ -->
 {% if gpus %}
-  {% for gpu in gpus %}
-  {% set gi = loop.index %}
-  {% set gtype = gpu.type | default('unknown') | lower %}
+<div class="gpu-overview-header">
+  <div>
+    <div class="gpu-overview-title">GPU Load Overview</div>
+    <div class="gpu-overview-sub">Real-time GPU utilization and performance metrics</div>
+  </div>
+  <select class="gpu-range-select" id="gpu-range-select" onchange="loadGpuHistory(this.value)">
+    <option value="15">Last 15 minutes</option>
+    <option value="60" selected>Last 60 minutes</option>
+    <option value="360">Last 6 hours</option>
+    <option value="1440">Last 24 hours</option>
+  </select>
+</div>
 
-  {# ── resolve initial values, handle both naming conventions ── #}
-  {% if gtype == 'intel' %}
-    {% set g_load    = gpu.gpu_percent       | default(0) | float %}
-    {% set g_compute = gpu.compute_percent   | default(0) | float %}
-    {% set g_render  = gpu.render_3d_percent | default(0) | float %}
-    {% set g_video   = gpu.video_percent     | default(0) | float %}
-    {% set g_freq    = gpu.freq_actual_mhz   | default(0) | float %}
-    {% set g_pwrgpu  = gpu.power_gpu_w       | default(0) | float %}
-    {% set g_pwrpkg  = gpu.power_package_w   | default(0) | float %}
-    {% set g_rc6     = gpu.rc6_idle_percent  | default(0) | float %}
-    {% set g_temp    = gpu.temp_c            | default(0) | float %}
-    {% set g_vmem_used  = gpu.mem_used_mb    | default(0) | float %}
-    {% set g_vmem_total = gpu.mem_total_mb   | default(0) | float %}
-  {% else %}
-    {# Nvidia: support both mem_used_mb and memory_used_mb naming #}
-    {% set g_load       = gpu.load_percent     | default(gpu.gpu_percent     | default(0)) | float %}
-    {% set g_temp       = gpu.temperature      | default(gpu.temp_c          | default(0)) | float %}
-    {% set g_vmem_used  = gpu.memory_used_mb   | default(gpu.mem_used_mb     | default(0)) | float %}
-    {% set g_vmem_total = gpu.memory_total_mb  | default(gpu.mem_total_mb    | default(0)) | float %}
-    {% set g_mem_pct    = gpu.mem_percent      | default(0) | float %}
-  {% endif %}
+{% for gpu in gpus %}
+{% set gi = loop.index0 %}
+{% set idx = loop.index %}
+{% set gtype = gpu.type | default('unknown') | lower %}
+{% set gh = gpu_history.gpus[gi] if gpu_history and gpu_history.gpus|length > gi else None %}
+{% set accent = '#3b82f6' if gtype == 'intel' else '#a855f7' %}
 
-  {% set g_name_short = gpu.name.split('\n')[0] if gpu.name else 'GPU ' ~ gi %}
+{% if gtype == 'intel' %}
+  {% set g_load    = gpu.gpu_percent       | default(0) | float %}
+  {% set g_compute = gpu.compute_percent   | default(0) | float %}
+  {% set g_render  = gpu.render_3d_percent | default(0) | float %}
+  {% set g_video   = gpu.video_percent     | default(0) | float %}
+  {% set g_freq    = gpu.freq_actual_mhz   | default(0) | float %}
+  {% set g_pwrgpu  = gpu.power_gpu_w       | default(0) | float %}
+  {% set g_pwrpkg  = gpu.power_package_w   | default(0) | float %}
+  {% set g_rc6     = gpu.rc6_idle_percent  | default(0) | float %}
+  {% set g_temp    = gpu.temp_c            | default(0) | float %}
+  {% set g_vmem_total = 0 %}
+{% else %}
+  {% set g_load       = gpu.load_percent     | default(gpu.gpu_percent     | default(0)) | float %}
+  {% set g_temp       = gpu.temperature      | default(gpu.temp_c          | default(0)) | float %}
+  {% set g_vmem_used  = gpu.memory_used_mb   | default(gpu.mem_used_mb     | default(0)) | float %}
+  {% set g_vmem_total = gpu.memory_total_mb  | default(gpu.mem_total_mb    | default(0)) | float %}
+{% endif %}
+{% set g_name_short = gpu.name.split('\n')[0] if gpu.name else 'GPU ' ~ idx %}
+{% if g_vmem_total > 0 %}
+  {% set vram_pct = (g_vmem_used / g_vmem_total * 100) | round(1) %}
+{% else %}
+  {% set vram_pct = 0 %}
+{% endif %}
 
-  {# VRAM display: GB when >= 1024 MB #}
-  {% if g_vmem_total > 0 %}
-    {% set vram_pct     = (g_vmem_used / g_vmem_total * 100) | round(1) %}
-    {% set vram_used_s  = ('%.1f'%(g_vmem_used/1024) + ' GB')  if g_vmem_used  >= 1024 else ('%.0f'%g_vmem_used  + ' MB') %}
-    {% set vram_tot_s   = ('%.1f'%(g_vmem_total/1024) + ' GB') if g_vmem_total >= 1024 else ('%.0f'%g_vmem_total + ' MB') %}
-  {% else %}
-    {% set vram_pct = 0 %} {% set vram_used_s = '—' %} {% set vram_tot_s = '—' %}
-  {% endif %}
+<div class="gpu-card" id="gpu-card-{{ gi }}">
+  <div class="gpu-card-left">
+    <div class="gpu-card-badge-row">
+      <span class="gpu-vendor-badge" style="background:{{ accent }}22;color:{{ accent }};">{{ gtype[:1]|upper }}</span>
+      <span class="gpu-card-title-txt">{{ gtype|upper }} GPU {{ idx }}</span>
+    </div>
+    <div class="gpu-card-name">{{ g_name_short }}</div>
 
-  {# row height: Intel is taller due to extra stats grid #}
-  <div class="metric-row" id="gpu-row-{{ gi }}"
-       style="min-height:{% if gtype == 'intel' %}180px{% else %}130px{% endif %};">
-
-    <div class="metric-row-left mrl-gpu"
-         style="justify-content:flex-start;padding-top:14px;padding-bottom:14px;">
-
-      <!-- Vendor badge + index -->
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
-        <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
-                     padding:2px 6px;border-radius:4px;
-                     {% if gtype=='intel' %}background:rgba(0,112,243,.2);color:#60a5fa;
-                     {% elif gtype=='nvidia' %}background:rgba(118,185,0,.2);color:#86efac;
-                     {% else %}background:rgba(100,116,139,.2);color:#94a3b8;{% endif %}">
-          {{ gtype | upper }}
-        </span>
-        <span class="metric-label" style="margin-bottom:0;">GPU {{ gi }}</span>
+    <div class="gpu-ring-wrap">
+      <canvas id="gpu-ring-{{ gi }}"></canvas>
+      <div class="gpu-ring-val">
+        <span class="num" id="gpu-ring-val-{{ gi }}" style="color:{{ accent }};">{{ '%.0f'%g_load }}%</span>
+        <span class="lbl">GPU Load</span>
       </div>
-
-      <!-- GPU name -->
-      <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;line-height:1.3;word-break:break-word;">
-        {{ g_name_short }}
-      </div>
-
-      <!-- Load value -->
-      <div class="metric-val" id="val-gpu-load-{{ gi }}" style="color:#e879f9">
-        {{ '%.0f'|format(g_load) }}%
-      </div>
-      <div class="metric-sub" style="margin-bottom:6px;">
-        {% if gtype == 'intel' %}Overall GPU load{% else %}GPU Load{% endif %}
-      </div>
-      <div class="progress-bar">
-        <div class="progress-fill pink" id="bar-gpu-load-{{ gi }}"
-             style="width:{{ [g_load,100]|min }}%"></div>
-      </div>
-
-      {% if gtype == 'intel' %}
-      <!-- Intel extra stats -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-top:10px;">
-        <div class="metric-sub">🔵 Compute
-          <span style="color:var(--text);font-weight:600;" id="val-gpu-compute-{{ gi }}">{{ '%.0f'|format(g_compute) }}%</span>
-        </div>
-        <div class="metric-sub">🎨 Render
-          <span style="color:var(--text);font-weight:600;" id="val-gpu-render-{{ gi }}">{{ '%.0f'|format(g_render) }}%</span>
-        </div>
-        <div class="metric-sub">🎬 Video
-          <span style="color:var(--text);font-weight:600;" id="val-gpu-video-{{ gi }}">{{ '%.0f'|format(g_video) }}%</span>
-        </div>
-        <div class="metric-sub">😴 RC6 Idle
-          <span style="color:var(--text);font-weight:600;" id="val-gpu-rc6-{{ gi }}">{{ '%.0f'|format(g_rc6) }}%</span>
-        </div>
-        <div class="metric-sub">⚡ GPU Pwr
-          <span style="color:#f59e0b;font-weight:600;" id="val-gpu-pwrgpu-{{ gi }}">{{ '%.1f'|format(g_pwrgpu) }}W</span>
-        </div>
-        <div class="metric-sub">📦 Pkg Pwr
-          <span style="color:#f59e0b;font-weight:600;" id="val-gpu-pwrpkg-{{ gi }}">{{ '%.1f'|format(g_pwrpkg) }}W</span>
-        </div>
-        <div class="metric-sub" style="grid-column:1/-1;">🔄 Freq
-          <span style="color:#00d4ff;font-weight:600;" id="val-gpu-freq-{{ gi }}">{{ '%.0f'|format(g_freq) }} MHz</span>
-        </div>
-      </div>
-
-      {% else %}
-      <!-- Nvidia VRAM -->
-      {% if g_vmem_total > 0 %}
-      <div style="margin-top:8px;">
-        <div class="metric-sub" style="margin-bottom:3px;">
-          🗂 VRAM · <span id="val-gpu-vrampct-{{ gi }}">{{ '%.0f'%vram_pct }}%</span>
-        </div>
-        <div class="progress-bar" style="height:6px;">
-          <div class="progress-fill {% if vram_pct>85 %}red{% elif vram_pct>60 %}yellow{% else %}pink{% endif %}"
-               id="bar-gpu-vram-{{ gi }}" style="width:{{ [vram_pct,100]|min }}%"></div>
-        </div>
-        <div class="metric-sub" id="val-gpu-vram-{{ gi }}" style="margin-top:3px;">
-          {{ vram_used_s }} / {{ vram_tot_s }}
-        </div>
-      </div>
-      {% endif %}
-      <!-- Nvidia temp -->
-      {% if g_temp > 0 %}
-      <div class="metric-sub" id="val-gpu-temp-{{ gi }}" style="margin-top:6px;">
-        🌡️ {{ '%.0f'|format(g_temp) }}°C
-      </div>
-      {% endif %}
-      {% endif %}
-
-    </div><!-- /left -->
-
-    <!-- Chart panel -->
-    <div class="metric-row-right" style="display:flex;flex-direction:column;gap:0;">
-      {% if gtype == 'intel' %}
-        <div class="chart-label">GPU Load % (overall)</div>
-        <div style="height:90px;position:relative;"><canvas id="chart-gpu-load-{{ gi }}"></canvas></div>
-        <div class="chart-label" style="margin-top:8px;">Package Power (W)</div>
-        <div style="height:70px;position:relative;"><canvas id="chart-gpu-pwr-{{ gi }}"></canvas></div>
-      {% else %}
-        <div class="chart-label">GPU Load % — last 60 readings</div>
-        <div style="height:70px;position:relative;"><canvas id="chart-gpu-load-{{ gi }}"></canvas></div>
-        {% if g_vmem_total > 0 %}
-        <div class="chart-label" style="margin-top:6px;">VRAM Usage % — last 60 readings</div>
-        <div style="height:55px;position:relative;"><canvas id="chart-gpu-vram-{{ gi }}"></canvas></div>
-        {% endif %}
-      {% endif %}
     </div>
 
+    {% if gtype == 'intel' %}
+    <div class="gpu-intel-grid">
+      <div>Compute <b id="val-gpu-compute-{{ idx }}">{{ '%.0f'%g_compute }}%</b></div>
+      <div>Render <b id="val-gpu-render-{{ idx }}">{{ '%.0f'%g_render }}%</b></div>
+      <div>Video <b id="val-gpu-video-{{ idx }}">{{ '%.0f'%g_video }}%</b></div>
+      <div>RC6 Idle <b id="val-gpu-rc6-{{ idx }}">{{ '%.0f'%g_rc6 }}%</b></div>
+      <div>GPU Pwr <b id="val-gpu-pwrgpu-{{ idx }}" style="color:#f59e0b;">{{ '%.1f'%g_pwrgpu }}W</b></div>
+      <div>Pkg Pwr <b id="val-gpu-pwrpkg-{{ idx }}" style="color:#f59e0b;">{{ '%.1f'%g_pwrpkg }}W</b></div>
+      <div style="grid-column:1/-1;">Freq <b id="val-gpu-freq-{{ idx }}" style="color:#00d4ff;">{{ '%.0f'%g_freq }} MHz</b></div>
+    </div>
+    {% else %}
+    {% if g_vmem_total > 0 %}
+    {% set vram_used_s = ('%.1f GB'%(g_vmem_used/1024)) if g_vmem_used >= 1024 else ('%.0f MB'%g_vmem_used) %}
+    {% set vram_tot_s  = ('%.1f GB'%(g_vmem_total/1024)) if g_vmem_total >= 1024 else ('%.0f MB'%g_vmem_total) %}
+    <div class="gpu-side-metric">
+      <div class="gpu-side-metric-row"><span>VRAM Usage</span><b id="val-gpu-vrampct-{{ idx }}">{{ '%.0f'%vram_pct }}%</b></div>
+      <div class="gpu-side-bar"><div class="gpu-side-bar-fill" id="bar-gpu-vram-{{ idx }}" style="width:{{ [vram_pct,100]|min }}%;background:{{ accent }};"></div></div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:-4px;margin-bottom:8px;" id="val-gpu-vram-{{ idx }}">{{ vram_used_s }} / {{ vram_tot_s }}</div>
+    </div>
+    {% endif %}
+    <div class="gpu-side-metric-row"><span>Temperature</span><b id="val-gpu-temp-{{ idx }}" style="color:#f59e0b;">{{ '%.0f'%g_temp }}°C</b></div>
+    {% endif %}
   </div>
-  {% endfor %}
+
+  <div style="min-width:0;">
+    <div class="gpu-stats-row">
+      <div class="gpu-stat-pill"><div class="gpu-stat-pill-lbl">Average Load</div><div class="gpu-stat-pill-val" id="gpu-stat-avg-{{ gi }}" style="color:{{ accent }};">{{ gh.stats.avg if gh else 0 }}%</div></div>
+      <div class="gpu-stat-pill"><div class="gpu-stat-pill-lbl">Min Load</div><div class="gpu-stat-pill-val" id="gpu-stat-min-{{ gi }}" style="color:{{ accent }};">{{ gh.stats.min if gh else 0 }}%</div></div>
+      <div class="gpu-stat-pill"><div class="gpu-stat-pill-lbl">Max Load</div><div class="gpu-stat-pill-val" id="gpu-stat-max-{{ gi }}" style="color:{{ accent }};">{{ gh.stats.max if gh else 0 }}%</div></div>
+      <div class="gpu-stat-pill"><div class="gpu-stat-pill-lbl">Time &gt; 50%</div><div class="gpu-stat-pill-val" id="gpu-stat-t50-{{ gi }}" style="color:{{ accent }};">{{ gh.stats.time_above_50 if gh else '0m 0s' }}</div></div>
+      <div class="gpu-stat-pill"><div class="gpu-stat-pill-lbl">Time &gt; 80%</div><div class="gpu-stat-pill-val" id="gpu-stat-t80-{{ gi }}" style="color:{{ accent }};">{{ gh.stats.time_above_80 if gh else '0m 0s' }}</div></div>
+    </div>
+    <div class="dash-card-title" style="margin-bottom:8px;">GPU LOAD (%)</div>
+    <div style="height:220px;position:relative;"><canvas id="gpu-chart-{{ gi }}"></canvas></div>
+  </div>
+</div>
+{% endfor %}
 
 {% else %}
 <div class="gpu-unavail">
@@ -692,68 +653,30 @@ function toggleAlerts() {
 </div>
 {% endif %}
 
-<!-- ═══ DISK PARTITIONS ═══ -->
-<div class="disk-section">
-  <div class="disk-section-title">
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-    Disk Partitions
-    <span style="font-size:10px;color:var(--text-muted);font-weight:400;margin-left:4px;">(squashfs / snap loops hidden)</span>
-  </div>
-  <div class="disk-items-grid" id="disk-items-grid">
-    {% set real_disks = disks | selectattr('fstype', 'ne', 'squashfs') | list %}
-    {% for disk in real_disks %}
-    {% set pct   = disk.percent  | float %}
-    {% set used  = disk.used_gb  if disk.used_gb  is defined else 0 %}
-    {% set total = disk.total_gb if disk.total_gb is defined else 0 %}
-    {% set free  = disk.free_gb  if disk.free_gb  is defined else (total - used) %}
-    <div class="disk-item">
-      <div class="disk-item-header">
-        <div>
-          <div class="disk-mount">{{ disk.mountpoint }}</div>
-          <div class="disk-fstype">{{ disk.device or '' }} &bull; {{ disk.fstype or '' }}</div>
-        </div>
-        <span class="disk-pct-badge {% if pct>85 %}disk-pct-red{% elif pct>60 %}disk-pct-yellow{% else %}disk-pct-green{% endif %}">
-          {{ '%.1f'%pct }}%
-        </span>
-      </div>
-      <div class="storage-bar-wrap">
-        <div class="storage-bar">
-          <div class="storage-bar-used {% if pct>85 %}progress-fill red{% elif pct>60 %}progress-fill yellow{% else %}progress-fill green{% endif %}"
-               style="width:{{ [pct,100]|min }}%"></div>
-        </div>
-        <div class="storage-legend">
-          <div class="storage-legend-item">
-            <div class="storage-legend-dot" style="background:{% if pct>85 %}#ef4444{% elif pct>60 %}#f59e0b{% else %}#22c55e{% endif %}"></div>
-            Used {{ '%.1f'%used }} GB
-          </div>
-          <div class="storage-legend-item">
-            <div class="storage-legend-dot" style="background:rgba(255,255,255,.2)"></div>
-            Free {{ '%.1f'%free }} GB
-          </div>
-          {% if total > 0 %}
-          <div class="storage-legend-item" style="margin-left:auto;">Total {{ '%.1f'%total }} GB</div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-    {% else %}
-    <p style="font-size:13px;color:var(--text-muted)">No disk data.</p>
-    {% endfor %}
-  </div>
-</div>
-
-<!-- ═══ ALERT HISTORY (full log) ═══ -->
+<!-- ═══ ALERT HISTORY (paginated, 10 per page) ═══ -->
 <div class="info-card">
-  <div class="card-section-title">Alert History</div>
-  {% for a in alert_history %}
-  <div class="proc-row">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span class="badge badge-warning">{{ a.alert_type }}</span>
-      <span style="font-size:12px;">{{ a.subject }}</span>
-    </div>
-    <span style="font-size:11px;color:var(--text-muted);">{{ a.sent_at.strftime('%m-%d %H:%M') if a.sent_at else '—' }}</span>
+  <div class="card-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+    <span>Alert History</span>
+    <span style="font-size:11px;color:var(--text-muted);font-weight:400;" id="alert-hist-range"></span>
   </div>
-  {% else %}<p style="font-size:13px;color:var(--text-muted)">No alerts for this machine.</p>{% endfor %}
+  <div id="alert-hist-list">
+    {% for a in alert_history %}
+    <div class="proc-row">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-warning">{{ a.alert_type }}</span>
+        <span style="font-size:12px;">{{ a.subject }}</span>
+      </div>
+      <span style="font-size:11px;color:var(--text-muted);">{{ a.sent_at.strftime('%m-%d %H:%M') if a.sent_at else '—' }}</span>
+    </div>
+    {% else %}<p style="font-size:13px;color:var(--text-muted)">No alerts for this machine.</p>{% endfor %}
+  </div>
+  {% if alert_total and alert_total > 10 %}
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+    <button type="button" class="btn btn-ghost btn-sm" id="alert-hist-prev" onclick="alertHistPage(-1)" disabled>← Prev</button>
+    <span style="font-size:11px;color:var(--text-muted);" id="alert-hist-status"></span>
+    <button type="button" class="btn btn-ghost btn-sm" id="alert-hist-next" onclick="alertHistPage(1)">Next →</button>
+  </div>
+  {% endif %}
 </div>
 
 <!-- ═══ Chart expand modal ═══ -->
@@ -822,53 +745,10 @@ cpuData  = padArr(cpuData);  ramData  = padArr(ramData);
 swapData = padArr(swapData); tempData = padArr(tempData);
 sentData = padArr(sentData); recvData = padArr(recvData);
 
-// ── GPU metadata from Jinja (type, initial load, has-vram flag) ──
-// gpuMeta[idx] = { type, initLoad, initPwr, hasVram, initVramPct }
-const gpuMeta = {};
-{% if gpus %}
-  {% for gpu in gpus %}
-  {% set gi    = loop.index %}
-  {% set gtype = gpu.type | default('unknown') | lower %}
-  {% if gtype == 'intel' %}
-    {% set init_load = gpu.gpu_percent     | default(0) | float %}
-    {% set init_pwr  = gpu.power_package_w | default(0) | float %}
-    gpuMeta[{{ gi }}] = {
-      type: 'intel',
-      initLoad: {{ init_load }},
-      initPwr:  {{ init_pwr }},
-      hasVram:  false,
-      initVramPct: 0
-    };
-  {% else %}
-    {% set init_load  = gpu.load_percent   | default(gpu.gpu_percent    | default(0)) | float %}
-    {% set vmem_used  = gpu.memory_used_mb | default(gpu.mem_used_mb    | default(0)) | float %}
-    {% set vmem_total = gpu.memory_total_mb| default(gpu.mem_total_mb   | default(0)) | float %}
-    {% set init_vpct  = (vmem_used / vmem_total * 100) if vmem_total > 0 else 0 %}
-    gpuMeta[{{ gi }}] = {
-      type: 'nvidia',
-      initLoad: {{ init_load }},
-      initPwr:  0,
-      hasVram:  {{ 'true' if vmem_total > 0 else 'false' }},
-      initVramPct: {{ init_vpct | round(1) }}
-    };
-  {% endif %}
-  {% endfor %}
-{% endif %}
-
-// ── Build pre-seeded GPU history arrays (flat at initial value) ──
-// Each array has MAX_POINTS entries, all equal to the first real reading.
-// This makes the graph show a flat historical line at the correct level
-// instead of a spike from 0.
-const gpuLoadHist = {};   // load % for all GPUs
-const gpuPwrHist  = {};   // pkg power for Intel
-const gpuVramHist = {};   // vram % for Nvidia
-
-Object.keys(gpuMeta).forEach(function(idx) {
-  var m = gpuMeta[idx];
-  gpuLoadHist[idx] = Array(MAX_POINTS).fill(m.initLoad);
-  gpuPwrHist[idx]  = Array(MAX_POINTS).fill(m.initPwr);
-  gpuVramHist[idx] = Array(MAX_POINTS).fill(m.initVramPct);
-});
+// ── GPU Load Overview — real historical data (no fake flat-seeded arrays) ──
+// GPU_HISTORY_INITIAL.gpus[i] = { index, name, type, load: [...], vram_pct: [...]|null, stats: {avg,min,max,time_above_50,time_above_80} }
+const GPU_HISTORY_INITIAL = {{ gpu_history | tojson }};
+var gpuCharts = {};  // { [gpuIndex]: { ring, area, accent } }
 
 // ── New dashboard widget helpers: donut, ring, gauge-needle, bar, multi-line ──
 
@@ -1197,43 +1077,81 @@ setText('ring-swap-val', '{{ '%.0f'%(latest.swap_percent or 0) if latest else 0 
 })();
 {% endif %}
 
-// ── Init GPU charts — canvas IDs now use 'chart-gpu-load-N' ──
-// (The dashboard grid above intentionally does NOT duplicate per-GPU
-// metrics — the detailed GPU section below already auto-detects however
-// many GPUs are reported and shows each one's full metric set: Nvidia gets
-// load/VRAM/temp, Intel gets compute/render/video/RC6/power/freq.)
-var gpuLoadChart = {};   // chart objects, keyed by GPU index
-var gpuPwrChart  = {};
-var gpuVramChart = {};
+// ── GPU Load Overview — ring + big area chart per GPU, driven by real
+// historical data from /gpu-history (not the old flat-seeded fake arrays) ──
+function buildGpuTimeLabels(rawLabels) {
+  if (!rawLabels.length) return [];
+  var lastTs = new Date(rawLabels[rawLabels.length - 1]);
+  return rawLabels.map(function(l, i) {
+    if (i === rawLabels.length - 1) return 'Now';
+    var minsAgo = Math.round((lastTs - new Date(l)) / 60000);
+    return minsAgo > 0 ? minsAgo + 'm ago' : '';
+  });
+}
 
-Object.keys(gpuMeta).forEach(function(idx) {
-  var m = gpuMeta[idx];
+function makeGpuAreaChart(canvasId, dataArr, lbls, color) {
+  var el = document.getElementById(canvasId);
+  if (!el) return null;
+  return new Chart(el, {
+    type: 'line',
+    data: { labels: lbls, datasets: [{
+      data: dataArr, borderColor: color, backgroundColor: makeGradientFill(color),
+      cubicInterpolationMode: 'monotone', tension: 0.4, fill: true,
+      borderWidth: 2, borderCapStyle: 'round', borderJoinStyle: 'round', pointRadius: 0,
+    }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: 'rgba(15,18,28,.95)', padding: 8, cornerRadius: 6, displayColors: false },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 9 }, maxTicksLimit: 7, autoSkip: true } },
+        y: { min: 0, max: 100, grid: { color: 'rgba(37,42,58,.6)', borderDash: [3, 4] }, border: { display: false },
+             ticks: { font: { size: 9 }, callback: function(v) { return v + '%'; } } }
+      }
+    }
+  });
+}
 
-  // Load chart — every GPU type has this
-  gpuLoadChart[idx] = makeChart(
-    'chart-gpu-load-' + idx,
-    gpuLoadHist[idx],
-    '#e879f9',
-    100
-  );
+function initGpuCharts() {
+  var lbls = buildGpuTimeLabels(GPU_HISTORY_INITIAL.labels || []);
+  (GPU_HISTORY_INITIAL.gpus || []).forEach(function(g) {
+    var accent = g.type === 'intel' ? '#3b82f6' : '#a855f7';
+    var lastLoad = g.load.length ? (g.load[g.load.length - 1] || 0) : 0;
+    var ring = makeRing('gpu-ring-' + g.index, lastLoad, accent);
+    var area = makeGpuAreaChart('gpu-chart-' + g.index, g.load, lbls, accent);
+    gpuCharts[g.index] = { ring: ring, area: area, accent: accent };
+  });
+}
+initGpuCharts();
 
-  if (m.type === 'intel') {
-    // Intel gets a package-power chart
-    gpuPwrChart[idx] = makeChart(
-      'chart-gpu-pwr-' + idx,
-      gpuPwrHist[idx],
-      '#f59e0b'
-    );
-  } else if (m.hasVram) {
-    // Nvidia gets a VRAM % chart
-    gpuVramChart[idx] = makeChart(
-      'chart-gpu-vram-' + idx,
-      gpuVramHist[idx],
-      '#7c3aed',
-      100
-    );
+async function loadGpuHistory(minutes) {
+  try {
+    var r = await fetch('/servers/' + TABLE + '/gpu-history?minutes=' + minutes);
+    var d = await r.json();
+    if (d.error || !d.gpus) return;
+    var lbls = buildGpuTimeLabels(d.labels || []);
+    d.gpus.forEach(function(g) {
+      var c = gpuCharts[g.index];
+      if (!c) return;
+      c.area.data.labels = lbls;
+      c.area.data.datasets[0].data = g.load;
+      c.area.update('none');
+      var lastLoad = g.load.length ? (g.load[g.load.length - 1] || 0) : 0;
+      updateRing(c.ring, lastLoad);
+      setText('gpu-ring-val-' + g.index, lastLoad.toFixed(0) + '%');
+      setText('gpu-stat-avg-' + g.index, g.stats.avg + '%');
+      setText('gpu-stat-min-' + g.index, g.stats.min + '%');
+      setText('gpu-stat-max-' + g.index, g.stats.max + '%');
+      setText('gpu-stat-t50-' + g.index, g.stats.time_above_50);
+      setText('gpu-stat-t80-' + g.index, g.stats.time_above_80);
+    });
+  } catch (e) {
+    console.error('gpu history fetch failed', e);
   }
-});
+}
 
 // ── Helpers ──
 function pushPoint(chart, val, label) {
@@ -1283,44 +1201,6 @@ function escapeHtml(s) {
   var d = document.createElement('div');
   d.textContent = s == null ? '' : String(s);
   return d.innerHTML;
-}
-
-// Rebuilds the Disk Partitions cards from a fresh disk_partitions array —
-// mirrors the initial Jinja render (same fstype filter, same color bands).
-function renderDisks(disks) {
-  var grid = document.getElementById('disk-items-grid');
-  if (!grid || !Array.isArray(disks)) return;
-
-  var real = disks.filter(function(d) { return (d.fstype || '') !== 'squashfs'; });
-  if (!real.length) {
-    grid.innerHTML = '<p style="font-size:13px;color:var(--text-muted)">No disk data.</p>';
-    return;
-  }
-
-  grid.innerHTML = real.map(function(disk) {
-    var pct   = parseFloat(disk.percent || 0);
-    var used  = disk.used_gb  !== undefined ? parseFloat(disk.used_gb)  : 0;
-    var total = disk.total_gb !== undefined ? parseFloat(disk.total_gb) : 0;
-    var free  = disk.free_gb  !== undefined ? parseFloat(disk.free_gb) : (total - used);
-    var band  = pct > 85 ? 'red' : pct > 60 ? 'yellow' : 'green';
-    var dotColor = pct > 85 ? '#ef4444' : pct > 60 ? '#f59e0b' : '#22c55e';
-
-    return '<div class="disk-item">' +
-      '<div class="disk-item-header"><div>' +
-        '<div class="disk-mount">' + escapeHtml(disk.mountpoint) + '</div>' +
-        '<div class="disk-fstype">' + escapeHtml(disk.device || '') + ' &bull; ' + escapeHtml(disk.fstype || '') + '</div>' +
-      '</div>' +
-      '<span class="disk-pct-badge disk-pct-' + band + '">' + pct.toFixed(1) + '%</span></div>' +
-      '<div class="storage-bar-wrap">' +
-        '<div class="storage-bar"><div class="storage-bar-used progress-fill ' + band + '" style="width:' + Math.min(pct,100) + '%"></div></div>' +
-        '<div class="storage-legend">' +
-          '<div class="storage-legend-item"><div class="storage-legend-dot" style="background:' + dotColor + '"></div>Used ' + used.toFixed(1) + ' GB</div>' +
-          '<div class="storage-legend-item"><div class="storage-legend-dot" style="background:rgba(255,255,255,.2)"></div>Free ' + free.toFixed(1) + ' GB</div>' +
-          (total > 0 ? '<div class="storage-legend-item" style="margin-left:auto;">Total ' + total.toFixed(1) + ' GB</div>' : '') +
-        '</div>' +
-      '</div>' +
-    '</div>';
-  }).join('');
 }
 
 // ── Main poll ──
@@ -1463,17 +1343,14 @@ async function pollLive() {
       setText('proc-donut-center', String(d.top_processes.length));
     }
 
-    // Disk Partitions detail section further down the page still lives on
-    if (d.disk_partitions) renderDisks(d.disk_partitions);
-
-    // ── GPU live update — detailed per-GPU section only (auto-detects
-    // however many GPUs are reported; no duplicate simplified widgets in
-    // the dashboard grid above) ──
+    // ── GPU live update — feeds both the ring/area chart (GPU Load
+    // Overview) and the per-type detail metrics (compute/render/VRAM/etc) ──
     // /live must return: d.gpus = list from gpu_info jsonb column
     if (d.gpus && Array.isArray(d.gpus)) {
       d.gpus.forEach(function(gpu, i) {
-        var idx   = i + 1;                            // 1-based, matches Jinja gi
+        var idx   = i + 1;                            // 1-based, matches Jinja idx for sub-metrics
         var gtype = (gpu.type || '').toLowerCase();
+        var gc = gpuCharts[i];                         // 0-based, matches gpu_history's index
 
         if (gtype === 'intel') {
           // ── Intel ──
@@ -1486,7 +1363,6 @@ async function pollLive() {
           var pwrGpu  = parseFloat(gpu.power_gpu_w       || 0);
           var pwrPkg  = parseFloat(gpu.power_package_w   || 0);
 
-          setText('val-gpu-load-'    + idx, load.toFixed(0)    + '%');
           setText('val-gpu-compute-' + idx, compute.toFixed(0) + '%');
           setText('val-gpu-render-'  + idx, render.toFixed(0)  + '%');
           setText('val-gpu-video-'   + idx, video.toFixed(0)   + '%');
@@ -1494,10 +1370,12 @@ async function pollLive() {
           setText('val-gpu-freq-'    + idx, freq.toFixed(0)    + ' MHz');
           setText('val-gpu-pwrgpu-'  + idx, pwrGpu.toFixed(1)  + 'W');
           setText('val-gpu-pwrpkg-'  + idx, pwrPkg.toFixed(1)  + 'W');
-          setWidth('bar-gpu-load-'   + idx, load);
 
-          pushPoint(gpuLoadChart[idx], load,   now);
-          pushPoint(gpuPwrChart[idx],  pwrPkg, now);
+          if (gc) {
+            pushPoint(gc.area, load, now);
+            updateRing(gc.ring, load);
+            setText('gpu-ring-val-' + i, load.toFixed(0) + '%');
+          }
 
         } else {
           // ── Nvidia (handles both old & new field names) ──
@@ -1506,23 +1384,21 @@ async function pollLive() {
           var vTotal = parseFloat(gpu.memory_total_mb || gpu.mem_total_mb || 0);
           var temp_g = parseFloat(gpu.temperature     || gpu.temp_c       || 0);
 
-          setText('val-gpu-load-' + idx, load.toFixed(0) + '%');
-          setWidth('bar-gpu-load-' + idx, load);
-
-          var vPct = 0;
           if (vTotal > 0) {
-            vPct = (vUsed / vTotal) * 100;
+            var vPct = (vUsed / vTotal) * 100;
             setWidth('bar-gpu-vram-'    + idx, vPct);
             setText('val-gpu-vrampct-'  + idx, vPct.toFixed(0) + '%');
-            setText('val-gpu-vram-'     + idx,
-              fmtVram(vUsed) + ' / ' + fmtVram(vTotal));
-            pushPoint(gpuVramChart[idx], vPct, now);
+            setText('val-gpu-vram-'     + idx, fmtVram(vUsed) + ' / ' + fmtVram(vTotal));
           }
 
           if (temp_g > 0)
-            setText('val-gpu-temp-' + idx, '🌡️ ' + temp_g.toFixed(0) + '°C');
+            setText('val-gpu-temp-' + idx, temp_g.toFixed(0) + '°C');
 
-          pushPoint(gpuLoadChart[idx], load, now);
+          if (gc) {
+            pushPoint(gc.area, load, now);
+            updateRing(gc.ring, load);
+            setText('gpu-ring-val-' + i, load.toFixed(0) + '%');
+          }
         }
       });
     }
@@ -1859,5 +1735,55 @@ document.querySelectorAll('#modal-hist-presets .hist-preset-btn').forEach(functi
     loadModalHistory();
   });
 });
+
+// ── Alert History pagination — 10 per page ───────────────────────────────
+var alertHistState = { offset: 0, limit: 10, total: {{ alert_total or 0 }} };
+
+function renderAlertRows(alerts) {
+  var list = document.getElementById('alert-hist-list');
+  if (!list) return;
+  if (!alerts.length) {
+    list.innerHTML = '<p style="font-size:13px;color:var(--text-muted)">No alerts for this machine.</p>';
+    return;
+  }
+  list.innerHTML = alerts.map(function(a) {
+    return '<div class="proc-row">' +
+      '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<span class="badge badge-warning">' + escapeHtml(a.alert_type) + '</span>' +
+        '<span style="font-size:12px;">' + escapeHtml(a.subject) + '</span>' +
+      '</div>' +
+      '<span style="font-size:11px;color:var(--text-muted);">' + escapeHtml(a.sent_at) + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+function updateAlertHistControls() {
+  var prevBtn = document.getElementById('alert-hist-prev');
+  var nextBtn = document.getElementById('alert-hist-next');
+  var status  = document.getElementById('alert-hist-status');
+  if (!prevBtn || !nextBtn) return;
+  var start = alertHistState.total ? alertHistState.offset + 1 : 0;
+  var end   = Math.min(alertHistState.offset + alertHistState.limit, alertHistState.total);
+  if (status) status.textContent = alertHistState.total ? (start + '–' + end + ' of ' + alertHistState.total) : '';
+  prevBtn.disabled = alertHistState.offset <= 0;
+  nextBtn.disabled = alertHistState.offset + alertHistState.limit >= alertHistState.total;
+}
+
+async function alertHistPage(direction) {
+  var newOffset = alertHistState.offset + direction * alertHistState.limit;
+  if (newOffset < 0 || newOffset >= alertHistState.total) return;
+  try {
+    var r = await fetch('/servers/' + TABLE + '/alert-history?offset=' + newOffset + '&limit=' + alertHistState.limit);
+    var d = await r.json();
+    if (d.error) return;
+    alertHistState.offset = d.offset;
+    alertHistState.total  = d.total;
+    renderAlertRows(d.alerts);
+    updateAlertHistControls();
+  } catch (e) {
+    console.error('alert history fetch failed', e);
+  }
+}
+updateAlertHistControls();
 </script>
 {% endblock %}

@@ -41,6 +41,165 @@ def index():
     return render_template("servers.html", machines=machines)
 
 
+def _gpu_history_stats(table_name, minutes=60):
+    """
+    Downsampled per-GPU history (~200 points) + summary stats (avg/min/max
+    load, time spent above 50%/80%) over the last N minutes. Uses the same
+    window-function downsampling as the main /history endpoint, since a
+    machine polling every few seconds could have thousands of raw rows in a
+    60-minute window.
+    """
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(f"""
+            SELECT ts, gpu_info
+            FROM (
+                SELECT ts, gpu_info,
+                       ROW_NUMBER() OVER (ORDER BY ts) AS rn,
+                       COUNT(*) OVER () AS total
+                FROM {table_name}
+                WHERE ts > NOW() - INTERVAL '{int(minutes)} minutes' AND gpu_info IS NOT NULL
+            ) t
+            WHERE rn %% GREATEST(total / 200, 1) = 0
+            ORDER BY ts ASC
+        """)
+        rows = cur.fetchall()
+
+    if not rows:
+        return {"labels": [], "gpus": []}
+
+    labels = [str(r["ts"]) for r in rows]
+
+    # Some rows may have fewer GPUs than others (e.g. captured before a
+    # second GPU came online) — use the max seen so nothing gets dropped.
+    max_gpus = 0
+    for r in rows:
+        raw = r["gpu_info"]
+        arr = json.loads(raw) if isinstance(raw, str) else (raw or [])
+        max_gpus = max(max_gpus, len(arr))
+
+    window_secs = max((rows[-1]["ts"] - rows[0]["ts"]).total_seconds(), 1)
+
+    def _fmt_secs(s):
+        s = int(s)
+        m, sec = divmod(s, 60)
+        h, m = divmod(m, 60)
+        return f"{h}h {m}m {sec}s" if h else f"{m}m {sec}s"
+
+    gpus_out = []
+    for gi in range(max_gpus):
+        loads, vrams = [], []
+        name, gtype = None, "unknown"
+        for r in rows:
+            raw = r["gpu_info"]
+            arr = json.loads(raw) if isinstance(raw, str) else (raw or [])
+            if gi < len(arr):
+                g = arr[gi]
+                gtype = (g.get("type") or "unknown").lower()
+                name = g.get("name") or name
+                if gtype == "intel":
+                    loads.append(float(g.get("gpu_percent") or 0))
+                    vrams.append(None)
+                else:
+                    loads.append(float(g.get("load_percent") or g.get("gpu_percent") or 0))
+                    vt = float(g.get("memory_total_mb") or g.get("mem_total_mb") or 0)
+                    vu = float(g.get("memory_used_mb")  or g.get("mem_used_mb")  or 0)
+                    vrams.append(round(vu / vt * 100, 1) if vt > 0 else None)
+            else:
+                loads.append(None)
+                vrams.append(None)
+
+        clean = [v for v in loads if v is not None]
+        if clean:
+            avg_load = sum(clean) / len(clean)
+            min_load = min(clean)
+            max_load = max(clean)
+            above_50 = sum(1 for v in clean if v >= 50) / len(clean) * window_secs
+            above_80 = sum(1 for v in clean if v >= 80) / len(clean) * window_secs
+        else:
+            avg_load = min_load = max_load = above_50 = above_80 = 0
+
+        has_vram = any(v is not None for v in vrams)
+        gpus_out.append({
+            "index": gi,
+            "name": name or f"GPU {gi + 1}",
+            "type": gtype,
+            "load": loads,
+            "vram_pct": vrams if has_vram else None,
+            "stats": {
+                "avg": round(avg_load, 1),
+                "min": round(min_load, 1),
+                "max": round(max_load, 1),
+                "time_above_50": _fmt_secs(above_50),
+                "time_above_80": _fmt_secs(above_80),
+            }
+        })
+
+    return {"labels": labels, "gpus": gpus_out}
+
+
+@servers_bp.route("/<table_name>/gpu-history")
+@login_required
+def gpu_history(table_name):
+    _check_access(table_name)
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM machine_registry WHERE table_name=%s", (table_name,))
+        if not cur.fetchone():
+            return jsonify({"error": "not found"}), 404
+    try:
+        minutes = max(5, min(int(request.args.get("minutes", "60")), 10080))
+    except ValueError:
+        minutes = 60
+    try:
+        return jsonify(_gpu_history_stats(table_name, minutes))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@servers_bp.route("/<table_name>/alert-history")
+@login_required
+def alert_history_page(table_name):
+    """Paginated alert history for this machine — 10 per page by default."""
+    _check_access(table_name)
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT system_name, location FROM machine_registry WHERE table_name=%s", (table_name,))
+        m = cur.fetchone()
+        if not m:
+            return jsonify({"error": "not found"}), 404
+        machine_key = f"{m['system_name']}@{m['location']}"
+
+        try:
+            offset = max(0, int(request.args.get("offset", "0")))
+            limit  = max(1, min(int(request.args.get("limit", "10")), 100))
+        except ValueError:
+            offset, limit = 0, 10
+
+        cur.execute("SELECT COUNT(*) AS cnt FROM alert_log WHERE machine_key=%s", (machine_key,))
+        total = cur.fetchone()["cnt"]
+
+        cur.execute("""
+            SELECT alert_type, subject, sent_at, success
+            FROM alert_log WHERE machine_key=%s
+            ORDER BY sent_at DESC
+            LIMIT %s OFFSET %s
+        """, (machine_key, limit, offset))
+        rows = cur.fetchall()
+
+    return jsonify({
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "alerts": [{
+            "alert_type": r["alert_type"],
+            "subject": r["subject"],
+            "sent_at": r["sent_at"].strftime("%m-%d %H:%M") if r["sent_at"] else "—",
+            "success": r["success"],
+        } for r in rows],
+    })
+
+
 @servers_bp.route("/<table_name>")
 @login_required
 def detail(table_name):
@@ -68,11 +227,14 @@ def detail(table_name):
         """)
         history_rows = list(reversed(cur.fetchall()))
 
-        # Alert log for this machine
+        # Alert log for this machine — first page only (10); rest loads via
+        # /alert-history as the person clicks Next.
         machine_key = f"{machine['system_name']}@{machine['location']}"
+        cur.execute("SELECT COUNT(*) AS cnt FROM alert_log WHERE machine_key=%s", (machine_key,))
+        alert_total = cur.fetchone()["cnt"]
         cur.execute("""
             SELECT alert_type, subject, sent_at, success
-            FROM alert_log WHERE machine_key=%s ORDER BY sent_at DESC LIMIT 20
+            FROM alert_log WHERE machine_key=%s ORDER BY sent_at DESC LIMIT 10
         """, (machine_key,))
         alert_history = cur.fetchall()
 
@@ -161,11 +323,14 @@ def detail(table_name):
                 gpu_vram_pct = round(gpu_vram_used_mb / gpu_vram_total_mb * 100, 1)
 
     # ── Primary disk for the Disk Usage donut — root filesystem if present,
-    # else the first non-squashfs partition. The full per-partition
-    # breakdown remains in the Disk Partitions section further down.
+    # else the first non-squashfs partition.
     real_disks = [d for d in disks if d.get("fstype") != "squashfs"]
     disk_primary = next((d for d in real_disks if d.get("mountpoint") == "/"), None) \
                    or (real_disks[0] if real_disks else None)
+
+    # ── Per-GPU history + stats (last 60 minutes by default) for the
+    # redesigned GPU Load Overview section ──
+    gpu_history = _gpu_history_stats(table_name, 60) if gpus else {"labels": [], "gpus": []}
 
     # ── Process status tally — counts within the sampled top_processes list
     # only (your agent reports a "top N by usage" sample, not every process
@@ -182,6 +347,7 @@ def detail(table_name):
         gpus=gpus,
         procs=procs,
         alert_history=alert_history,
+        alert_total=alert_total,
         chart_labels=json.dumps(chart_labels),
         chart_cpu=json.dumps(chart_cpu),
         chart_ram=json.dumps(chart_ram),
@@ -200,6 +366,7 @@ def detail(table_name):
         gpu_vram_used_mb=gpu_vram_used_mb,
         gpu_vram_total_mb=gpu_vram_total_mb,
         disk_primary=disk_primary,
+        gpu_history=gpu_history,
         proc_status_counts=proc_status_counts,
     )
 
