@@ -10,7 +10,7 @@
 .server-meta{font-size:12px;color:var(--text-muted);margin-top:3px;}
 
 /* ── Metric Row Card ── */
-.metric-row{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:0;margin-bottom:14px;overflow:hidden;display:grid;grid-template-columns:220px 1fr;min-height:94px;}
+.metric-row{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:0;margin-bottom:14px;overflow:hidden;display:grid;grid-template-columns:220px 1fr;min-height:150px;}
 @media(max-width:700px){.metric-row{grid-template-columns:1fr;}}
 .metric-row-left{padding:16px 20px;display:flex;flex-direction:column;justify-content:center;border-right:1px solid var(--border);position:relative;overflow:hidden;}
 .metric-row-left::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;opacity:.6;}
@@ -217,7 +217,7 @@ function toggleAlerts() {
   </div>
   <div class="metric-row-right">
     <div class="chart-label">CPU % — last 60 readings</div>
-    <canvas id="chart-cpu" height="60"></canvas>
+    <div style="height:120px;position:relative;"><canvas id="chart-cpu"></canvas></div>
   </div>
 </div>
 
@@ -234,7 +234,7 @@ function toggleAlerts() {
   </div>
   <div class="metric-row-right">
     <div class="chart-label">RAM % — last 60 readings</div>
-    <canvas id="chart-ram" height="60"></canvas>
+    <div style="height:120px;position:relative;"><canvas id="chart-ram"></canvas></div>
   </div>
 </div>
 
@@ -249,7 +249,7 @@ function toggleAlerts() {
   </div>
   <div class="metric-row-right">
     <div class="chart-label">Temperature °C — last 60 readings</div>
-    <canvas id="chart-temp" height="60"></canvas>
+    <div style="height:120px;position:relative;"><canvas id="chart-temp"></canvas></div>
   </div>
 </div>
 
@@ -266,7 +266,7 @@ function toggleAlerts() {
   </div>
   <div class="metric-row-right">
     <div class="chart-label">Swap % — last 60 readings</div>
-    <canvas id="chart-swap" height="60"></canvas>
+    <div style="height:120px;position:relative;"><canvas id="chart-swap"></canvas></div>
   </div>
 </div>
 
@@ -282,7 +282,7 @@ function toggleAlerts() {
   </div>
   <div class="metric-row-right">
     <div class="chart-label">Upload KB/s — last 60 readings</div>
-    <canvas id="chart-net-up" height="60"></canvas>
+    <div style="height:120px;position:relative;"><canvas id="chart-net-up"></canvas></div>
   </div>
 </div>
 
@@ -298,7 +298,7 @@ function toggleAlerts() {
   </div>
   <div class="metric-row-right">
     <div class="chart-label">Download KB/s — last 60 readings</div>
-    <canvas id="chart-net-down" height="60"></canvas>
+    <div style="height:120px;position:relative;"><canvas id="chart-net-down"></canvas></div>
   </div>
 </div>
 
@@ -433,15 +433,15 @@ function toggleAlerts() {
     <div class="metric-row-right" style="display:flex;flex-direction:column;gap:0;">
       {% if gtype == 'intel' %}
         <div class="chart-label">GPU Load % (overall)</div>
-        <canvas id="chart-gpu-load-{{ gi }}" height="55"></canvas>
+        <div style="height:90px;position:relative;"><canvas id="chart-gpu-load-{{ gi }}"></canvas></div>
         <div class="chart-label" style="margin-top:8px;">Package Power (W)</div>
-        <canvas id="chart-gpu-pwr-{{ gi }}" height="45"></canvas>
+        <div style="height:70px;position:relative;"><canvas id="chart-gpu-pwr-{{ gi }}"></canvas></div>
       {% else %}
         <div class="chart-label">GPU Load % — last 60 readings</div>
-        <canvas id="chart-gpu-load-{{ gi }}" height="45"></canvas>
+        <div style="height:70px;position:relative;"><canvas id="chart-gpu-load-{{ gi }}"></canvas></div>
         {% if g_vmem_total > 0 %}
         <div class="chart-label" style="margin-top:6px;">VRAM Usage % — last 60 readings</div>
-        <canvas id="chart-gpu-vram-{{ gi }}" height="35"></canvas>
+        <div style="height:55px;position:relative;"><canvas id="chart-gpu-vram-{{ gi }}"></canvas></div>
         {% endif %}
       {% endif %}
     </div>
@@ -720,6 +720,7 @@ function makeChart(canvasId, dataArr, color, yMax) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       animation: false,
       interaction: { intersect: false, mode: 'index' },
       plugins: {
