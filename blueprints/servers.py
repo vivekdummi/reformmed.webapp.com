@@ -41,6 +41,31 @@ def index():
     return render_template("servers.html", machines=machines)
 
 
+def _safe_gpu_list(raw):
+    """
+    Parse a gpu_info cell into a list of GPU dicts, tolerating shapes that
+    don't match what the current agent writes (a legacy single dict instead
+    of a list, a malformed JSON string, non-dict entries, etc.) — one bad
+    historical row shouldn't take down the whole page.
+    """
+    try:
+        arr = json.loads(raw) if isinstance(raw, str) else (raw or [])
+    except Exception:
+        return []
+    if isinstance(arr, dict):
+        arr = [arr]
+    if not isinstance(arr, list):
+        return []
+    return [g for g in arr if isinstance(g, dict)]
+
+
+def _safe_float(v, default=0.0):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return default
+
+
 def _gpu_history_stats(table_name, minutes=60):
     """
     Downsampled per-GPU history (~200 points) + summary stats (avg/min/max
@@ -74,9 +99,7 @@ def _gpu_history_stats(table_name, minutes=60):
     # second GPU came online) — use the max seen so nothing gets dropped.
     max_gpus = 0
     for r in rows:
-        raw = r["gpu_info"]
-        arr = json.loads(raw) if isinstance(raw, str) else (raw or [])
-        max_gpus = max(max_gpus, len(arr))
+        max_gpus = max(max_gpus, len(_safe_gpu_list(r["gpu_info"])))
 
     window_secs = max((rows[-1]["ts"] - rows[0]["ts"]).total_seconds(), 1)
 
@@ -91,19 +114,18 @@ def _gpu_history_stats(table_name, minutes=60):
         loads, vrams = [], []
         name, gtype = None, "unknown"
         for r in rows:
-            raw = r["gpu_info"]
-            arr = json.loads(raw) if isinstance(raw, str) else (raw or [])
+            arr = _safe_gpu_list(r["gpu_info"])
             if gi < len(arr):
                 g = arr[gi]
                 gtype = (g.get("type") or "unknown").lower()
                 name = g.get("name") or name
                 if gtype == "intel":
-                    loads.append(float(g.get("gpu_percent") or 0))
+                    loads.append(_safe_float(g.get("gpu_percent")))
                     vrams.append(None)
                 else:
-                    loads.append(float(g.get("load_percent") or g.get("gpu_percent") or 0))
-                    vt = float(g.get("memory_total_mb") or g.get("mem_total_mb") or 0)
-                    vu = float(g.get("memory_used_mb")  or g.get("mem_used_mb")  or 0)
+                    loads.append(_safe_float(g.get("load_percent") or g.get("gpu_percent")))
+                    vt = _safe_float(g.get("memory_total_mb") or g.get("mem_total_mb"))
+                    vu = _safe_float(g.get("memory_used_mb")  or g.get("mem_used_mb"))
                     vrams.append(round(vu / vt * 100, 1) if vt > 0 else None)
             else:
                 loads.append(None)
@@ -329,8 +351,16 @@ def detail(table_name):
                    or (real_disks[0] if real_disks else None)
 
     # ── Per-GPU history + stats (last 60 minutes by default) for the
-    # redesigned GPU Load Overview section ──
-    gpu_history = _gpu_history_stats(table_name, 60) if gpus else {"labels": [], "gpus": []}
+    # redesigned GPU Load Overview section — wrapped so a bug in this
+    # brand-new code can't 500 the whole page; CPU/RAM/etc. still load.
+    if gpus:
+        try:
+            gpu_history = _gpu_history_stats(table_name, 60)
+        except Exception as e:
+            print(f"[servers] gpu_history_stats failed for {table_name}: {e}")
+            gpu_history = {"labels": [], "gpus": []}
+    else:
+        gpu_history = {"labels": [], "gpus": []}
 
     # ── Process status tally — counts within the sampled top_processes list
     # only (your agent reports a "top N by usage" sample, not every process
