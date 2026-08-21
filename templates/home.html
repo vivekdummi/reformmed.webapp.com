@@ -28,7 +28,46 @@
     <div class="stat-value" style="color:var(--yellow)" id="stat-alerts">—</div>
     <div class="stat-label">Alerts Today</div>
   </div>
+  {% if dvr_summary and dvr_summary.total %}
+  <a href="{{ url_for('dvr.index') }}" class="stat-card total" style="text-decoration:none;display:block;">
+    <div class="stat-value" style="color:var(--accent)">{{ dvr_summary.online }}<span style="font-size:14px;color:var(--text-muted);">/{{ dvr_summary.total }}</span></div>
+    <div class="stat-label">DVRs Online</div>
+  </a>
+  {% endif %}
+  {% if dbmon_summary and dbmon_summary.total %}
+  <a href="{{ url_for('dbmonitor.index') }}" class="stat-card total" style="text-decoration:none;display:block;">
+    <div class="stat-value" style="color:var(--accent)">{{ dbmon_summary.total }}</div>
+    <div class="stat-label">DB Tables Watched</div>
+  </a>
+  {% endif %}
 </div>
+
+{% if attention %}
+<!-- Machines needing attention -->
+<div class="card mb-2">
+  <div class="card-title" style="display:flex;align-items:center;gap:8px;">
+    <span style="color:var(--yellow);">⚠</span> Needs Attention
+    <span style="font-size:11px;color:var(--text-muted);font-weight:400;">(CPU/RAM/disk ≥ 90%, temp ≥ 80°C — checked on page load)</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Machine</th><th class="hide-mobile">Location</th><th>Why</th><th></th></tr></thead>
+      <tbody>
+        {% for a in attention %}
+        <tr>
+          <td><span class="mono" style="font-size:12px">{{ a.system_name }}</span></td>
+          <td class="text-muted hide-mobile">{{ a.location }}</td>
+          <td>
+            {% for reason in a.reasons %}<span class="badge badge-offline" style="margin-right:4px;">{{ reason }}</span>{% endfor %}
+          </td>
+          <td><a href="{{ url_for('servers.detail', table_name=a.table_name) }}" class="btn btn-ghost btn-sm">View →</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
 
 <!-- Recent machines -->
 <div class="card mb-2">
