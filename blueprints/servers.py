@@ -1,5 +1,5 @@
 import json
-from flask import Blueprint, render_template, abort, jsonify
+from flask import Blueprint, render_template, abort, jsonify, request
 from flask_login import login_required, current_user
 from db import get_db
 
@@ -153,10 +153,74 @@ def toggle_alerts(table_name):
     return jsonify({"alerts_enabled": row["alerts_enabled"]})
 
 
-@servers_bp.route("/<table_name>/live")
+@servers_bp.route("/<table_name>/history")
+@login_required
+def history(table_name):
+    """
+    Historical metrics for an arbitrary date range, for the chart date-filter.
+    Evenly downsampled to ~300 points via a window function so a multi-day
+    range doesn't ship (and chart) tens of thousands of raw rows.
+    """
+    _check_access(table_name)
+    start = request.args.get("start", "").strip()
+    end   = request.args.get("end", "").strip()
+    if not start or not end:
+        return jsonify({"error": "Pick both a start and end date/time."}), 400
+
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM machine_registry WHERE table_name=%s", (table_name,))
+        if not cur.fetchone():
+            return jsonify({"error": "not found"}), 404
+
+        try:
+            cur.execute(f"""
+                SELECT ts, cpu_percent, ram_percent, swap_percent, cpu_temp,
+                       net_bytes_sent, net_bytes_recv
+                FROM (
+                    SELECT ts, cpu_percent, ram_percent, swap_percent, cpu_temp,
+                           net_bytes_sent, net_bytes_recv,
+                           ROW_NUMBER() OVER (ORDER BY ts) AS rn,
+                           COUNT(*) OVER () AS total
+                    FROM {table_name}
+                    WHERE ts BETWEEN %s AND %s
+                ) t
+                WHERE rn %% GREATEST(total / 300, 1) = 0
+                ORDER BY ts ASC
+            """, (start, end))
+            rows = cur.fetchall()
+        except Exception as e:
+            return jsonify({"error": f"Invalid date range: {e}"}), 400
+
+    if not rows:
+        return jsonify({
+            "labels": [], "cpu": [], "ram": [], "swap": [], "temp": [],
+            "net_sent": [], "net_recv": [], "count": 0,
+        })
+
+    labels = [str(r["ts"]) for r in rows]
+    cpu  = [r["cpu_percent"]  or 0 for r in rows]
+    ram  = [r["ram_percent"]  or 0 for r in rows]
+    swap = [r["swap_percent"] or 0 for r in rows]
+    temp = [r["cpu_temp"]     or 0 for r in rows]
+
+    net_sent, net_recv = [], []
+    for i, r in enumerate(rows):
+        if i == 0:
+            net_sent.append(0)
+            net_recv.append(0)
+        else:
+            prev = rows[i - 1]
+            net_sent.append(max(0, (r["net_bytes_sent"] or 0) - (prev["net_bytes_sent"] or 0)) // 1024)
+            net_recv.append(max(0, (r["net_bytes_recv"] or 0) - (prev["net_bytes_recv"] or 0)) // 1024)
+
+    return jsonify({
+        "labels": labels, "cpu": cpu, "ram": ram, "swap": swap, "temp": temp,
+        "net_sent": net_sent, "net_recv": net_recv, "count": len(rows),
+    })
 @login_required
 def live(table_name):
-    """JSON endpoint polled every 10 s by the detail page."""
+    """JSON endpoint polled every 2s by the detail page."""
     _check_access(table_name)
 
     with get_db() as conn:
@@ -168,8 +232,10 @@ def live(table_name):
 
         cur.execute(f"""
             SELECT ts, cpu_percent, ram_percent, swap_percent,
+                   swap_used_gb, swap_total_gb,
                    net_bytes_sent, net_bytes_recv, cpu_temp, cpu_freq_mhz,
-                   ram_used_gb, ram_total_gb, uptime_seconds, disk_partitions
+                   ram_used_gb, ram_total_gb, uptime_seconds,
+                   disk_partitions, gpu_info, top_processes
             FROM {table_name} ORDER BY ts DESC LIMIT 2
         """)
         rows = cur.fetchall()
@@ -180,6 +246,17 @@ def live(table_name):
     raw_dp = latest.pop("disk_partitions", None)
     if raw_dp:
         latest["disk_partitions"] = json.loads(raw_dp) if isinstance(raw_dp, str) else raw_dp
+
+    # GPU info — the frontend's pollLive() reads d.gpus (matches the "gpus"
+    # key the initial page render also uses), not the raw column name.
+    raw_gpus = latest.pop("gpu_info", None)
+    if raw_gpus:
+        latest["gpus"] = json.loads(raw_gpus) if isinstance(raw_gpus, str) else raw_gpus
+
+    # Top processes
+    raw_procs = latest.pop("top_processes", None)
+    if raw_procs:
+        latest["top_processes"] = json.loads(raw_procs) if isinstance(raw_procs, str) else raw_procs
 
     # Network KB/s
     if len(rows) >= 2:

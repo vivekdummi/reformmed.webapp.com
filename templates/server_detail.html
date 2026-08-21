@@ -80,6 +80,16 @@
 .pair-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
 @media(max-width:700px){.pair-row{grid-template-columns:1fr;}}
 .mini-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 20px;}
+
+/* ── History range filter bar ── */
+.history-bar{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px 18px;margin-bottom:14px;}
+.history-bar-row{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;}
+.history-field{display:flex;flex-direction:column;gap:4px;}
+.history-field label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;}
+.history-field input{padding:6px 10px;font-size:12px;}
+.history-status{font-size:12px;color:var(--text-muted);margin-left:auto;}
+.history-status.warn{color:#f59e0b;}
+.history-status.err{color:#ef4444;}
 </style>
 {% endblock %}
 
@@ -148,6 +158,23 @@ function toggleAlerts() {
     .catch(() => {});
 }
 </script>
+
+<!-- ═══ History range filter ═══ -->
+<div class="history-bar" id="history-bar">
+  <div class="history-bar-row">
+    <div class="history-field">
+      <label>From</label>
+      <input type="datetime-local" id="hist-from">
+    </div>
+    <div class="history-field">
+      <label>To</label>
+      <input type="datetime-local" id="hist-to">
+    </div>
+    <button type="button" class="btn btn-primary btn-sm" onclick="loadHistory()">View Range</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="hist-live-btn" onclick="backToLive()" style="display:none;">← Back to Live</button>
+    <span id="hist-status" class="history-status"></span>
+  </div>
+</div>
 
 <!-- ═══ CPU ═══ -->
 <div class="metric-row">
@@ -430,7 +457,7 @@ function toggleAlerts() {
     Disk Partitions
     <span style="font-size:10px;color:var(--text-muted);font-weight:400;margin-left:4px;">(squashfs / snap loops hidden)</span>
   </div>
-  <div class="disk-items-grid">
+  <div class="disk-items-grid" id="disk-items-grid">
     {% set real_disks = disks | selectattr('fstype', 'ne', 'squashfs') | list %}
     {% for disk in real_disks %}
     {% set pct   = disk.percent  | float %}
@@ -479,6 +506,7 @@ function toggleAlerts() {
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline;vertical-align:middle;margin-right:4px;"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
     Top Processes
   </div>
+  <div id="procs-list">
   {% for p in procs %}
   <div class="proc-row">
     <span class="mono" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
@@ -490,6 +518,7 @@ function toggleAlerts() {
     </span>
   </div>
   {% else %}<p style="font-size:13px;color:var(--text-muted)">No process data.</p>{% endfor %}
+  </div>
 </div>
 
 <!-- ═══ MACHINE INFO + ALERTS ═══ -->
@@ -610,10 +639,25 @@ function hexFill(hex, alpha) {
   return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
 }
 
+// Vertical gradient (rich color at top fading to transparent) instead of a
+// flat fill — this is what gives the "financial dashboard" look: the fill
+// reads as a soft glow under the line rather than a flat block of color.
+function makeGradientFill(hex) {
+  return function(context) {
+    var chart = context.chart;
+    var ctx = chart.ctx, chartArea = chart.chartArea;
+    if (!chartArea) return hexFill(hex, 0.1);  // first render pass, area not known yet
+    var gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+    gradient.addColorStop(0,   hexFill(hex, 0.38));
+    gradient.addColorStop(0.6, hexFill(hex, 0.12));
+    gradient.addColorStop(1,   hexFill(hex, 0.0));
+    return gradient;
+  };
+}
+
 function makeChart(canvasId, dataArr, color, yMax) {
   var el = document.getElementById(canvasId);
   if (!el) return null;
-  var fill = color.charAt(0) === '#' ? hexFill(color, 0.08) : color;
   return new Chart(el, {
     type: 'line',
     data: {
@@ -621,17 +665,37 @@ function makeChart(canvasId, dataArr, color, yMax) {
       datasets: [{
         data: dataArr.slice(),
         borderColor: color,
-        backgroundColor: fill,
-        tension: 0.35,
+        backgroundColor: makeGradientFill(color),
+        // 'monotone' gives a smooth flowing curve like the reference charts
+        // without the overshoot/undershoot a plain tension curve can cause
+        // on percentage data (e.g. dipping below 0 or above 100 near spikes).
+        cubicInterpolationMode: 'monotone',
+        tension: 0.4,
         fill: true,
-        borderWidth: 1.5,
-        pointRadius: 0
+        borderWidth: 2,
+        borderCapStyle: 'round',
+        borderJoinStyle: 'round',
+        pointRadius: 0,
+        pointHoverRadius: 3,
+        pointHoverBackgroundColor: color,
+        pointHitRadius: 8,
       }]
     },
     options: {
       responsive: true,
       animation: false,
-      plugins: { legend: { display: false } },
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(15,18,28,.95)',
+          titleFont: { size: 10 },
+          bodyFont: { size: 11 },
+          padding: 8,
+          cornerRadius: 6,
+          displayColors: false,
+        },
+      },
       scales: {
         x: { display: false },
         y: {
@@ -733,8 +797,75 @@ function fmtVram(mb) {
   return Math.round(mb) + ' MB';
 }
 
+function escapeHtml(s) {
+  var d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+
+// Rebuilds the Disk Partitions cards from a fresh disk_partitions array —
+// mirrors the initial Jinja render (same fstype filter, same color bands).
+function renderDisks(disks) {
+  var grid = document.getElementById('disk-items-grid');
+  if (!grid || !Array.isArray(disks)) return;
+
+  var real = disks.filter(function(d) { return (d.fstype || '') !== 'squashfs'; });
+  if (!real.length) {
+    grid.innerHTML = '<p style="font-size:13px;color:var(--text-muted)">No disk data.</p>';
+    return;
+  }
+
+  grid.innerHTML = real.map(function(disk) {
+    var pct   = parseFloat(disk.percent || 0);
+    var used  = disk.used_gb  !== undefined ? parseFloat(disk.used_gb)  : 0;
+    var total = disk.total_gb !== undefined ? parseFloat(disk.total_gb) : 0;
+    var free  = disk.free_gb  !== undefined ? parseFloat(disk.free_gb) : (total - used);
+    var band  = pct > 85 ? 'red' : pct > 60 ? 'yellow' : 'green';
+    var dotColor = pct > 85 ? '#ef4444' : pct > 60 ? '#f59e0b' : '#22c55e';
+
+    return '<div class="disk-item">' +
+      '<div class="disk-item-header"><div>' +
+        '<div class="disk-mount">' + escapeHtml(disk.mountpoint) + '</div>' +
+        '<div class="disk-fstype">' + escapeHtml(disk.device || '') + ' &bull; ' + escapeHtml(disk.fstype || '') + '</div>' +
+      '</div>' +
+      '<span class="disk-pct-badge disk-pct-' + band + '">' + pct.toFixed(1) + '%</span></div>' +
+      '<div class="storage-bar-wrap">' +
+        '<div class="storage-bar"><div class="storage-bar-used progress-fill ' + band + '" style="width:' + Math.min(pct,100) + '%"></div></div>' +
+        '<div class="storage-legend">' +
+          '<div class="storage-legend-item"><div class="storage-legend-dot" style="background:' + dotColor + '"></div>Used ' + used.toFixed(1) + ' GB</div>' +
+          '<div class="storage-legend-item"><div class="storage-legend-dot" style="background:rgba(255,255,255,.2)"></div>Free ' + free.toFixed(1) + ' GB</div>' +
+          (total > 0 ? '<div class="storage-legend-item" style="margin-left:auto;">Total ' + total.toFixed(1) + ' GB</div>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// Rebuilds the Top Processes list — mirrors the initial Jinja render
+// (same field fallbacks: name/pid, cpu_percent/cpu, memory_percent/mem/memory).
+function renderProcs(procs) {
+  var list = document.getElementById('procs-list');
+  if (!list || !Array.isArray(procs)) return;
+
+  if (!procs.length) {
+    list.innerHTML = '<p style="font-size:13px;color:var(--text-muted)">No process data.</p>';
+    return;
+  }
+
+  list.innerHTML = procs.map(function(p) {
+    var name = p.name || p.pid || '?';
+    var cpu  = parseFloat(p.cpu_percent !== undefined ? p.cpu_percent : (p.cpu || 0));
+    var ram  = parseFloat(p.memory_percent !== undefined ? p.memory_percent : (p.mem !== undefined ? p.mem : (p.memory || 0)));
+    return '<div class="proc-row">' +
+      '<span class="mono" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(name) + '</span>' +
+      '<span style="color:var(--text-muted);">CPU ' + cpu.toFixed(1) + '% &nbsp; RAM ' + ram.toFixed(1) + '%</span>' +
+    '</div>';
+  }).join('');
+}
+
 // ── Main poll ──
 async function pollLive() {
+  if (typeof histBaseState !== 'undefined' && histBaseState) return;  // browsing history — don't overwrite it
   try {
     var r = await fetch('/servers/' + TABLE + '/live');
     if (!r.ok) return;
@@ -779,6 +910,12 @@ async function pollLive() {
     if (d.swap_used_gb !== undefined && d.swap_total_gb !== undefined)
       setText('val-swap-detail',
         d.swap_used_gb.toFixed(1) + ' / ' + d.swap_total_gb.toFixed(1) + ' GB');
+
+    // Disk + processes — these don't change every 2s in reality, but the
+    // page is labeled "Live · 2s refresh" so they should track /live too
+    // instead of freezing at whatever was on the page at load time.
+    if (d.disk_partitions) renderDisks(d.disk_partitions);
+    if (d.top_processes)   renderProcs(d.top_processes);
 
     setBar('bar-cpu',  cpu);
     setBar('bar-ram',  ram);
@@ -863,8 +1000,111 @@ async function pollLive() {
 {% if machine.status == 'offline' %}
 // Machine is offline — do not poll live data
 // Charts show last recorded historical data
+var liveInterval = null;
 {% else %}
-setInterval(pollLive, 2000);
+var liveInterval = setInterval(pollLive, 2000);
 {% endif %}
+
+// ── History range filter ─────────────────────────────────────────────────
+// Lets the person pick an older date/time window and see it charted instead
+// of the live last-60-readings view. Swaps chart data in place (same Chart.js
+// instances) rather than rebuilding charts, and pauses live polling while
+// browsing so the fetched history doesn't get overwritten mid-view.
+var histBaseState = null;  // snapshot of live-mode chart data, for "Back to Live"
+
+function snapshotLiveState() {
+  return {
+    labels: labels.slice(),
+    cpu: cpuData.slice(), ram: ramData.slice(), swap: swapData.slice(),
+    temp: tempData.slice(), sent: sentData.slice(), recv: recvData.slice(),
+  };
+}
+
+function setChartData(chart, lbls, data) {
+  if (!chart) return;
+  chart.data.labels = lbls;
+  chart.data.datasets[0].data = data;
+  chart.update('none');
+}
+
+function fmtHistLabel(iso) {
+  // "2026-08-21T10:30:00" -> "08-21 10:30"
+  var t = String(iso).replace('T', ' ');
+  return t.length >= 16 ? t.slice(5, 16) : t;
+}
+
+async function loadHistory() {
+  var fromEl  = document.getElementById('hist-from');
+  var toEl    = document.getElementById('hist-to');
+  var status  = document.getElementById('hist-status');
+  var liveBtn = document.getElementById('hist-live-btn');
+
+  if (!fromEl.value || !toEl.value) {
+    status.textContent = 'Pick both a From and To date/time.';
+    status.className = 'history-status warn';
+    return;
+  }
+
+  status.textContent = 'Loading…';
+  status.className = 'history-status';
+
+  try {
+    var url = '/servers/' + TABLE + '/history' +
+      '?start=' + encodeURIComponent(fromEl.value) +
+      '&end='   + encodeURIComponent(toEl.value);
+    var r = await fetch(url);
+    var d = await r.json();
+
+    if (d.error) {
+      status.textContent = d.error;
+      status.className = 'history-status err';
+      return;
+    }
+    if (!d.count) {
+      status.textContent = 'No data in that range.';
+      status.className = 'history-status warn';
+      return;
+    }
+
+    // Snapshot live data + pause polling the first time we enter history mode
+    if (!histBaseState) {
+      histBaseState = snapshotLiveState();
+      if (liveInterval) { clearInterval(liveInterval); liveInterval = null; }
+    }
+
+    var lbls = d.labels.map(fmtHistLabel);
+    setChartData(charts.cpu,     lbls, d.cpu);
+    setChartData(charts.ram,     lbls, d.ram);
+    setChartData(charts.swap,    lbls, d.swap);
+    setChartData(charts.temp,    lbls, d.temp);
+    setChartData(charts.netUp,   lbls, d.net_sent);
+    setChartData(charts.netDown, lbls, d.net_recv);
+
+    status.textContent = d.count + ' points loaded for that range.';
+    status.className = 'history-status';
+    liveBtn.style.display = '';
+  } catch (e) {
+    status.textContent = 'Failed to load history.';
+    status.className = 'history-status err';
+  }
+}
+
+function backToLive() {
+  if (!histBaseState) return;
+  setChartData(charts.cpu,     histBaseState.labels, histBaseState.cpu);
+  setChartData(charts.ram,     histBaseState.labels, histBaseState.ram);
+  setChartData(charts.swap,    histBaseState.labels, histBaseState.swap);
+  setChartData(charts.temp,    histBaseState.labels, histBaseState.temp);
+  setChartData(charts.netUp,   histBaseState.labels, histBaseState.sent);
+  setChartData(charts.netDown, histBaseState.labels, histBaseState.recv);
+  histBaseState = null;
+
+  document.getElementById('hist-live-btn').style.display = 'none';
+  document.getElementById('hist-status').textContent = '';
+
+  {% if machine.status != 'offline' %}
+  if (!liveInterval) liveInterval = setInterval(pollLive, 2000);
+  {% endif %}
+}
 </script>
 {% endblock %}
