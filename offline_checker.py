@@ -177,8 +177,21 @@ async def _get_machine_overrides(conn) -> dict:
 
 
 def _effective_config(global_config: dict, machine_overrides: dict) -> dict:
-    """Merge global config with this machine's overrides (override wins per type)."""
-    return {**global_config, **machine_overrides}
+    """
+    Threshold and cooldown always come from the global System Alert config —
+    those are fleet-wide settings, not overridable per machine. A machine's
+    override can only change two things per alert type: whether it's enabled
+    for that machine, and who gets notified for it.
+    """
+    merged = {atype: dict(cfg) for atype, cfg in global_config.items()}
+    for atype, ocfg in machine_overrides.items():
+        base = dict(merged.get(atype, {}))
+        if "enabled" in ocfg and ocfg["enabled"] is not None:
+            base["enabled"] = ocfg["enabled"]
+        if ocfg.get("notify_emails"):
+            base["notify_emails"] = ocfg["notify_emails"]
+        merged[atype] = base
+    return merged
 
 
 def _recipients(config: dict, atype: str) -> list[str]:

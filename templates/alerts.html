@@ -44,7 +44,6 @@
               <th>Enabled</th>
               <th>Threshold</th>
               <th class="hide-mobile">Cooldown</th>
-              <th>Notify Emails</th>
               <th class="hide-mobile">Updated</th>
               <th>Test</th>
             </tr>
@@ -84,9 +83,6 @@
                 <input type="number" name="cooldown_{{ c.id }}" value="{{ c.cooldown_minutes }}"
                        min="1" max="1440" style="width:70px"> min
               </td>
-              <td style="min-width:220px;">
-                {{ macros.recipient_picker('emails_' ~ c.id, recipients, c.notify_emails) }}
-              </td>
               <td class="text-muted hide-mobile" style="font-size:12px">
                 {{ c.updated_at.strftime('%m-%d %H:%M') if c.updated_at else '—' }}
               </td>
@@ -97,6 +93,9 @@
             {% endfor %}
           </tbody>
         </table>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">
+        Who gets notified is set per-machine in the <a href="#machine" onclick="showTab('alerts','machine')" style="color:var(--accent);">Machine Alerts</a> tab, not here.
       </div>
       <div style="margin-top:14px">
         <button type="submit" class="btn btn-primary">Save System Alerts</button>
@@ -132,61 +131,46 @@
 
   {% if current_user.is_admin %}
   <div class="card mb-2">
-    <div class="card-title">Add Machine Alert Rule</div>
+    <div class="card-title">Machine Alert Rules</div>
     <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">
-      A rule here overrides the fleet-wide System Alert of the same type, for that one machine only —
-      e.g. give a server you expect to run hot its own higher temperature threshold instead of
-      triggering the global rule every time.
+      Pick a machine to see all six alert types for it — each one you edit here overrides the
+      fleet-wide System Alert of the same type, for that machine only. Unselected here just falls
+      back to the global rule.
     </div>
-    <form method="POST" action="{{ url_for('alerts.add_machine_alert') }}">
-      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
-        <div class="form-group" style="flex:1;min-width:200px;margin-bottom:0;">
-          <label>Machine</label>
-          <select name="table_name" required>
-            <option value="">— Select a machine —</option>
-            {% for m in machines %}
-            <option value="{{ m.table_name }}">{{ m.system_name }} — {{ m.location }}</option>
-            {% endfor %}
-          </select>
+    <div class="form-group" style="max-width:360px;">
+      <label>Machine</label>
+      <select id="ma-machine-select" onchange="loadMachineAlertRules(this.value)">
+        <option value="">— Select a machine —</option>
+        {% for m in machines %}
+        <option value="{{ m.table_name }}">{{ m.system_name }} — {{ m.location }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div id="ma-rules-panel" style="display:none;margin-top:16px;">
+      <form id="ma-rules-form" method="POST">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Enabled</th>
+                <th>Notify Emails</th>
+              </tr>
+            </thead>
+            <tbody id="ma-rules-tbody">
+              <!-- filled by loadMachineAlertRules() -->
+            </tbody>
+          </table>
         </div>
-        <div class="form-group" style="min-width:140px;margin-bottom:0;">
-          <label>Alert Type</label>
-          <select name="alert_type" id="ma-alert-type" onchange="toggleMaThreshold(this)" required>
-            <option value="offline">🔴 offline</option>
-            <option value="online">🟢 online</option>
-            <option value="cpu" selected>🔥 cpu</option>
-            <option value="ram">🧠 ram</option>
-            <option value="disk">💿 disk</option>
-            <option value="temp">🌡️ temp</option>
-          </select>
-        </div>
-        <div class="form-group" style="min-width:90px;margin-bottom:0;">
-          <label>Enabled</label>
-          <select name="enabled">
-            <option value="1" selected>On</option>
-            <option value="0">Off</option>
-          </select>
-        </div>
-        <div class="form-group" id="ma-threshold-wrap" style="min-width:110px;margin-bottom:0;">
-          <label>Threshold</label>
-          <input type="number" name="threshold" id="ma-threshold-input" step="0.5" min="0" max="100" value="90">
-        </div>
-        <div class="form-group" style="min-width:110px;margin-bottom:0;">
-          <label>Cooldown (min)</label>
-          <input type="number" name="cooldown_minutes" value="10" min="1" max="1440">
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Notify Emails</label>
-        {{ macros.recipient_picker('recipient_emails', recipients, '') }}
-      </div>
-      <button type="submit" class="btn btn-primary" style="margin-top:8px;">Add Rule</button>
-    </form>
+        <button type="submit" class="btn btn-primary" style="margin-top:14px;">Save Machine Alert Rules</button>
+      </form>
+    </div>
   </div>
   {% endif %}
 
   <div class="card">
-    <div class="card-title">Machine Alert Rules</div>
+    <div class="card-title">All Machine Overrides <span style="font-size:11px;color:var(--text-muted);font-weight:400;">(across every machine)</span></div>
     <div class="table-wrap">
       <table>
         <thead>
@@ -194,8 +178,6 @@
             <th>Machine</th>
             <th>Type</th>
             <th>Enabled</th>
-            <th>Threshold</th>
-            <th class="hide-mobile">Cooldown</th>
             <th>Notify Emails</th>
             <th class="hide-mobile">Updated</th>
             {% if current_user.is_admin %}<th></th>{% endif %}
@@ -226,22 +208,8 @@
                 <option value="1" {% if o.enabled %}selected{% endif %}>On</option>
                 <option value="0" {% if not o.enabled %}selected{% endif %}>Off</option>
               </select>
-            </td>
-            <td>
-              {% if o.alert_type in ('cpu','ram','disk','temp') %}
-              <input form="ma-row-{{ o.id }}" type="number" name="threshold" value="{{ o.threshold }}"
-                     step="0.5" min="0" max="100" style="width:80px">
-              <span class="text-muted" style="font-size:11px">{% if o.alert_type=='temp' %}°C{% else %}%{% endif %}</span>
-              {% else %}
-              <span class="text-muted">N/A</span>
-              <input form="ma-row-{{ o.id }}" type="hidden" name="threshold" value="">
-              {% endif %}
               <input form="ma-row-{{ o.id }}" type="hidden" name="alert_type" value="{{ o.alert_type }}">
               <input form="ma-row-{{ o.id }}" type="hidden" name="table_name" value="{{ o.table_name }}">
-            </td>
-            <td class="hide-mobile">
-              <input form="ma-row-{{ o.id }}" type="number" name="cooldown_minutes" value="{{ o.cooldown_minutes }}"
-                     min="1" max="1440" style="width:70px"> min
             </td>
             <td style="min-width:220px;">
               {{ macros.recipient_picker('recipient_emails', recipients, o.notify_emails, form_id='ma-row-' ~ o.id) }}
@@ -256,15 +224,13 @@
             </td>
             {% else %}
             <td><span class="badge badge-{{ 'online' if o.enabled else 'offline' }}">{{ 'ON' if o.enabled else 'OFF' }}</span></td>
-            <td>{{ (o.threshold|string + ('°C' if o.alert_type=='temp' else '%')) if o.threshold is not none else 'N/A' }}</td>
-            <td class="hide-mobile">{{ o.cooldown_minutes }} min</td>
             <td style="font-size:12px;">{{ o.notify_emails or '—' }}</td>
             <td class="hide-mobile text-muted" style="font-size:12px">{{ o.updated_at.strftime('%m-%d %H:%M') if o.updated_at else '—' }}</td>
             {% endif %}
           </tr>
           {% else %}
-          <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px">
-            No per-machine alert rules yet — add one above to override a fleet-wide threshold for a specific machine.
+          <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">
+            No per-machine alert routing yet — select a machine above to set who gets notified for it.
           </td></tr>
           {% endfor %}
         </tbody>
@@ -457,13 +423,66 @@ function filterLog(){
   });
 }
 
-function toggleMaThreshold(select){
-  var wrap  = document.getElementById('ma-threshold-wrap');
-  var input = document.getElementById('ma-threshold-input');
-  var needsThreshold = ['cpu','ram','disk','temp'].indexOf(select.value) !== -1;
-  wrap.style.display = needsThreshold ? '' : 'none';
-  if (!needsThreshold) input.value = '';
-  else if (!input.value) input.value = select.value === 'temp' ? '80' : '90';
+const MA_RECIPIENTS = {{ recipients | tojson }};
+const MA_ICONS = {offline:'🔴', online:'🟢', cpu:'🔥', ram:'🧠', disk:'💿', temp:'🌡️'};
+
+function _maEscapeHtml(s){
+  var d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+
+async function loadMachineAlertRules(tableName){
+  var panel = document.getElementById('ma-rules-panel');
+  var tbody = document.getElementById('ma-rules-tbody');
+  var form  = document.getElementById('ma-rules-form');
+  if (!tableName){ panel.style.display = 'none'; return; }
+
+  form.action = '/alerts/machine/' + tableName + '/save-all';
+
+  var rows;
+  try {
+    var r = await fetch('/alerts/machine/' + encodeURIComponent(tableName) + '/overrides');
+    rows = await r.json();
+  } catch(e){ console.error('failed to load machine alert rules', e); return; }
+
+  tbody.innerHTML = rows.map(function(row){
+    var t = row.alert_type;
+    var selected = (row.notify_emails || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+
+    var recipientHtml = MA_RECIPIENTS.length
+      ? MA_RECIPIENTS.map(function(rc){
+          var checked = selected.indexOf(rc.email) !== -1;
+          return '<label class="recipient-chip' + (checked ? ' checked' : '') + '">' +
+            '<input type="checkbox" name="emails_' + t + '" value="' + _maEscapeHtml(rc.email) + '"' + (checked ? ' checked' : '') + '>' +
+            '<span>' + _maEscapeHtml(rc.label || rc.email) + '</span></label>';
+        }).join('')
+      : '<span class="recipient-picker-empty">No recipients yet — add some in Settings → Alert Recipients.</span>';
+
+    var overrideBadge = row.has_override
+      ? ' <span class="badge badge-info" style="font-size:9px;">override</span>'
+      : ' <span class="text-muted" style="font-size:10px;">(using global default)</span>';
+
+    return '<tr>' +
+      '<td><span style="font-size:16px">' + MA_ICONS[t] + '</span> <span class="mono" style="font-size:12px">' + t + '</span>' + overrideBadge + '</td>' +
+      '<td><select name="enabled_' + t + '" style="width:auto;padding:5px 8px">' +
+        '<option value="1"' + (row.enabled ? ' selected' : '') + '>On</option>' +
+        '<option value="0"' + (!row.enabled ? ' selected' : '') + '>Off</option>' +
+      '</select></td>' +
+      '<td style="min-width:220px;"><div class="recipient-picker">' + recipientHtml + '</div></td>' +
+    '</tr>';
+  }).join('');
+
+  // Wire chip highlight state for the freshly-inserted checkboxes (mirrors
+  // base.html's global recipient-chip handler, which only binds on page load)
+  tbody.querySelectorAll('.recipient-chip input[type="checkbox"]').forEach(function(cb){
+    cb.addEventListener('change', function(){
+      var chip = cb.closest('.recipient-chip');
+      if (chip) chip.classList.toggle('checked', cb.checked);
+    });
+  });
+
+  panel.style.display = '';
 }
 </script>
 {% endblock %}

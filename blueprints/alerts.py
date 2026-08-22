@@ -70,30 +70,90 @@ def update_config():
             enabled  = request.form.get(f"enabled_{aid}") == "1"
             threshold = request.form.get(f"threshold_{aid}", "").strip() or None
             cooldown  = request.form.get(f"cooldown_{aid}", "10").strip()
-            emails    = ", ".join(request.form.getlist(f"emails_{aid}"))
             try:
                 thresh_val   = float(threshold) if threshold else None
                 cooldown_val = int(cooldown)
             except ValueError:
                 flash(f"Invalid value for {atype}.", "danger")
                 return redirect(url_for("alerts.index"))
+            # Notify Emails is no longer set here — recipients are chosen
+            # per-machine in the Machine Alerts tab instead. This only
+            # touches enabled/threshold/cooldown, which stay fleet-wide.
             cur.execute("""
                 UPDATE alert_config
-                SET enabled=%s, threshold=%s, cooldown_minutes=%s,
-                    notify_emails=%s, updated_at=NOW()
+                SET enabled=%s, threshold=%s, cooldown_minutes=%s, updated_at=NOW()
                 WHERE id=%s
-            """, (enabled, thresh_val, cooldown_val, emails, aid))
+            """, (enabled, thresh_val, cooldown_val, aid))
     flash("System alert configuration saved.", "success")
     return redirect(url_for("alerts.index") + "#system")
+
+
+@alerts_bp.route("/machine/<table_name>/overrides")
+@login_required
+def machine_overrides_json(table_name):
+    """
+    Per-machine alert routing for one machine. Only 'enabled' and
+    'notify_emails' are configurable per machine — threshold and cooldown
+    always come from the fleet-wide System Alerts config (see alert_config),
+    not from here.
+    """
+    if not current_user.is_admin:
+        abort(403)
+    types = ["offline", "online", "cpu", "ram", "disk", "temp"]
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT alert_type, enabled FROM alert_config")
+        global_cfg = {r["alert_type"]: r for r in cur.fetchall()}
+        cur.execute("SELECT * FROM machine_alert_overrides WHERE table_name=%s", (table_name,))
+        existing = {r["alert_type"]: r for r in cur.fetchall()}
+
+    out = []
+    for t in types:
+        o = existing.get(t)
+        g = global_cfg.get(t, {})
+        out.append({
+            "alert_type": t,
+            "enabled": bool(o["enabled"]) if o else bool(g.get("enabled", True)),
+            "notify_emails": (o["notify_emails"] if o else "") or "",
+            "has_override": o is not None,
+        })
+    return jsonify(out)
+
+
+@alerts_bp.route("/machine/<table_name>/save-all", methods=["POST"])
+@login_required
+def save_machine_alerts_all(table_name):
+    """
+    Bulk-save the per-machine routing (enabled + recipients) for all six
+    alert types in one go. Threshold/cooldown aren't set here — those stay
+    fleet-wide, configured once in System Alerts.
+    """
+    if not current_user.is_admin:
+        abort(403)
+    types = ["offline", "online", "cpu", "ram", "disk", "temp"]
+    with get_db() as conn:
+        cur = conn.cursor()
+        for t in types:
+            enabled = request.form.get(f"enabled_{t}") == "1"
+            emails  = ", ".join(request.form.getlist(f"emails_{t}"))
+            cur.execute("""
+                INSERT INTO machine_alert_overrides
+                    (table_name, alert_type, enabled, notify_emails, updated_at)
+                VALUES (%s, %s, %s, %s, NOW())
+                ON CONFLICT (table_name, alert_type) DO UPDATE
+                SET enabled=EXCLUDED.enabled, notify_emails=EXCLUDED.notify_emails,
+                    updated_at=NOW()
+            """, (table_name, t, enabled, emails))
+    flash("Machine alert rules saved.", "success")
+    return redirect(url_for("alerts.index") + "#machine")
 
 
 @alerts_bp.route("/machine/add", methods=["POST"])
 @login_required
 def add_machine_alert():
     """
-    Create or update a per-machine alert override. A row for
-    (table_name, alert_type) takes precedence over the fleet-wide
-    alert_config rule of the same type, for that one machine only.
+    Create or update a per-machine alert override (enabled + recipients
+    only — threshold/cooldown stay fleet-wide, set once in System Alerts).
     """
     if not current_user.is_admin:
         abort(403)
@@ -103,29 +163,19 @@ def add_machine_alert():
         flash("Pick a machine and an alert type.", "danger")
         return redirect(url_for("alerts.index") + "#machine")
 
-    enabled   = request.form.get("enabled") == "1"
-    threshold = request.form.get("threshold", "").strip() or None
-    cooldown  = request.form.get("cooldown_minutes", "10").strip()
-    emails    = ", ".join(request.form.getlist("recipient_emails"))
-
-    try:
-        thresh_val   = float(threshold) if threshold else None
-        cooldown_val = int(cooldown)
-    except ValueError:
-        flash("Invalid threshold or cooldown value.", "danger")
-        return redirect(url_for("alerts.index") + "#machine")
+    enabled = request.form.get("enabled") == "1"
+    emails  = ", ".join(request.form.getlist("recipient_emails"))
 
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO machine_alert_overrides
-                (table_name, alert_type, enabled, threshold, cooldown_minutes, notify_emails, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                (table_name, alert_type, enabled, notify_emails, updated_at)
+            VALUES (%s, %s, %s, %s, NOW())
             ON CONFLICT (table_name, alert_type) DO UPDATE
-            SET enabled=EXCLUDED.enabled, threshold=EXCLUDED.threshold,
-                cooldown_minutes=EXCLUDED.cooldown_minutes, notify_emails=EXCLUDED.notify_emails,
+            SET enabled=EXCLUDED.enabled, notify_emails=EXCLUDED.notify_emails,
                 updated_at=NOW()
-        """, (table_name, atype, enabled, thresh_val, cooldown_val, emails))
+        """, (table_name, atype, enabled, emails))
     flash(f"Machine alert rule saved for {atype}.", "success")
     return redirect(url_for("alerts.index") + "#machine")
 
