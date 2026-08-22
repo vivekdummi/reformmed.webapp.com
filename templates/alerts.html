@@ -16,6 +16,9 @@
   <button class="tab-btn active" data-tabgroup="alerts" data-tabid="system" onclick="showTab('alerts','system')">
     🔔 System Alerts
   </button>
+  <button class="tab-btn" data-tabgroup="alerts" data-tabid="machine" onclick="showTab('alerts','machine')">
+    🖥️ Machine Alerts
+  </button>
   <button class="tab-btn" data-tabgroup="alerts" data-tabid="dvr" onclick="showTab('alerts','dvr')">
     📹 DVR Alerts
   </button>
@@ -122,6 +125,159 @@
     </div>
     {% endif %}
   </div>
+</div>
+
+<!-- ── MACHINE ALERTS (per-machine threshold overrides) ─────────────────── -->
+<div class="tab-panel" data-tabpanel="alerts" data-panelid="machine">
+
+  {% if current_user.is_admin %}
+  <div class="card mb-2">
+    <div class="card-title">Add Machine Alert Rule</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">
+      A rule here overrides the fleet-wide System Alert of the same type, for that one machine only —
+      e.g. give a server you expect to run hot its own higher temperature threshold instead of
+      triggering the global rule every time.
+    </div>
+    <form method="POST" action="{{ url_for('alerts.add_machine_alert') }}">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
+        <div class="form-group" style="flex:1;min-width:200px;margin-bottom:0;">
+          <label>Machine</label>
+          <select name="table_name" required>
+            <option value="">— Select a machine —</option>
+            {% for m in machines %}
+            <option value="{{ m.table_name }}">{{ m.system_name }} — {{ m.location }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="min-width:140px;margin-bottom:0;">
+          <label>Alert Type</label>
+          <select name="alert_type" id="ma-alert-type" onchange="toggleMaThreshold(this)" required>
+            <option value="offline">🔴 offline</option>
+            <option value="online">🟢 online</option>
+            <option value="cpu" selected>🔥 cpu</option>
+            <option value="ram">🧠 ram</option>
+            <option value="disk">💿 disk</option>
+            <option value="temp">🌡️ temp</option>
+          </select>
+        </div>
+        <div class="form-group" style="min-width:90px;margin-bottom:0;">
+          <label>Enabled</label>
+          <select name="enabled">
+            <option value="1" selected>On</option>
+            <option value="0">Off</option>
+          </select>
+        </div>
+        <div class="form-group" id="ma-threshold-wrap" style="min-width:110px;margin-bottom:0;">
+          <label>Threshold</label>
+          <input type="number" name="threshold" id="ma-threshold-input" step="0.5" min="0" max="100" value="90">
+        </div>
+        <div class="form-group" style="min-width:110px;margin-bottom:0;">
+          <label>Cooldown (min)</label>
+          <input type="number" name="cooldown_minutes" value="10" min="1" max="1440">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notify Emails</label>
+        {{ macros.recipient_picker('recipient_emails', recipients, '') }}
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-top:8px;">Add Rule</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-title">Machine Alert Rules</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Machine</th>
+            <th>Type</th>
+            <th>Enabled</th>
+            <th>Threshold</th>
+            <th class="hide-mobile">Cooldown</th>
+            <th>Notify Emails</th>
+            <th class="hide-mobile">Updated</th>
+            {% if current_user.is_admin %}<th></th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for o in machine_overrides %}
+          <tr>
+            <td>
+              <span class="mono" style="font-size:12px">{{ o.system_name or o.table_name }}</span>
+              {% if o.location %}<div class="text-muted" style="font-size:11px;">{{ o.location }}</div>{% endif %}
+            </td>
+            <td>
+              <span style="font-size:16px">
+                {% if o.alert_type=='offline' %}🔴
+                {% elif o.alert_type=='online' %}🟢
+                {% elif o.alert_type=='cpu' %}🔥
+                {% elif o.alert_type=='ram' %}🧠
+                {% elif o.alert_type=='disk' %}💿
+                {% elif o.alert_type=='temp' %}🌡️
+                {% else %}🔔{% endif %}
+              </span>
+              <span class="mono" style="font-size:12px">{{ o.alert_type }}</span>
+            </td>
+            {% if current_user.is_admin %}
+            <td>
+              <select form="ma-row-{{ o.id }}" name="enabled" style="width:auto;padding:5px 8px">
+                <option value="1" {% if o.enabled %}selected{% endif %}>On</option>
+                <option value="0" {% if not o.enabled %}selected{% endif %}>Off</option>
+              </select>
+            </td>
+            <td>
+              {% if o.alert_type in ('cpu','ram','disk','temp') %}
+              <input form="ma-row-{{ o.id }}" type="number" name="threshold" value="{{ o.threshold }}"
+                     step="0.5" min="0" max="100" style="width:80px">
+              <span class="text-muted" style="font-size:11px">{% if o.alert_type=='temp' %}°C{% else %}%{% endif %}</span>
+              {% else %}
+              <span class="text-muted">N/A</span>
+              <input form="ma-row-{{ o.id }}" type="hidden" name="threshold" value="">
+              {% endif %}
+              <input form="ma-row-{{ o.id }}" type="hidden" name="alert_type" value="{{ o.alert_type }}">
+              <input form="ma-row-{{ o.id }}" type="hidden" name="table_name" value="{{ o.table_name }}">
+            </td>
+            <td class="hide-mobile">
+              <input form="ma-row-{{ o.id }}" type="number" name="cooldown_minutes" value="{{ o.cooldown_minutes }}"
+                     min="1" max="1440" style="width:70px"> min
+            </td>
+            <td style="min-width:220px;">
+              {{ macros.recipient_picker('recipient_emails', recipients, o.notify_emails, form_id='ma-row-' ~ o.id) }}
+            </td>
+            <td class="text-muted hide-mobile" style="font-size:12px">
+              {{ o.updated_at.strftime('%m-%d %H:%M') if o.updated_at else '—' }}
+            </td>
+            <td style="display:flex;gap:6px;">
+              <button type="submit" form="ma-row-{{ o.id }}" class="btn btn-ghost btn-sm">Save</button>
+              <button type="submit" form="ma-del-{{ o.id }}" class="btn btn-danger btn-sm"
+                      onclick="return confirm('Remove this machine alert rule?')">Delete</button>
+            </td>
+            {% else %}
+            <td><span class="badge badge-{{ 'online' if o.enabled else 'offline' }}">{{ 'ON' if o.enabled else 'OFF' }}</span></td>
+            <td>{{ (o.threshold|string + ('°C' if o.alert_type=='temp' else '%')) if o.threshold is not none else 'N/A' }}</td>
+            <td class="hide-mobile">{{ o.cooldown_minutes }} min</td>
+            <td style="font-size:12px;">{{ o.notify_emails or '—' }}</td>
+            <td class="hide-mobile text-muted" style="font-size:12px">{{ o.updated_at.strftime('%m-%d %H:%M') if o.updated_at else '—' }}</td>
+            {% endif %}
+          </tr>
+          {% else %}
+          <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px">
+            No per-machine alert rules yet — add one above to override a fleet-wide threshold for a specific machine.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if current_user.is_admin %}
+  {% for o in machine_overrides %}
+  <form id="ma-row-{{ o.id }}" method="POST" action="{{ url_for('alerts.add_machine_alert') }}" style="display:none"></form>
+  <form id="ma-del-{{ o.id }}" method="POST" action="{{ url_for('alerts.delete_machine_alert', override_id=o.id) }}" style="display:none"></form>
+  {% endfor %}
+  {% endif %}
 </div>
 
 <!-- ── DVR ALERTS ─────────────────────────────────────────────────── -->
@@ -299,6 +455,15 @@ function filterLog(){
   document.querySelectorAll('#log-tbody tr[data-source]').forEach(function(tr){
     tr.style.display=(!src||tr.dataset.source===src)?'':'none';
   });
+}
+
+function toggleMaThreshold(select){
+  var wrap  = document.getElementById('ma-threshold-wrap');
+  var input = document.getElementById('ma-threshold-input');
+  var needsThreshold = ['cpu','ram','disk','temp'].indexOf(select.value) !== -1;
+  wrap.style.display = needsThreshold ? '' : 'none';
+  if (!needsThreshold) input.value = '';
+  else if (!input.value) input.value = select.value === 'temp' ? '80' : '90';
 }
 </script>
 {% endblock %}

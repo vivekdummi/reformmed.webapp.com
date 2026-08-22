@@ -115,6 +115,25 @@ def init_db():
             )
         """)
 
+        # ── Per-machine alert overrides ──────────────────────────────────────
+        # A row here for (table_name, alert_type) takes precedence over the
+        # global alert_config row of the same type, for that one machine only
+        # — e.g. a beefier server that's expected to run hot can have its own
+        # higher CPU/temp threshold instead of triggering the fleet-wide rule.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS machine_alert_overrides (
+                id                    SERIAL PRIMARY KEY,
+                table_name            TEXT NOT NULL,
+                alert_type            TEXT NOT NULL,
+                enabled               BOOLEAN NOT NULL DEFAULT TRUE,
+                threshold             FLOAT,
+                cooldown_minutes      INTEGER NOT NULL DEFAULT 10,
+                notify_emails         TEXT NOT NULL DEFAULT '',
+                updated_at            TIMESTAMPTZ DEFAULT NOW(),
+                UNIQUE(table_name, alert_type)
+            )
+        """)
+
         # ── Alert log (unified — system + DVR + DB monitor) ─────────────────
         cur.execute("""
             CREATE TABLE IF NOT EXISTS alert_log (

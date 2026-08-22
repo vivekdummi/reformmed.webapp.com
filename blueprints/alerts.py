@@ -31,12 +31,27 @@ def index():
             ORDER BY c.name, w.display_name
         """)
         dbmon_watches = cur.fetchall()
+        # Machines (for the "add machine alert" picker) + existing overrides
+        cur.execute("""
+            SELECT system_name, location, table_name FROM machine_registry
+            ORDER BY system_name
+        """)
+        machines = cur.fetchall()
+        cur.execute("""
+            SELECT o.*, m.system_name, m.location
+            FROM machine_alert_overrides o
+            LEFT JOIN machine_registry m ON m.table_name = o.table_name
+            ORDER BY m.system_name, o.alert_type
+        """)
+        machine_overrides = cur.fetchall()
 
     return render_template("alerts.html",
                            configs=configs,
                            logs=logs,
                            dvr_settings=dvr_settings,
                            dbmon_watches=dbmon_watches,
+                           machines=machines,
+                           machine_overrides=machine_overrides,
                            recipients=list_alert_recipients())
 
 
@@ -70,6 +85,60 @@ def update_config():
             """, (enabled, thresh_val, cooldown_val, emails, aid))
     flash("System alert configuration saved.", "success")
     return redirect(url_for("alerts.index") + "#system")
+
+
+@alerts_bp.route("/machine/add", methods=["POST"])
+@login_required
+def add_machine_alert():
+    """
+    Create or update a per-machine alert override. A row for
+    (table_name, alert_type) takes precedence over the fleet-wide
+    alert_config rule of the same type, for that one machine only.
+    """
+    if not current_user.is_admin:
+        abort(403)
+    table_name = request.form.get("table_name", "").strip()
+    atype      = request.form.get("alert_type", "").strip()
+    if not table_name or not atype:
+        flash("Pick a machine and an alert type.", "danger")
+        return redirect(url_for("alerts.index") + "#machine")
+
+    enabled   = request.form.get("enabled") == "1"
+    threshold = request.form.get("threshold", "").strip() or None
+    cooldown  = request.form.get("cooldown_minutes", "10").strip()
+    emails    = ", ".join(request.form.getlist("recipient_emails"))
+
+    try:
+        thresh_val   = float(threshold) if threshold else None
+        cooldown_val = int(cooldown)
+    except ValueError:
+        flash("Invalid threshold or cooldown value.", "danger")
+        return redirect(url_for("alerts.index") + "#machine")
+
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO machine_alert_overrides
+                (table_name, alert_type, enabled, threshold, cooldown_minutes, notify_emails, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (table_name, alert_type) DO UPDATE
+            SET enabled=EXCLUDED.enabled, threshold=EXCLUDED.threshold,
+                cooldown_minutes=EXCLUDED.cooldown_minutes, notify_emails=EXCLUDED.notify_emails,
+                updated_at=NOW()
+        """, (table_name, atype, enabled, thresh_val, cooldown_val, emails))
+    flash(f"Machine alert rule saved for {atype}.", "success")
+    return redirect(url_for("alerts.index") + "#machine")
+
+
+@alerts_bp.route("/machine/<int:override_id>/delete", methods=["POST"])
+@login_required
+def delete_machine_alert(override_id):
+    if not current_user.is_admin:
+        abort(403)
+    with get_db() as conn:
+        conn.cursor().execute("DELETE FROM machine_alert_overrides WHERE id=%s", (override_id,))
+    flash("Machine alert rule removed.", "success")
+    return redirect(url_for("alerts.index") + "#machine")
 
 
 @alerts_bp.route("/dvr/update", methods=["POST"])

@@ -163,6 +163,24 @@ async def _get_alert_config(conn) -> dict:
     return {r["alert_type"]: dict(r) for r in rows}
 
 
+async def _get_machine_overrides(conn) -> dict:
+    """
+    Load per-machine alert overrides into {table_name: {alert_type: {...}}}.
+    A machine's override for a given alert_type replaces the global
+    alert_config row of that type only for that one machine.
+    """
+    rows = await conn.fetch("SELECT * FROM machine_alert_overrides")
+    out: dict = {}
+    for r in rows:
+        out.setdefault(r["table_name"], {})[r["alert_type"]] = dict(r)
+    return out
+
+
+def _effective_config(global_config: dict, machine_overrides: dict) -> dict:
+    """Merge global config with this machine's overrides (override wins per type)."""
+    return {**global_config, **machine_overrides}
+
+
 def _recipients(config: dict, atype: str) -> list[str]:
     cfg = config.get(atype, {})
     emails = cfg.get("notify_emails", "") or os.getenv("ALERT_TO", "")
@@ -253,21 +271,26 @@ async def main():
     while True:
         try:
             async with pool.acquire() as conn:
-                config   = await _get_alert_config(conn)
+                config    = await _get_alert_config(conn)
+                overrides = await _get_machine_overrides(conn)
                 machines = await conn.fetch("SELECT * FROM machine_registry")
                 now      = datetime.now(timezone.utc)
-
-                offline_cfg = config.get("offline", {})
-                online_cfg  = config.get("online",  {})
-                thresh_secs = OFFLINE_THRESHOLD_SECS
 
                 for machine in machines:
                     system_name    = machine["system_name"]
                     location       = machine["location"]
+                    table_name     = machine["table_name"]
                     current_status = machine["status"]
                     last_seen      = machine["last_seen"]
                     alerts_enabled = machine["alerts_enabled"]
                     key            = f"{system_name}@{location}"
+
+                    # This machine's own thresholds win over the fleet-wide
+                    # defaults, alert_type by alert_type.
+                    effective_cfg = _effective_config(config, overrides.get(table_name, {}))
+                    offline_cfg   = effective_cfg.get("offline", {})
+                    online_cfg    = effective_cfg.get("online",  {})
+                    thresh_secs   = OFFLINE_THRESHOLD_SECS
 
                     seconds_offline = (now - last_seen).total_seconds()
                     new_status = "offline" if seconds_offline > thresh_secs else "online"
@@ -284,15 +307,15 @@ async def main():
                                      system_name, location, new_status)
                         elif new_status == "offline" and offline_cfg.get("enabled", True):
                             log.warning("🔴 %s (%s) went OFFLINE", system_name, location)
-                            await _alert(conn, config, key, "offline", system_name, location,
+                            await _alert(conn, effective_cfg, key, "offline", system_name, location,
                                          [("Last seen", _fmt_ist(last_seen))])
                         elif new_status == "online" and online_cfg.get("enabled", True):
                             log.info("🟢 %s (%s) came back ONLINE", system_name, location)
-                            await _alert(conn, config, key, "online", system_name, location,
+                            await _alert(conn, effective_cfg, key, "online", system_name, location,
                                          [("Back online since", _fmt_ist(now))])
 
                     if new_status == "online":
-                        await check_metrics(conn, machine, config, alerts_enabled)
+                        await check_metrics(conn, machine, effective_cfg, alerts_enabled)
 
             await asyncio.sleep(CHECK_INTERVAL_SECS)
 
