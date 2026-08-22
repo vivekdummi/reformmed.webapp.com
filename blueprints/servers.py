@@ -490,6 +490,9 @@ def history(table_name):
         "labels": labels, "cpu": cpu, "ram": ram, "swap": swap, "temp": temp,
         "net_sent": net_sent, "net_recv": net_recv, "count": len(rows),
     })
+
+
+@servers_bp.route("/<table_name>/live")
 @login_required
 def live(table_name):
     """JSON endpoint polled every 2s by the detail page."""
