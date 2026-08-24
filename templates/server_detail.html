@@ -1267,6 +1267,7 @@ async function pollLive() {
     setText('cpuarea-val', cpu.toFixed(1) + '%');
     pushPoint(charts.cpuArea, cpu, now);
     pushPoint(charts.tempSpark, temp, now);
+    if (modalIsLiveFor('cpu')) pushPoint(modalChart, cpu, now);
 
     // ── RAM donut ──
     if (d.ram_used_gb !== undefined && d.ram_total_gb !== undefined) {
@@ -1274,6 +1275,11 @@ async function pollLive() {
       setText('ram-donut-center', ram.toFixed(1) + '%');
       setText('ram-legend-used', d.ram_used_gb.toFixed(1) + ' GB');
       setText('ram-legend-free', Math.max(0, d.ram_total_gb - d.ram_used_gb).toFixed(1) + ' GB');
+      if (modalIsLiveFor('ram')) {
+        updateDonut(modalChart, d.ram_used_gb, d.ram_total_gb);
+        setText('chart-modal-donut-center', ram.toFixed(1) + '%');
+        renderModalDonutLegend('#a78bfa', d.ram_used_gb, d.ram_total_gb);
+      }
     }
 
     // ── Swap donut ──
@@ -1282,6 +1288,11 @@ async function pollLive() {
       setText('swap-donut-center', swap.toFixed(1) + '%');
       setText('swap-legend-used', d.swap_used_gb.toFixed(1) + ' GB');
       setText('swap-legend-free', Math.max(0, d.swap_total_gb - d.swap_used_gb).toFixed(1) + ' GB');
+      if (modalIsLiveFor('swap')) {
+        updateDonut(modalChart, d.swap_used_gb, d.swap_total_gb);
+        setText('chart-modal-donut-center', swap.toFixed(1) + '%');
+        renderModalDonutLegend('#c084fc', d.swap_used_gb, d.swap_total_gb);
+      }
     }
 
     // ── Net traffic ──
@@ -1292,6 +1303,12 @@ async function pollLive() {
       charts.netBar.data.datasets[0].data.push(sent); charts.netBar.data.datasets[0].data.shift();
       charts.netBar.data.datasets[1].data.push(recv); charts.netBar.data.datasets[1].data.shift();
       charts.netBar.update('none');
+    }
+    if (modalIsLiveFor('net')) {
+      modalChart.data.labels.push(now); modalChart.data.labels.shift();
+      modalChart.data.datasets[0].data.push(sent); modalChart.data.datasets[0].data.shift();
+      modalChart.data.datasets[1].data.push(recv); modalChart.data.datasets[1].data.shift();
+      modalChart.update('none');
     }
 
     // ── Disk donut (re-picks the primary partition from live data) ──
@@ -1304,6 +1321,11 @@ async function pollLive() {
         updateDonut(charts.diskDonut, used, total);
         setText('ring-disk-val', pct.toFixed(0) + '%');
         updateRing(charts.ringDisk, pct);
+        if (modalIsLiveFor('disk')) {
+          updateDonut(modalChart, used, total);
+          setText('chart-modal-donut-center', pct.toFixed(1) + '%');
+          renderModalDonutLegend('#f59e0b', used, total);
+        }
       }
     }
 
@@ -1316,6 +1338,16 @@ async function pollLive() {
         ds.data.push(coreVal); ds.data.shift();
       });
       charts.cores.update('none');
+
+      if (modalIsLiveFor('cores')) {
+        modalChart.data.labels.push(now); modalChart.data.labels.shift();
+        d.cpu_per_core.forEach(function(coreVal, i) {
+          var mds = modalChart.data.datasets[i];
+          if (!mds) return;
+          mds.data.push(coreVal); mds.data.shift();
+        });
+        modalChart.update('none');
+      }
     }
 
     // ── Temperature gauge ──
@@ -1326,6 +1358,14 @@ async function pollLive() {
     setText('gauge-temp-val', temp ? temp.toFixed(0) + '°C' : '—');
     var gEl = document.getElementById('gauge-temp-val');
     if (gEl) gEl.style.color = ts.color;
+    if (modalIsLiveFor('temp')) {
+      modalChart.$gaugeValue = temp;
+      modalChart.update('none');
+      var mgv = document.getElementById('chart-modal-gauge-val');
+      var mgs = document.getElementById('chart-modal-gauge-status');
+      if (mgv) { mgv.textContent = temp ? temp.toFixed(0) + '°C' : '—'; mgv.style.color = ts.color; }
+      if (mgs) { mgs.textContent = ts.text; mgs.style.color = ts.color; }
+    }
     var gsEl = document.getElementById('gauge-temp-status');
     if (gsEl) { gsEl.textContent = ts.text; gsEl.style.color = ts.color; }
 
@@ -1554,6 +1594,24 @@ document.querySelectorAll('#hist-presets .hist-preset-btn').forEach(function(btn
 var modalChart = null;
 var modalKind  = null;
 var modalHistBase = null;
+
+// The modal defaults to LIVE — it only freezes on a fixed range once you
+// actually apply a preset/From-To filter inside it (modalHistBase gets set
+// at that point). Clicking "Back to Live" clears modalHistBase and this
+// resumes ticking again, same as the small card behind it.
+function modalIsLiveFor(kind) {
+  return !!modalChart && modalKind === kind && !modalHistBase;
+}
+
+function renderModalDonutLegend(color, used, total) {
+  var legendEl = document.getElementById('chart-modal-donut-legend');
+  if (!legendEl) return;
+  var free = Math.max(0, (total || 0) - (used || 0));
+  legendEl.innerHTML =
+    '<div class="donut-legend-item"><span class="dot" style="background:' + color + ';"></span>Used <b>' + (used || 0).toFixed(1) + ' GB</b></div>' +
+    '<div class="donut-legend-item"><span class="dot" style="background:#3a3f52;"></span>Free <b>' + free.toFixed(1) + ' GB</b></div>' +
+    '<div class="donut-legend-item total">Total <b>' + (total || 0).toFixed(1) + ' GB</b></div>';
+}
 
 function closeChartModal() {
   document.getElementById('chart-modal-backdrop').classList.remove('open');
