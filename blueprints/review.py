@@ -189,6 +189,7 @@ def stream():
 
     def generate():
         import urllib.request
+        import urllib.error
         import os
 
         try:
@@ -229,7 +230,16 @@ def stream():
             yield "data:{\"done\":true}\n\n"
 
         except Exception as e:
-            yield f"data:{json.dumps({'error': str(e)})}\n\n"
+            if isinstance(e, urllib.error.HTTPError):
+                try:
+                    body = e.read().decode()
+                except Exception:
+                    body = ""
+                print(f"[review stream] Anthropic API error {e.code}: {body}")
+                yield f"data:{json.dumps({'error': f'Anthropic API error {e.code}: {body}'})}\n\n"
+            else:
+                print(f"[review stream] Non-HTTP error ({type(e).__name__}): {e}")
+                yield f"data:{json.dumps({'error': f'{type(e).__name__}: {e}'})}\n\n"
 
     return Response(
         stream_with_context(generate()),
@@ -247,7 +257,7 @@ def run():
     """Non-streaming review endpoint — avoids nginx SSE buffering issues."""
     if not current_user.is_admin:
         abort(403)
-    import json, urllib.request, os
+    import json, urllib.request, urllib.error, os
     try:
         data   = _collect_data()
         prompt = _build_prompt(data)
@@ -270,5 +280,15 @@ def run():
             result = json.loads(resp.read().decode())
             text = result.get("content", [{}])[0].get("text", "")
             return jsonify({"text": text})
+    except urllib.error.HTTPError as e:
+        # Anthropic's real reason lives in the response body, not in str(e)
+        # (which is just the generic "HTTP Error 400: Bad Request").
+        try:
+            body = e.read().decode()
+        except Exception:
+            body = ""
+        print(f"[review] Anthropic API error {e.code}: {body}")
+        return jsonify({"error": f"Anthropic API error {e.code}: {body}"}), 500
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"[review] Non-HTTP error ({type(e).__name__}): {e}")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500

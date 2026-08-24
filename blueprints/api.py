@@ -272,7 +272,7 @@ def agent_context():
 @login_required
 def agent_chat():
     """Simple (non-streaming) Claude response for the AI agent popup."""
-    import json, urllib.request, os
+    import json, urllib.request, urllib.error, os
     from flask import request
 
     body = request.get_json(silent=True) or {}
@@ -351,5 +351,16 @@ Be concise, direct, and use bullet points for lists. For normal conversation, re
             data = json.loads(resp.read().decode())
             text = data.get("content",[{}])[0].get("text","")
             return jsonify({"text": text})
+    except urllib.error.HTTPError as e:
+        try:
+            body = e.read().decode()
+        except Exception:
+            body = ""
+        print(f"[api/aria] Anthropic API error {e.code}: {body}")
+        return jsonify({"error": f"Anthropic API error {e.code}: {body}"}), 500
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        # Catch-all so we can never lose visibility into what actually
+        # failed — includes network errors (DNS/timeout/connection refused),
+        # JSON parse errors on a malformed response, etc.
+        print(f"[api/aria] Non-HTTP error ({type(e).__name__}): {e}")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
