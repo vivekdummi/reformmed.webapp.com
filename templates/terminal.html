@@ -5,77 +5,87 @@
 {% block extra_css %}
 <style>
   /* Terminal layout */
-  .term-wrap{display:flex;gap:0;height:calc(100vh - 120px);min-height:500px;}
-  .term-sidebar{width:220px;flex-shrink:0;background:var(--bg2);border:1px solid var(--border);border-radius:12px 0 0 12px;overflow-y:auto;display:flex;flex-direction:column;}
-  .term-main{flex:1;display:flex;flex-direction:column;border:1px solid var(--border);border-left:none;border-radius:0 12px 12px 0;overflow:hidden;background:var(--bg);}
+  .term-wrap{display:flex;gap:14px;height:calc(100vh - 130px);min-height:520px;}
+  .term-sidebar{width:250px;flex-shrink:0;background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow-y:auto;display:flex;flex-direction:column;}
+  .term-main{flex:1;display:flex;flex-direction:column;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--bg2);min-width:0;}
 
   /* Sidebar */
-  .term-sidebar-title{padding:12px 14px;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);flex-shrink:0;}
-  .machine-item{padding:9px 14px;cursor:pointer;border-left:3px solid transparent;transition:all .15s;font-size:12px;}
-  .machine-item:hover{background:var(--bg3);border-left-color:var(--border);}
-  .machine-item.active{background:rgba(0,212,255,.08);border-left-color:var(--accent);}
-  .machine-name{font-weight:600;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;}
-  .machine-loc{font-size:10px;color:var(--text-muted);margin-top:2px;}
-  .machine-status{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;}
-  .machine-status.online{background:var(--green);}
-  .machine-status.offline{background:var(--red);}
-  .schema-toggle{padding:6px 14px 10px;font-size:10px;color:var(--accent);cursor:pointer;}
-  .schema-panel{display:none;padding:0 14px 10px;font-size:11px;}
+  .term-sidebar-title{padding:14px 16px 10px;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.2px;display:flex;align-items:center;gap:6px;}
+  .term-sidebar-count{margin-left:auto;background:var(--bg3);color:var(--text-muted);border-radius:99px;padding:1px 8px;font-size:10px;font-weight:600;}
+  .machine-list{padding:4px 8px 10px;display:flex;flex-direction:column;gap:4px;}
+  .machine-item{padding:10px 10px;cursor:pointer;border-radius:10px;border:1px solid transparent;transition:all .15s;}
+  .machine-item:hover{background:var(--bg3);}
+  .machine-item.active{background:rgba(56,189,248,.1);border-color:rgba(56,189,248,.3);}
+  .machine-name{font-weight:600;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;display:flex;align-items:center;gap:7px;}
+  .machine-loc{font-size:10.5px;color:var(--text-muted);margin-top:3px;margin-left:15px;}
+  .machine-status{display:inline-block;width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+  .machine-status.online{background:var(--green);box-shadow:0 0 0 3px rgba(34,197,94,.18);}
+  .machine-status.offline{background:var(--red);box-shadow:0 0 0 3px rgba(239,68,68,.18);}
+  .schema-toggle{margin:6px 0 0 15px;font-size:10.5px;color:var(--accent);cursor:pointer;display:inline-flex;align-items:center;gap:3px;opacity:.85;}
+  .schema-toggle:hover{opacity:1;}
+  .schema-panel{display:none;margin:8px 0 0 15px;font-size:11px;background:var(--bg);border-radius:8px;padding:8px 10px;border:1px solid var(--border);}
   .schema-panel.open{display:block;}
-  .schema-col{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);color:var(--text-muted);}
+  .schema-col{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);color:var(--text-muted);}
+  .schema-col:last-child{border-bottom:none;}
   .schema-col span:first-child{color:var(--text);font-family:'JetBrains Mono',monospace;}
 
   /* Tabs */
-  .term-tabs{display:flex;align-items:center;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 8px;gap:2px;flex-shrink:0;overflow-x:auto;}
-  .term-tab{display:flex;align-items:center;gap:6px;padding:8px 14px;font-size:12px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-muted);white-space:nowrap;transition:all .15s;user-select:none;}
+  .term-tabs{display:flex;align-items:center;background:var(--bg3);border-bottom:1px solid var(--border);padding:0 8px;gap:2px;flex-shrink:0;overflow-x:auto;}
+  .term-tab{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:12px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-muted);white-space:nowrap;transition:all .15s;user-select:none;}
   .term-tab:hover{color:var(--text);}
-  .term-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
-  .term-tab .tab-close{width:14px;height:14px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-muted);transition:all .15s;}
-  .term-tab .tab-close:hover{background:var(--red);color:white;}
-  .tab-add{padding:6px 10px;color:var(--text-muted);cursor:pointer;font-size:16px;line-height:1;transition:color .15s;flex-shrink:0;}
-  .tab-add:hover{color:var(--accent);}
+  .term-tab.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--bg2);}
+  .term-tab .tab-close{width:15px;height:15px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-muted);transition:all .15s;}
+  .term-tab .tab-close:hover{background:rgba(239,68,68,.15);color:var(--red);}
+  .tab-add{padding:8px 12px;color:var(--text-muted);cursor:pointer;font-size:15px;line-height:1;transition:color .15s;flex-shrink:0;border-radius:6px;}
+  .tab-add:hover{color:var(--accent);background:var(--bg2);}
 
   /* Editor area */
-  .term-editor-area{padding:12px;display:flex;flex-direction:column;gap:8px;flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--border);}
-  .term-editor{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;padding:12px;resize:vertical;min-height:80px;outline:none;transition:border-color .15s;line-height:1.6;}
-  .term-editor:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,212,255,.08);}
-  .term-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-  .term-hint{font-size:11px;color:var(--text-muted);flex:1;}
-  .term-run{display:flex;align-items:center;gap:6px;padding:8px 18px;background:var(--accent);color:#0d0f14;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;}
-  .term-run:hover{opacity:.88;}
-  .term-run:disabled{opacity:.5;cursor:not-allowed;}
-  .term-clear{padding:7px 12px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-size:12px;cursor:pointer;font-family:inherit;transition:all .15s;}
-  .term-clear:hover{border-color:var(--text-muted);color:var(--text);}
+  .term-editor-area{padding:14px;display:flex;flex-direction:column;gap:10px;flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--border);}
+  .term-editor-label{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:6px;}
+  .term-editor{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;padding:14px;resize:vertical;min-height:100px;outline:none;transition:border-color .15s,box-shadow .15s;line-height:1.7;}
+  .term-editor:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(56,189,248,.12);}
+  .term-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .term-hint{font-size:11px;color:var(--text-muted);flex:1;display:flex;align-items:center;gap:6px;}
+  .term-hint kbd{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text);}
+  .term-run{display:flex;align-items:center;gap:7px;padding:9px 20px;background:linear-gradient(135deg,var(--accent),#0ea5c4);color:#062028;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:transform .12s,opacity .15s;box-shadow:0 2px 10px rgba(56,189,248,.25);}
+  .term-run:hover{opacity:.92;transform:translateY(-1px);}
+  .term-run:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+  .term-clear{padding:8px 14px;background:transparent;border:1px solid var(--border);border-radius:9px;color:var(--text-muted);font-size:12px;cursor:pointer;font-family:inherit;transition:all .15s;}
+  .term-clear:hover{border-color:var(--text-muted);color:var(--text);background:var(--bg3);}
 
   /* Results */
-  .term-results{flex:1;overflow:auto;padding:12px;}
+  .term-results{flex:1;overflow:auto;padding:14px;background:var(--bg);}
   .result-block{margin-bottom:16px;}
-  .result-meta{font-size:11px;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-  .result-meta .r-sql{font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px;background:var(--bg2);padding:3px 8px;border-radius:4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .result-meta .r-count{color:var(--green);font-weight:600;}
+  .result-meta{font-size:11px;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .result-meta .r-sql{font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px;background:var(--bg2);border:1px solid var(--border);padding:4px 10px;border-radius:6px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .result-meta .r-count{color:var(--green);font-weight:700;background:rgba(34,197,94,.1);padding:3px 9px;border-radius:99px;}
   .result-meta .r-time{color:var(--text-muted);}
-  .result-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:12px;color:var(--red);font-family:'JetBrains Mono',monospace;font-size:12px;margin-bottom:12px;}
-  .result-table-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border);}
+  .result-error{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:14px;color:var(--red);font-family:'JetBrains Mono',monospace;font-size:12px;margin-bottom:12px;}
+  .result-table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border);}
   .result-table{width:100%;border-collapse:collapse;font-size:12px;font-family:'JetBrains Mono',monospace;}
-  .result-table th{background:var(--bg2);padding:8px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0;}
-  .result-table td{padding:7px 12px;border-bottom:1px solid rgba(37,42,58,.4);color:var(--text);white-space:nowrap;max-width:300px;overflow:hidden;text-overflow:ellipsis;}
+  .result-table th{background:var(--bg2);padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0;}
+  .result-table td{padding:8px 14px;border-bottom:1px solid rgba(37,42,58,.4);color:var(--text);white-space:nowrap;max-width:300px;overflow:hidden;text-overflow:ellipsis;}
+  .result-table tr:nth-child(even) td{background:rgba(255,255,255,.015);}
   .result-table tr:last-child td{border-bottom:none;}
-  .result-table tr:hover td{background:rgba(0,212,255,.04);}
+  .result-table tr:hover td{background:rgba(56,189,248,.06);}
   .result-table td.null{color:var(--text-muted);font-style:italic;}
-  .dl-btn{padding:5px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-muted);font-size:11px;cursor:pointer;font-family:inherit;transition:all .15s;}
-  .dl-btn:hover{border-color:var(--accent);color:var(--accent);}
-  .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;color:var(--text-muted);gap:10px;font-size:13px;}
-  .empty-state svg{opacity:.3;}
+  .dl-btn{padding:6px 12px;background:transparent;border:1px solid var(--border);border-radius:7px;color:var(--text-muted);font-size:11px;cursor:pointer;font-family:inherit;transition:all .15s;font-weight:600;}
+  .dl-btn:hover{border-color:var(--green);color:var(--green);background:rgba(34,197,94,.06);}
+  .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:220px;color:var(--text-muted);gap:12px;font-size:13px;}
+  .empty-state .empty-icon-wrap{width:64px;height:64px;border-radius:16px;background:var(--bg2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;}
+  .empty-state svg{opacity:.4;color:var(--accent);}
 
   /* Quick queries */
-  .quick-queries{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;}
-  .qq{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--text-muted);cursor:pointer;white-space:nowrap;transition:all .15s;font-family:inherit;}
-  .qq:hover{border-color:var(--accent);color:var(--accent);}
+  .quick-queries{display:flex;gap:8px;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;align-items:center;}
+  .quick-queries-lbl{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin-right:2px;}
+  .qq{font-size:11.5px;font-weight:500;padding:6px 13px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--text-muted);cursor:pointer;white-space:nowrap;transition:all .15s;font-family:inherit;display:inline-flex;align-items:center;gap:5px;}
+  .qq:hover{border-color:var(--accent);color:var(--accent);background:rgba(56,189,248,.08);transform:translateY(-1px);}
+  .qq.qq-warn:hover{border-color:#f59e0b;color:#f59e0b;background:rgba(245,158,11,.08);}
+  .qq.qq-danger:hover{border-color:var(--red);color:var(--red);background:rgba(239,68,68,.08);}
 
   @media(max-width:768px){
     .term-wrap{flex-direction:column;height:auto;}
-    .term-sidebar{width:100%;border-radius:12px 12px 0 0;max-height:180px;}
-    .term-main{border-radius:0 0 12px 12px;border-left:1px solid var(--border);}
+    .term-sidebar{width:100%;max-height:220px;}
   }
 </style>
 {% endblock %}
@@ -91,17 +101,26 @@
 <div class="term-wrap">
   <!-- Sidebar — machine list -->
   <div class="term-sidebar">
-    <div class="term-sidebar-title">Machine Tables</div>
+    <div class="term-sidebar-title">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Machine Tables
+      <span class="term-sidebar-count">{{ machines|length }}</span>
+    </div>
+    <div class="machine-list">
     {% for m in machines %}
     <div class="machine-item" onclick="selectMachine('{{ m.table_name }}','{{ m.system_name }}')" id="mi-{{ m.table_name }}">
       <div class="machine-name">
         <span class="machine-status {{ m.status }}"></span>{{ m.system_name }}
       </div>
       <div class="machine-loc">{{ m.location }}</div>
-      <div class="schema-toggle" onclick="event.stopPropagation();toggleSchema('{{ m.table_name }}')">⌕ Schema</div>
+      <div class="schema-toggle" onclick="event.stopPropagation();toggleSchema('{{ m.table_name }}')">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Schema
+      </div>
       <div class="schema-panel" id="schema-{{ m.table_name }}">Loading...</div>
     </div>
     {% endfor %}
+    </div>
   </div>
 
   <!-- Main terminal -->
@@ -114,22 +133,26 @@
 
     <!-- Quick queries -->
     <div class="quick-queries" id="quick-queries">
-      <span style="font-size:10px;color:var(--text-muted);align-self:center">Quick:</span>
-      <button class="qq" onclick="setQuick('latest10')">Latest 10 rows</button>
-      <button class="qq" onclick="setQuick('hightemp')">Temp &gt; 90°C</button>
-      <button class="qq" onclick="setQuick('highcpu')">CPU &gt; 80%</button>
-      <button class="qq" onclick="setQuick('highram')">RAM &gt; 80%</button>
-      <button class="qq" onclick="setQuick('highdisk')">High Disk</button>
-      <button class="qq" onclick="setQuick('count')">Row count</button>
-      <button class="qq" onclick="setQuick('daterange')">Date range</button>
+      <span class="quick-queries-lbl">Quick:</span>
+      <button class="qq" onclick="setQuick('latest10')">📋 Latest 10 rows</button>
+      <button class="qq qq-danger" onclick="setQuick('hightemp')">🌡️ Temp &gt; 90°C</button>
+      <button class="qq qq-warn" onclick="setQuick('highcpu')">🔥 CPU &gt; 80%</button>
+      <button class="qq qq-warn" onclick="setQuick('highram')">🧠 RAM &gt; 80%</button>
+      <button class="qq qq-danger" onclick="setQuick('highdisk')">💿 High Disk</button>
+      <button class="qq" onclick="setQuick('count')">🔢 Row count</button>
+      <button class="qq" onclick="setQuick('daterange')">📅 Date range</button>
     </div>
 
     <!-- Editor -->
     <div class="term-editor-area">
+      <div class="term-editor-label">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        SQL Query
+      </div>
       <textarea class="term-editor" id="sql-input" placeholder="SELECT * FROM machine_nephro_rcore_pc1_hyderabad WHERE cpu_temp > 90 ORDER BY ts DESC LIMIT 100"
         onkeydown="handleKey(event)"></textarea>
       <div class="term-toolbar">
-        <span class="term-hint">Ctrl+Enter to run · SELECT only · max 500 rows auto-applied</span>
+        <span class="term-hint">Press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to run · SELECT only · max 500 rows auto-applied</span>
         <button class="term-clear" onclick="clearResults()">Clear</button>
         <button class="term-run" id="run-btn" onclick="runQuery()">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -141,9 +164,11 @@
     <!-- Results -->
     <div class="term-results" id="results-area">
       <div class="empty-state">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-          <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-        </svg>
+        <div class="empty-icon-wrap">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+        </div>
         <div>Select a machine from the left, then run a query</div>
         <div style="font-size:11px">Ctrl+Enter to execute · Results auto-download as CSV</div>
       </div>
@@ -199,7 +224,7 @@ function activateTab(id){
   var tab = _tabs.find(function(t){ return t.id===id; });
   if(!tab) return;
   document.getElementById('sql-input').value = tab.sql || '';
-  document.getElementById('results-area').innerHTML = tab.results || '<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><div>Run a query to see results</div></div>';
+  document.getElementById('results-area').innerHTML = tab.results || '<div class="empty-state"><div class="empty-icon-wrap"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div><div>Run a query to see results</div></div>';
   renderTabs();
   document.getElementById('sql-input').focus();
 }
@@ -341,7 +366,7 @@ function runQuery(){
 
 function clearResults(){
   _lastData = null;
-  document.getElementById('results-area').innerHTML = '<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><div>Run a query to see results</div></div>';
+  document.getElementById('results-area').innerHTML = '<div class="empty-state"><div class="empty-icon-wrap"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div><div>Run a query to see results</div></div>';
   var tab = _tabs.find(function(t){ return t.id===_activeTab; });
   if(tab) tab.results = null;
 }
