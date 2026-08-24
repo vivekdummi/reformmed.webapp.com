@@ -196,7 +196,7 @@ def stream():
             prompt = _build_prompt(data)
 
             payload = json.dumps({
-                "model":      "claude-sonnet-4-20250514",
+                "model":      "claude-sonnet-5",
                 "max_tokens": 1024,
                 "stream":     True,
                 "messages":   [{"role": "user", "content": prompt}],
@@ -252,7 +252,7 @@ def run():
         data   = _collect_data()
         prompt = _build_prompt(data)
         payload = json.dumps({
-            "model":      "claude-sonnet-4-6",
+            "model":      "claude-sonnet-5",
             "max_tokens": 1500,
             "stream":     False,
             "messages":   [{"role": "user", "content": prompt}],

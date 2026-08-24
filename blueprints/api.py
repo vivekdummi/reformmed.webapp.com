@@ -327,7 +327,7 @@ You can answer questions about:
 Be concise, direct, and use bullet points for lists. For normal conversation, reply in 1-3 sentences. Always reference actual data from the context above when answering infrastructure questions."""
 
     payload = json.dumps({
-        "model":      "claude-sonnet-4-6",
+        "model":      "claude-sonnet-5",
         "max_tokens": 800,
         "stream":     True,
         "system":     system,
