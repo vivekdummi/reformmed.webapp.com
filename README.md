@@ -6,21 +6,21 @@ Replaces Grafana with a fully custom Flask web app integrated directly into the 
 
 ```
                   ┌──────────────────────────────────────┐
-                  │         Docker Compose Stack          │
-                  │                                       │
-  Agents ──────► │  :8000  FastAPI (main.py)             │
-  (metrics push) │         ↕ PostgreSQL                  │
-                  │                                       │
-  Browser ──────► │  :5000  Flask Webapp (app.py)         │
-                  │         • Login / session auth         │
-                  │         • Home overview                │
-                  │         • Server list + details        │
-                  │         • User management (admin)      │
-                  │         • Alert config + log           │
-                  │                                       │
-                  │  Checker (offline_checker.py)         │
-                  │         • Reads alert config from DB  │
-                  │         • Sends emails                 │
+                  │         Docker Compose Stack         │
+                  │                                      │
+  Agents ──────►  │  :8000  FastAPI (main.py)            │
+  (metrics push)  │         ↕ PostgreSQL                 │
+                  │                                      │
+  Browser ──────► │  :5000  Flask Webapp (app.py)        │
+                  │         • Login / session auth       │
+                  │         • Home overview              │
+                  │         • Server list + details      │
+                  │         • User management (admin)    │
+                  │         • Alert config + log         │
+                  │                                      │
+                  │  Checker (offline_checker.py)        │
+                  │         • Reads alert config from DB │
+                  │         • Sends emails               │
                   └──────────────────────────────────────┘
 ```
 

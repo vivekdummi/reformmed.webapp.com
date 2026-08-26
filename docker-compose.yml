@@ -23,7 +23,7 @@ services:
     build:
       context: ./server
     container_name: reformmed_api
-    command: python main.py
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
     environment:
       POSTGRES_HOST:     reformmed_postgres
       POSTGRES_USER:     ${POSTGRES_USER}
