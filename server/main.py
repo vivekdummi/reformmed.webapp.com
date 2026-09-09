@@ -192,6 +192,7 @@ async def register(request: Request, x_api_key: str = Header(...)):
                 net_packets_recv BIGINT,
                 public_ip TEXT,
                 top_processes JSONB,
+                pm2_processes JSONB,
                 uptime_seconds FLOAT,
                 boot_time TIMESTAMPTZ,
                 os_version TEXT,
@@ -201,6 +202,15 @@ async def register(request: Request, x_api_key: str = Header(...)):
         """)
         await conn.execute(
             f"CREATE INDEX IF NOT EXISTS idx_{table_name}_ts ON {table_name}(ts DESC)"
+        )
+        # CREATE TABLE IF NOT EXISTS above is a no-op for machines that
+        # already registered before this column existed — this explicit
+        # ALTER runs every time (register() is called on every agent
+        # restart), so already-registered machines pick up new columns
+        # automatically the next time their agent restarts, with no manual
+        # per-table SQL needed.
+        await conn.execute(
+            f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS pm2_processes JSONB"
         )
         await _load_registered_tables(conn)
 
@@ -226,6 +236,7 @@ async def metrics(request: Request, x_api_key: str = Header(...)):
     disk_partitions = json.dumps(data.get("disk_partitions")) if data.get("disk_partitions") else None
     disk_io         = json.dumps(data.get("disk_io"))         if data.get("disk_io")         else None
     top_processes   = json.dumps(data.get("top_processes"))   if data.get("top_processes")   else None
+    pm2_processes   = json.dumps(data.get("pm2_processes"))   if data.get("pm2_processes")   else None
 
     boot_time_str = data.get("boot_time")
     boot_time = datetime.fromisoformat(boot_time_str) if boot_time_str else None
@@ -244,10 +255,10 @@ async def metrics(request: Request, x_api_key: str = Header(...)):
                 swap_total_gb, swap_used_gb, swap_percent,
                 gpu_info, disk_partitions, disk_io,
                 net_bytes_sent, net_bytes_recv, net_packets_sent, net_packets_recv,
-                public_ip, top_processes, uptime_seconds, boot_time, os_version, hostname, status
+                public_ip, top_processes, pm2_processes, uptime_seconds, boot_time, os_version, hostname, status
             ) VALUES (
                 $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-                $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24
+                $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
             )
         """,
         data.get("cpu_percent"), cpu_per_core, data.get("cpu_freq_mhz"), data.get("cpu_temp"),
@@ -256,7 +267,7 @@ async def metrics(request: Request, x_api_key: str = Header(...)):
         gpu_info, disk_partitions, disk_io,
         data.get("net_bytes_sent"), data.get("net_bytes_recv"),
         data.get("net_packets_sent"), data.get("net_packets_recv"),
-        data.get("public_ip"), top_processes, data.get("uptime_seconds"),
+        data.get("public_ip"), top_processes, pm2_processes, data.get("uptime_seconds"),
         boot_time, data.get("os_version"), data.get("hostname"), data.get("status"))
 
     return {"status": "ok"}
