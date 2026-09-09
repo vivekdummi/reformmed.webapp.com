@@ -2,331 +2,151 @@
 {% import "_macros.html" as macros %}
 {% block title %}DB Monitor — REFORMMED{% endblock %}
 {% block page_title %}DB Monitor{% endblock %}
+
 {% block extra_css %}
 <style>
-/* ── Watch card ── */
-.wcard {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  margin-bottom: 12px;
-  overflow: hidden;
-  transition: border-color .2s;
-}
-.wcard.dead  { border-color: var(--red); }
-.wcard.live  { border-color: rgba(34,197,94,.35); }
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.stat-value{font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;}
+.stat-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px;}
 
-.wcard-main {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 20px;
-  flex-wrap: wrap;
-}
+.wcard{background:var(--bg2);border:1px solid var(--border);border-radius:14px;margin-bottom:14px;overflow:hidden;transition:border-color .2s;}
+.wcard.live{border-color:rgba(34,197,94,.35);}
+.wcard.dead{border-color:rgba(239,68,68,.4);}
+.wcard-main{display:flex;align-items:center;gap:18px;padding:16px 20px;flex-wrap:wrap;}
+.status-pill{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:99px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.5px;flex-shrink:0;}
+.status-pill.loading{background:rgba(148,163,184,.12);color:var(--text-muted);}
+.status-pill.live{background:rgba(34,197,94,.12);color:var(--green);}
+.status-pill.dead{background:rgba(239,68,68,.12);color:var(--red);}
+.status-dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
+.wcard-info{flex:1;min-width:180px;}
+.wcard-name-click{font-weight:700;font-size:14px;display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;}
+.wcard-name-click:hover{color:var(--accent);}
+.wcard-name-click .chev{transition:transform .15s;display:inline-block;font-size:11px;color:var(--text-muted);}
+.wcard-name-click.open .chev{transform:rotate(90deg);}
+.name-sub-lbl{font-size:11px;font-weight:500;color:var(--text-muted);margin-left:4px;}
+.wcard-sub{font-size:11px;color:var(--text-muted);margin-top:3px;font-family:'JetBrains Mono',monospace;}
+.wcard-stats{display:flex;gap:26px;flex-wrap:wrap;}
+.wstat{text-align:center;min-width:70px;}
+.wstat-val{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;}
+.wstat-lbl{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-top:2px;}
+.dead-since{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--red);}
+.toggles{display:flex;align-items:center;gap:14px;}
+.toggle-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;}
+.toggle-lbl{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;}
+.toggle-form{margin:0;}
+.tog{background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--text-muted);cursor:pointer;}
+.tog.on-monitor{color:var(--accent);border-color:var(--accent);}
+.tog.on-alert{color:var(--yellow);border-color:var(--yellow);}
+.btn-remove{background:none;border:1px solid var(--border);border-radius:7px;color:var(--text-muted);font-size:13px;padding:5px 9px;cursor:pointer;}
+.btn-remove:hover{background:rgba(239,68,68,.1);color:var(--red);border-color:var(--red);}
 
-/* Big status pill */
-.status-pill {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 14px;
-  border-radius: 99px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .5px;
-  flex-shrink: 0;
-  min-width: 90px;
-  justify-content: center;
-}
-.status-pill.live    { background: rgba(34,197,94,.12); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
-.status-pill.dead    { background: rgba(239,68,68,.12);  color: var(--red);   border: 1px solid rgba(239,68,68,.3); }
-.status-pill.paused  { background: rgba(245,158,11,.1);  color: var(--yellow);border: 1px solid rgba(245,158,11,.3);}
-.status-pill.loading { background: var(--bg3); color: var(--text-muted); border: 1px solid var(--border); }
-.status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.status-pill.live  .status-dot { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
-.status-pill.dead  .status-dot { background: var(--red); }
-.status-pill.paused .status-dot { background: var(--yellow); }
-
-/* Info block */
-.wcard-info { flex: 1; min-width: 160px; }
-.wcard-name { font-weight: 600; font-size: 14px; }
-.wcard-sub  { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
-
-/* Stats strip */
-.wcard-stats {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-.wstat { text-align: center; }
-.wstat-val {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--accent);
-  line-height: 1;
-}
-.wstat-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; margin-top: 2px; }
-
-/* Dead time */
-.dead-since {
-  font-size: 12px;
-  color: var(--red);
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 600;
-}
-
-/* Toggle switches */
-.toggles {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-.toggle-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-}
-.toggle-lbl { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; }
-.toggle-form { display: inline; }
-
-/* pill toggle button */
-.tog {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: 99px;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid var(--border);
-  background: var(--bg3);
-  color: var(--text-muted);
-  font-family: inherit;
-  transition: all .15s;
-  white-space: nowrap;
-}
-.tog.on-monitor { background: rgba(0,212,255,.1); color: var(--accent); border-color: rgba(0,212,255,.3); }
-.tog.on-alert   { background: rgba(124,58,237,.1); color: #a78bfa;      border-color: rgba(124,58,237,.3); }
-.tog:hover { opacity: .8; }
-
-/* Remove button */
-.btn-remove {
-  background: transparent;
-  border: 1px solid rgba(239,68,68,.25);
-  color: var(--red);
-  padding: 5px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all .15s;
-}
-.btn-remove:hover { background: rgba(239,68,68,.1); }
-
-/* Email row */
-.wcard-emails {
-  border-top: 1px solid var(--border);
-  padding: 10px 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  background: var(--bg3);
-}
-.wcard-emails label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; white-space: nowrap; }
-.wcard-emails input { flex: 1; min-width: 180px; padding: 5px 10px; font-size: 12px; }
-.wcard-emails .btn-save {
-  padding: 5px 12px; font-size: 12px; font-weight: 600;
-  background: var(--accent); color: #0d0f14; border: none;
-  border-radius: 7px; cursor: pointer; font-family: inherit; transition: opacity .15s;
-}
-.wcard-emails .btn-save:hover { opacity: .85; }
-
-/* Summary bar */
-.sum-bar {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-.sum-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 18px;
-  flex: 1;
-  min-width: 120px;
-}
-.sum-val { font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700; line-height: 1; }
-.sum-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; margin-top: 2px; }
-
-/* conn table */
-.conn-row td { font-size: 12px; }
+/* ── History range filter bar ── */
+.history-bar{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:0;margin-bottom:14px;overflow:hidden;}
+.history-bar-header{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--border);}
+.history-bar-header svg{color:var(--accent);flex-shrink:0;}
+.history-bar-title{font-size:13px;font-weight:600;}
+.history-bar-title-sub{font-size:11px;color:var(--text-muted);margin-left:6px;font-weight:400;}
+.history-bar-body{padding:16px 18px;display:flex;flex-direction:column;gap:14px;}
+.history-presets{display:flex;gap:8px;flex-wrap:wrap;}
+.hist-preset-btn{background:var(--bg3);border:1px solid var(--border);border-radius:99px;color:var(--text-muted);font-size:12px;padding:6px 14px;cursor:pointer;transition:.15s;font-family:inherit;}
+.hist-preset-btn:hover{border-color:var(--accent);color:var(--text);}
+.hist-preset-btn.active{background:rgba(56,189,248,.12);border-color:var(--accent);color:var(--accent);font-weight:600;}
+.history-bar-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.history-custom-range{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;}
+.history-field{display:flex;flex-direction:column;gap:5px;}
+.history-field label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;}
+.history-field input{padding:8px 12px;font-size:12.5px;min-width:200px;}
+.history-divider{width:1px;align-self:stretch;background:var(--border);margin:0 2px;}
+.history-status{font-size:12px;color:var(--text-muted);}
+.history-status.warn{color:#f59e0b;}
+.history-status.err{color:#ef4444;}
+.history-status.ok{color:#22c55e;}
 
 /* ── Location expand panel ── */
-.wcard-name-click {
-  cursor: pointer;
-  display: flex; align-items: center; gap: 7px;
-  user-select: none;
-}
-.wcard-name-click:hover { color: var(--accent); }
-.wcard-name-click .chev {
-  transition: transform .15s; display: inline-block;
-  font-size: 11px; color: var(--text-muted); flex-shrink: 0;
-}
-.wcard-name-click.open .chev { transform: rotate(90deg); }
-.name-sub-lbl { font-size: 11px; font-weight: 500; color: var(--text-muted); margin-left: 4px; }
+.wcard-expand-btn{background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-size:11px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;}
+.wcard-expand-btn:hover{color:var(--text);border-color:var(--accent);}
+.wloc-panel{display:none;border-top:1px solid var(--border);padding:14px 20px;background:var(--bg1, rgba(0,0,0,.15));}
+.wloc-panel.open{display:block;}
+.wloc-panel-title{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;}
+.wloc-row{display:flex;flex-direction:column;align-items:stretch;padding:9px 12px;border-radius:8px;background:var(--bg2);border:1px solid var(--border);margin-bottom:6px;}
+.wloc-row.dead{border-color:rgba(239,68,68,.35);}
+.wloc-row.live{border-color:rgba(34,197,94,.25);}
+.wloc-row-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.wloc-info{flex:1;min-width:140px;}
+.wloc-name-click{font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px;}
+.wloc-name-click.clickable{cursor:pointer;user-select:none;}
+.wloc-name-click.clickable:hover{color:var(--accent);}
+.wloc-name-click .chev{transition:transform .15s;display:inline-block;font-size:10px;color:var(--text-muted);flex-shrink:0;}
+.wloc-name-click.open .chev{transform:rotate(90deg);}
+.wloc-sub{font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono', monospace;}
+.wloc-pill{font-family:'JetBrains Mono', monospace;font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px;letter-spacing:.4px;}
+.wloc-pill.live{background:rgba(34,197,94,.12);color:var(--green);}
+.wloc-pill.dead{background:rgba(239,68,68,.12);color:var(--red);}
+.wloc-pill.paused{background:rgba(245,158,11,.1);color:var(--yellow);}
+.wloc-toggles{display:flex;gap:6px;}
+.wloc-tog{border:1px solid var(--border);background:none;border-radius:6px;font-size:10px;padding:4px 8px;cursor:pointer;color:var(--text-muted);font-family:'JetBrains Mono', monospace;}
+.wloc-tog.on-monitor{color:var(--accent);border-color:var(--accent);}
+.wloc-tog.on-alert{color:var(--yellow);border-color:var(--yellow);}
+.warea-panel{display:none;margin-top:8px;padding-left:18px;border-left:2px solid var(--border);}
+.warea-panel.open{display:block;}
+.warea-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 10px;border-radius:6px;background:var(--bg1, rgba(0,0,0,.15));margin-bottom:4px;font-size:12px;}
+.warea-row.dead{outline:1px solid rgba(239,68,68,.3);}
+.warea-name{flex:1;min-width:120px;font-weight:500;}
+.warea-sub{font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono', monospace;}
+.warea-pill{font-family:'JetBrains Mono', monospace;font-size:9px;font-weight:700;padding:2px 7px;border-radius:99px;}
+.warea-pill.live{background:rgba(34,197,94,.12);color:var(--green);}
+.warea-pill.dead{background:rgba(239,68,68,.12);color:var(--red);}
+.warea-pill.paused{background:rgba(245,158,11,.1);color:var(--yellow);}
+.warea-tog{border:1px solid var(--border);background:none;border-radius:5px;font-size:9px;padding:3px 7px;cursor:pointer;color:var(--text-muted);font-family:'JetBrains Mono', monospace;}
+.warea-tog.on-monitor{color:var(--accent);border-color:var(--accent);}
+.warea-tog.on-alert{color:var(--yellow);border-color:var(--yellow);}
 
-.wloc-panel {
-  display: none;
-  border-top: 1px solid var(--border);
-  padding: 14px 20px;
-  background: var(--bg1, rgba(0,0,0,.15));
-}
-.wloc-panel.open { display: block; }
-.wloc-panel-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
-.wloc-row {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  padding: 9px 12px; border-radius: 8px; background: var(--bg2);
-  border: 1px solid var(--border); margin-bottom: 6px;
-}
-.wloc-row.dead { border-color: rgba(239,68,68,.35); }
-.wloc-row.live { border-color: rgba(34,197,94,.25); }
-.wloc-info { flex: 1; min-width: 140px; }
-.wloc-name-click {
-  font-weight: 600; font-size: 13px;
-  display: flex; align-items: center; gap: 6px;
-}
-.wloc-name-click.clickable { cursor: pointer; user-select: none; }
-.wloc-name-click.clickable:hover { color: var(--accent); }
-.wloc-name-click .chev {
-  transition: transform .15s; display: inline-block;
-  font-size: 10px; color: var(--text-muted); flex-shrink: 0;
-}
-.wloc-name-click.open .chev { transform: rotate(90deg); }
-.wloc-sub  { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
-.wloc-pill {
-  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
-  padding: 3px 9px; border-radius: 99px; letter-spacing: .4px;
-}
-.wloc-pill.live   { background: rgba(34,197,94,.12); color: var(--green); }
-.wloc-pill.dead   { background: rgba(239,68,68,.12); color: var(--red); }
-.wloc-pill.paused { background: rgba(245,158,11,.1); color: var(--yellow); }
-.wloc-toggles { display: flex; gap: 6px; }
-.wloc-tog {
-  border: 1px solid var(--border); background: none; border-radius: 6px;
-  font-size: 10px; padding: 4px 8px; cursor: pointer; color: var(--text-muted);
-  font-family: 'JetBrains Mono', monospace;
-}
-.wloc-tog.on-monitor { color: var(--accent); border-color: var(--accent); }
-.wloc-tog.on-alert   { color: var(--yellow); border-color: var(--yellow); }
+/* ── Hospital group card ── */
+.wgroup-card{border:1px solid var(--border);border-radius:12px;margin-bottom:16px;background:var(--bg2, rgba(255,255,255,.02));overflow:hidden;}
+.wgroup-header{display:flex;align-items:center;gap:12px;padding:14px 20px;cursor:pointer;user-select:none;background:var(--bg3, rgba(255,255,255,.03));}
+.wgroup-header:hover{background:var(--bg4, rgba(255,255,255,.05));}
+.wgroup-header .chev{transition:transform .15s;display:inline-block;font-size:12px;color:var(--text-muted);}
+.wgroup-header.open .chev{transform:rotate(90deg);}
+.wgroup-name{font-weight:700;font-size:15px;flex:1;}
+.wgroup-sub{font-size:12px;color:var(--text-muted);}
+.wgroup-pill{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;font-family:'JetBrains Mono', monospace;font-size:10px;font-weight:700;background:rgba(148,163,184,.12);color:var(--text-muted);}
+.wgroup-pill .status-dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
+.wgroup-pill.live{background:rgba(34,197,94,.12);color:var(--green);}
+.wgroup-pill.dead{background:rgba(239,68,68,.12);color:var(--red);}
+.wgroup-body{display:none;padding:14px;padding-top:4px;}
+.wgroup-body.open{display:block;}
+.wgroup-body .wcard{margin-bottom:10px;}
+.wgroup-body .wcard:last-child{margin-bottom:0;}
 
-/* ── Area sub-panel (nested one level under a location) ── */
-.wloc-row { flex-direction: column; align-items: stretch; }
-.wloc-row-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.warea-panel { display: none; margin-top: 8px; padding-left: 18px; border-left: 2px solid var(--border); }
-.warea-panel.open { display: block; }
-.warea-row {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 6px 10px; border-radius: 6px; background: var(--bg1, rgba(0,0,0,.15));
-  margin-bottom: 4px; font-size: 12px;
-}
-.warea-row.dead { outline: 1px solid rgba(239,68,68,.3); }
-.warea-name { flex: 1; min-width: 120px; font-weight: 500; }
-.warea-sub  { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
-.warea-pill {
-  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
-  padding: 2px 7px; border-radius: 99px;
-}
-.warea-pill.live   { background: rgba(34,197,94,.12); color: var(--green); }
-.warea-pill.dead   { background: rgba(239,68,68,.12); color: var(--red); }
-.warea-pill.paused { background: rgba(245,158,11,.1); color: var(--yellow); }
-.warea-tog {
-  border: 1px solid var(--border); background: none; border-radius: 5px;
-  font-size: 9px; padding: 3px 7px; cursor: pointer; color: var(--text-muted);
-  font-family: 'JetBrains Mono', monospace;
-}
-.warea-tog.on-monitor { color: var(--accent); border-color: var(--accent); }
-.warea-tog.on-alert   { color: var(--yellow); border-color: var(--yellow); }
-
-/* ── Hospital group card (wraps multiple table watches together) ── */
-.wgroup-card {
-  border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px;
-  background: var(--bg2, rgba(255,255,255,.02)); overflow: hidden;
-}
-.wgroup-header {
-  display: flex; align-items: center; gap: 12px; padding: 14px 20px;
-  cursor: pointer; user-select: none; background: var(--bg3, rgba(255,255,255,.03));
-}
-.wgroup-header:hover { background: var(--bg4, rgba(255,255,255,.05)); }
-.wgroup-header .chev {
-  transition: transform .15s; display: inline-block; font-size: 12px; color: var(--text-muted);
-}
-.wgroup-header.open .chev { transform: rotate(90deg); }
-.wgroup-name { font-weight: 700; font-size: 15px; flex: 1; }
-.wgroup-sub  { font-size: 12px; color: var(--text-muted); }
-.wgroup-pill {
-  display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px;
-  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
-  background: rgba(148,163,184,.12); color: var(--text-muted);
-}
-.wgroup-pill .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.wgroup-pill.live { background: rgba(34,197,94,.12); color: var(--green); }
-.wgroup-pill.dead { background: rgba(239,68,68,.12); color: var(--red); }
-.wgroup-body { display: none; padding: 14px; padding-top: 4px; }
-.wgroup-body.open { display: block; }
-.wgroup-body .wcard { margin-bottom: 10px; }
-.wgroup-body .wcard:last-child { margin-bottom: 0; }
+/* conn table */
+.conn-row td{font-size:12px;}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <div>
-    <h1>DB Monitor</h1>
-    <p>Live data flow status for external PostgreSQL tables</p>
+  <div><h1>DB Monitor</h1><p>Live data flow status for external PostgreSQL tables</p></div>
+  <div style="display:flex;gap:10px;">
+    {% if current_user.is_admin %}
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-add-conn').classList.add('open')">+ Connection</button>
+    <button class="btn btn-ghost btn-sm" onclick="openGroupModal()">+ Hospital Group</button>
+    <button class="btn btn-primary btn-sm" onclick="document.getElementById('modal-add-watch').classList.add('open')">+ Watch Table</button>
+    {% endif %}
   </div>
-  {% if current_user.is_admin %}
-  <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-conn').classList.add('open')">+ Connection</button>
-    <button class="btn btn-primary btn-sm" onclick="document.getElementById('modal-watch').classList.add('open')">+ Watch Table</button>
-  </div>
-  {% endif %}
 </div>
 
-<!-- Summary bar -->
-<div class="sum-bar">
-  <div class="sum-chip">
-    <div><div class="sum-val" style="color:var(--accent)" id="sum-total">{{ watches|length }}</div><div class="sum-lbl">Watching</div></div>
-  </div>
-  <div class="sum-chip">
-    <div><div class="sum-val" style="color:var(--green)" id="sum-live">—</div><div class="sum-lbl">Live</div></div>
-  </div>
-  <div class="sum-chip">
-    <div><div class="sum-val" style="color:var(--red)" id="sum-dead">—</div><div class="sum-lbl">Dead</div></div>
-  </div>
-  <div class="sum-chip">
-    <div><div class="sum-val" style="color:var(--yellow)" id="sum-off">{{ watches|rejectattr("monitoring")|list|length }}</div><div class="sum-lbl">Monitoring Off</div></div>
-  </div>
+<div class="stat-grid">
+  <div class="stat-card"><div class="stat-value" style="color:var(--accent)">{{ watches|length }}</div><div class="stat-label">Watching</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--green)" id="stat-live">–</div><div class="stat-label">Live</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--red)" id="stat-dead">–</div><div class="stat-label">Dead</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--yellow)" id="stat-off">–</div><div class="stat-label">Monitoring Off</div></div>
 </div>
 
 {% if not watches %}
 <div class="card" style="text-align:center;padding:48px;">
-  <div style="font-size:36px;margin-bottom:12px;">📡</div>
-  <div style="font-weight:600;margin-bottom:6px;">No tables being watched</div>
-  <div class="text-muted" style="font-size:13px;margin-bottom:20px;">Add a connection then watch a table to start monitoring</div>
-  {% if current_user.is_admin %}
-  <button class="btn btn-primary" onclick="document.getElementById('modal-conn').classList.add('open')">Add Connection</button>
-  {% endif %}
+  <div style="font-weight:600;font-size:16px;margin-bottom:6px;">No tables watched yet</div>
+  <div class="text-muted" style="font-size:13px;">Add a connection and watch a table to see live status here.</div>
 </div>
 {% else %}
 
@@ -413,33 +233,11 @@
     </div>
   </div>
 
-  <!-- Email config row (admin only) -->
-  {% if current_user.is_admin %}
-  <div class="wcard-emails" style="align-items:flex-start;">
-    <label style="padding-top:6px;">Alert to</label>
-    <form method="POST" action="{{ url_for('dbmonitor.update_emails', watch_id=w.id) }}" style="display:flex;flex:1;gap:10px;align-items:center;flex-wrap:wrap;">
-      {{ macros.recipient_picker('recipient_emails', recipients, w.alert_emails) }}
-      <button type="submit" class="btn-save">Save</button>
-    </form>
-    {% if not w.alerts_enabled %}
-    <span style="font-size:11px;color:var(--yellow);">⚠ Alerts disabled for this table</span>
-    {% endif %}
-  </div>
-  <div class="wcard-emails">
-    <label>Hospital group</label>
-    <form method="POST" action="{{ url_for('dbmonitor.update_group', watch_id=w.id) }}" style="display:flex;flex:1;gap:8px;align-items:center;flex-wrap:wrap;">
-      <select name="group_name" id="grp-{{ w.id }}-group-select" onchange="toggleNewGroupInput('grp-{{ w.id }}')" style="flex:1;min-width:180px;">
-        <option value="" {% if not w.group_name %}selected{% endif %}>— No group (standalone table) —</option>
-        {% for gname in existing_group_names %}
-        <option value="{{ gname }}" {% if w.group_name == gname %}selected{% endif %}>{{ gname }}</option>
-        {% endfor %}
-        <option value="__new__">+ New hospital group…</option>
-      </select>
-      <input type="text" name="new_group_name" id="grp-{{ w.id }}-new-group-input"
-             placeholder="e.g. Bharath Oncology" style="display:none;flex:1;min-width:180px;">
-      <button type="submit" class="btn-save">Save</button>
-    </form>
-    <span style="font-size:11px;color:var(--text-muted);">Tables sharing the same group name are shown together</span>
+  <!-- Hospital group + recipient/alert-email selection now live in
+       + Hospital Group and Alerts → DB Monitor Alerts, not here. -->
+  {% if current_user.is_admin and not w.alerts_enabled %}
+  <div style="padding:0 20px 14px;">
+    <span style="font-size:11px;color:var(--yellow);">⚠ Alerts disabled for this table — recipients are managed in <a href="{{ url_for('alerts.index') }}#dbmon" style="color:var(--accent);">Alerts → DB Monitor Alerts</a>.</span>
   </div>
   {% endif %}
 
@@ -472,6 +270,7 @@
     {% endfor %}
   {% endif %}
 {% endfor %}
+
 {% endif %}
 
 <!-- Connections list (admin) -->
@@ -488,11 +287,10 @@
           <td class="mono text-muted">{{ c.host }}:{{ c.port }}</td>
           <td class="mono text-muted">{{ c.dbname }}</td>
           <td class="mono text-muted">{{ c.username }}</td>
-          <td><span id="conn-st-{{ c.id }}" class="badge badge-info">—</span></td>
-          <td style="display:flex;gap:6px;">
-            <button class="btn btn-ghost btn-sm" onclick="testConn({{ c.id }})">Test</button>
+          <td><span class="badge badge-online">Active</span></td>
+          <td>
             <form method="POST" action="{{ url_for('dbmonitor.delete_connection', conn_id=c.id) }}"
-                  onsubmit="return confirm('Delete connection? All watches will be removed.')">
+                  onsubmit="return confirm('Delete this connection? Any watches using it will stop working.')">
               <button type="submit" class="btn btn-danger btn-sm">Delete</button>
             </form>
           </td>
@@ -504,68 +302,87 @@
 </div>
 {% endif %}
 
-
-<!-- ── Add Connection Modal ── -->
-<div class="modal-backdrop" id="modal-conn">
+<!-- Modal: Add Connection -->
+<div class="modal-backdrop" id="modal-add-conn">
   <div class="modal">
     <div class="modal-title">Add DB Connection</div>
     <form method="POST" action="{{ url_for('dbmonitor.add_connection') }}">
-      <div class="form-group"><label>Label / Name</label><input type="text" name="name" placeholder="Production DB" required></div>
-      <div class="grid-2">
-        <div class="form-group"><label>Host / IP</label><input type="text" name="host" placeholder="db.example.com" required></div>
-        <div class="form-group"><label>Port</label><input type="number" name="port" value="5432"></div>
-      </div>
-      <div class="form-group"><label>Database Name</label><input type="text" name="dbname" placeholder="mydb" required></div>
-      <div class="grid-2">
-        <div class="form-group"><label>Username</label><input type="text" name="username" required></div>
-        <div class="form-group"><label>Password</label><input type="password" name="password" required></div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-conn').classList.remove('open')">Cancel</button>
+      <div class="form-group"><label>Name</label><input type="text" name="name" placeholder="AWS RDS Prod" required></div>
+      <div class="form-group"><label>Host</label><input type="text" name="host" placeholder="db.example.com" required></div>
+      <div class="form-group"><label>Port</label><input type="number" name="port" value="5432" required></div>
+      <div class="form-group"><label>Database</label><input type="text" name="dbname" required></div>
+      <div class="form-group"><label>Username</label><input type="text" name="username" required></div>
+      <div class="form-group"><label>Password</label><input type="password" name="password" required></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-add-conn').classList.remove('open')">Cancel</button>
         <button type="submit" class="btn btn-primary">Add Connection</button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- ── Add Watch Modal ── -->
-<div class="modal-backdrop" id="modal-watch">
+<!-- Modal: Add Watch Table -->
+<div class="modal-backdrop" id="modal-add-watch">
   <div class="modal">
     <div class="modal-title">Watch a Table</div>
     <form method="POST" action="{{ url_for('dbmonitor.add_watch') }}">
       <div class="form-group">
         <label>Connection</label>
         <select name="conn_id" required>
-          <option value="">Select connection…</option>
           {% for c in connections %}
-          <option value="{{ c.id }}">{{ c.name }} ({{ c.dbname }})</option>
+          <option value="{{ c.id }}">{{ c.name }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="grid-2">
-        <div class="form-group"><label>Schema</label><input type="text" name="schema_name" placeholder="public" required></div>
-        <div class="form-group"><label>Table</label><input type="text" name="table_name" placeholder="sensor_readings" required></div>
-      </div>
+      <div class="form-group"><label>Schema</label><input type="text" name="schema_name" placeholder="public" required></div>
+      <div class="form-group"><label>Table</label><input type="text" name="table_name" placeholder="sensor_readings" required></div>
       <div class="form-group"><label>Display Name (optional)</label><input type="text" name="display_name" placeholder="Sensor Readings"></div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:-6px;margin-bottom:14px;">
+        Hospital group can be set afterward with <strong>+ Hospital Group</strong>, and alert recipients in <a href="{{ url_for('alerts.index') }}#dbmon" style="color:var(--accent);">Alerts → DB Monitor Alerts</a>.
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-add-watch').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Watch Table</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Add / Manage Hospital Group -->
+<div class="modal-backdrop" id="modal-add-group">
+  <div class="modal" style="width:560px;">
+    <div class="modal-title">Hospital Group</div>
+    <form method="POST" action="{{ url_for('dbmonitor.save_group') }}" id="group-form">
       <div class="form-group">
-        <label>Hospital Group (optional)</label>
-        <select name="group_name" id="add-group-select" onchange="toggleNewGroupInput('add')">
-          <option value="">— No group (standalone table) —</option>
+        <label>Group</label>
+        <select name="group_name" id="group-select" onchange="onGroupSelectChange(this.value)">
+          <option value="__new__">+ Create new group…</option>
           {% for gname in existing_group_names %}
           <option value="{{ gname }}">{{ gname }}</option>
           {% endfor %}
-          <option value="__new__">+ New hospital group…</option>
         </select>
-        <input type="text" name="new_group_name" id="add-new-group-input"
-               placeholder="e.g. Bharath Oncology" style="display:none;margin-top:8px;">
+      </div>
+      <div class="form-group" id="group-new-name-wrap">
+        <label>Group Name</label>
+        <input type="text" name="group_name" id="group-new-name-input" placeholder="e.g. Bharath Oncology">
       </div>
       <div class="form-group">
-        <label>Alert To</label>
-        {{ macros.recipient_picker('recipient_emails', recipients, '') }}
+        <label>Tables in this group</label>
+        <div style="max-height:260px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;" id="group-watch-list">
+          {% for w in watches %}
+          <label style="display:flex;align-items:center;gap:8px;margin-bottom:7px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer;">
+            <input type="checkbox" name="watch_ids" value="{{ w.id }}" class="group-watch-cb" data-watch-id="{{ w.id }}" style="width:auto;margin:0;">
+            <span>{{ w.display_name or (w.schema_name ~ "." ~ w.table_name) }}</span>
+            <span class="text-muted" style="font-size:11px;">— {{ w.schema_name }}.{{ w.table_name }}</span>
+          </label>
+          {% else %}
+          <span class="text-muted" style="font-size:13px;">No watched tables yet.</span>
+          {% endfor %}
+        </div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-watch').classList.remove('open')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Start Watching</button>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-add-group').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Group</button>
       </div>
     </form>
   </div>
@@ -580,7 +397,7 @@ const IS_ADMIN  = {{ current_user.is_admin | tojson }};
 const OPEN_PANELS = new Set();       // watch ids whose location panel is expanded
 const OPEN_AREA_PANELS = new Set();  // "watchId-locId" keys whose area panel is expanded
 
-// { groupIdx: [watchId, ...] } — for hospital groups with 2+ tables
+// { groupIdx: [watchId, ...] } for hospital groups with 2+ tables
 const GROUP_WATCH_IDS = {{ group_watch_ids | tojson }};
 const WATCH_TO_GROUP = {};
 Object.keys(GROUP_WATCH_IDS).forEach(gi => {
@@ -589,23 +406,20 @@ Object.keys(GROUP_WATCH_IDS).forEach(gi => {
 const WATCH_STATE = {};  // watchId -> {monitoring, is_dead}
 const OPEN_GROUP_PANELS = new Set(Object.keys(GROUP_WATCH_IDS).map(Number)); // groups start open
 
-// Format timestamp → precise human string showing exact time
 function fmtTime(iso) {
   if (!iso) return '—';
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now - d;
-  const diffMin = Math.floor(diffMs / 60000);
-
-  // Show exact time always, plus relative duration
-  const timeStr = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
-  const dateStr = d.toLocaleDateString([], {day:'2-digit', month:'short'});
-
-  if (diffMin < 1)   return timeStr + ' (just now)';
-  if (diffMin < 60)  return timeStr + ' (' + diffMin + 'm ago)';
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH  < 24)   return dateStr + ' ' + timeStr + ' (' + diffH + 'h ago)';
-  return dateStr + ' ' + timeStr;
+  var d = new Date(iso);
+  if (isNaN(d)) return iso;
+  var now = new Date();
+  var diffMs = now - d;
+  var diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 5) return 'just now';
+  if (diffSec < 60) return diffSec + 's ago';
+  if (diffSec < 3600) return Math.floor(diffSec / 60) + 'm ago';
+  var hh = String(d.getHours()).padStart(2, '0');
+  var mm = String(d.getMinutes()).padStart(2, '0');
+  var ss = String(d.getSeconds()).padStart(2, '0');
+  return hh + ':' + mm + ':' + ss + ' (' + Math.floor(diffSec / 3600) + 'h ago)';
 }
 
 function fmtNum(n) {
@@ -613,28 +427,45 @@ function fmtNum(n) {
   return Number(n).toLocaleString();
 }
 
-// Shared by the "+ Watch Table" modal and each card's "Hospital group" row.
-// Reveals the free-text input only when "+ New hospital group…" is picked,
-// so adding a table to an existing hospital is just a dropdown pick — no
-// retyping, no risk of a typo splitting one hospital into two cards.
-function toggleNewGroupInput(prefix) {
-  const select = document.getElementById(prefix + '-group-select');
-  const input  = document.getElementById(prefix + '-new-group-input');
-  if (!select || !input) return;
-  const isNew = select.value === '__new__';
-  input.style.display = isNew ? '' : 'none';
-  if (isNew) input.focus();
-  else input.value = '';
+// GROUP_MEMBERS: { groupName: [watchId, watchId, ...] } — lets the
+// "+ Hospital Group" modal pre-check the right tables the moment you pick
+// an existing group, with no extra network round-trip.
+const GROUP_MEMBERS = {{ group_members | tojson }};
+
+function openGroupModal() {
+  const sel = document.getElementById('group-select');
+  sel.value = '__new__';
+  onGroupSelectChange('__new__');
+  document.getElementById('modal-add-group').classList.add('open');
+}
+
+function onGroupSelectChange(value) {
+  const nameWrap = document.getElementById('group-new-name-wrap');
+  const nameInput = document.getElementById('group-new-name-input');
+  const isNew = value === '__new__';
+
+  nameWrap.style.display = isNew ? '' : 'none';
+  if (isNew) {
+    nameInput.value = '';
+    nameInput.focus();
+  }
+
+  // Pre-check whichever tables already belong to the selected existing
+  // group; a fresh "new group" starts with nothing checked.
+  const members = isNew ? [] : (GROUP_MEMBERS[value] || []);
+  document.querySelectorAll('.group-watch-cb').forEach(cb => {
+    cb.checked = members.includes(parseInt(cb.dataset.watchId, 10));
+  });
 }
 
 async function loadStatus(id) {
   try {
-    const r = await fetch('/dbmonitor/watch/' + id + '/status');
-    const d = await r.json();
-
-    const card  = document.getElementById('wcard-' + id);
-    const pill  = document.getElementById('pill-' + id);
-    const ptxt  = document.getElementById('pill-txt-' + id);
+    var r = await fetch('/dbmonitor/watch/' + id + '/status');
+    var d = await r.json();
+    var pill = document.getElementById('pill-' + id);
+    var ptxt = document.getElementById('pill-txt-' + id);
+    var card = document.getElementById('wcard-' + id);
+    if (!pill) return;
 
     if (d.error) {
       pill.className = 'status-pill dead';
@@ -660,7 +491,6 @@ async function loadStatus(id) {
       return;
     }
 
-    // Live vs Dead
     if (d.is_dead) {
       pill.className = 'status-pill dead';
       ptxt.textContent = 'DEAD';
@@ -689,54 +519,6 @@ async function loadStatus(id) {
 
   } catch(e) {
     console.error('status fetch failed for watch', id, e);
-  }
-}
-
-// ── Hospital group rollup ───────────────────────────────────────────────
-
-function toggleGroupPanel(groupIdx) {
-  const header = document.getElementById('wgroup-header-' + groupIdx);
-  const body   = document.getElementById('wgroup-body-' + groupIdx);
-  if (!body) return;
-  const nowOpen = !body.classList.contains('open');
-  body.classList.toggle('open', nowOpen);
-  if (header) header.classList.toggle('open', nowOpen);
-  if (nowOpen) OPEN_GROUP_PANELS.add(groupIdx); else OPEN_GROUP_PANELS.delete(groupIdx);
-}
-
-function updateGroupPillFor(watchId) {
-  const gi = WATCH_TO_GROUP[watchId];
-  if (gi === undefined) return;  // not part of a group
-  const ids = GROUP_WATCH_IDS[gi] || [];
-  const pill = document.getElementById('wgroup-pill-' + gi);
-  const sub  = document.getElementById('wgroup-sub-' + gi);
-  if (!pill) return;
-
-  let anyDead = false, anyLive = false, deadCount = 0, monitoredCount = 0;
-  for (const id of ids) {
-    const s = WATCH_STATE[id];
-    if (!s) continue;          // status hasn't loaded yet for this table
-    if (!s.monitoring) continue;
-    monitoredCount++;
-    if (s.is_dead) { anyDead = true; deadCount++; } else { anyLive = true; }
-  }
-
-  let cls = 'wgroup-pill', label;
-  if (monitoredCount === 0) {
-    label = 'OFF';
-  } else if (anyDead) {
-    cls += ' dead';
-    label = deadCount + '/' + monitoredCount + ' DEAD';
-  } else {
-    cls += ' live';
-    label = 'LIVE';
-  }
-  pill.className = cls;
-  pill.innerHTML = '<span class="status-dot"></span>' + label;
-
-  if (sub) {
-    sub.textContent = ids.length + ' table' + (ids.length === 1 ? '' : 's') +
-      (deadCount ? ' — ' + deadCount + ' dead' : '');
   }
 }
 
@@ -804,12 +586,10 @@ function renderLocations(watchId, locationCol, locations) {
         </div>`;
     }
 
-    // Click the location NAME to expand/collapse its areas (only if it has any)
     const nameId  = `wloc-name-${watchId}-${loc.id}`;
     const clickAttr = areas.length ? ` onclick="toggleAreaPanel(${watchId}, ${loc.id})"` : '';
     const chev = areas.length ? '<span class="chev">▸</span>' : '';
 
-    // Preserve open/closed state across the 10s auto-refresh re-render
     const isOpen = OPEN_AREA_PANELS.has(watchId + '-' + loc.id);
     const nameOpenClass  = isOpen ? 'open' : '';
     const panelOpenClass = isOpen ? 'open' : '';
@@ -870,7 +650,6 @@ function renderAreas(watchId, areas) {
   }).join('');
 }
 
-// Click a location name → toggle its areas open/closed (accordion "sink back")
 function toggleAreaPanel(watchId, locId) {
   const panel  = document.getElementById('warea-panel-' + watchId + '-' + locId);
   const nameEl = document.getElementById('wloc-name-' + watchId + '-' + locId);
@@ -908,44 +687,75 @@ async function toggleAreaAlert(watchId, areaId) {
   loadStatus(watchId);
 }
 
-async function refreshAll() {
-  await Promise.all(WATCH_IDS.map(id => loadStatus(id)));
+// ── Hospital group rollup ───────────────────────────────────────────────
 
-  // Update summary
-  let live = 0, dead = 0;
+function toggleGroupPanel(groupIdx) {
+  const header = document.getElementById('wgroup-header-' + groupIdx);
+  const body   = document.getElementById('wgroup-body-' + groupIdx);
+  if (!body) return;
+  const nowOpen = !body.classList.contains('open');
+  body.classList.toggle('open', nowOpen);
+  if (header) header.classList.toggle('open', nowOpen);
+  if (nowOpen) OPEN_GROUP_PANELS.add(groupIdx); else OPEN_GROUP_PANELS.delete(groupIdx);
+}
+
+function updateGroupPillFor(watchId) {
+  const gi = WATCH_TO_GROUP[watchId];
+  if (gi === undefined) return;
+  const ids = GROUP_WATCH_IDS[gi] || [];
+  const pill = document.getElementById('wgroup-pill-' + gi);
+  const sub  = document.getElementById('wgroup-sub-' + gi);
+  if (!pill) return;
+
+  let anyDead = false, deadCount = 0, monitoredCount = 0;
+  for (const id of ids) {
+    const s = WATCH_STATE[id];
+    if (!s) continue;
+    if (!s.monitoring) continue;
+    monitoredCount++;
+    if (s.is_dead) { anyDead = true; deadCount++; }
+  }
+
+  let cls = 'wgroup-pill', label;
+  if (monitoredCount === 0) {
+    label = 'OFF';
+  } else if (anyDead) {
+    cls += ' dead';
+    label = deadCount + '/' + monitoredCount + ' DEAD';
+  } else {
+    cls += ' live';
+    label = 'LIVE';
+  }
+  pill.className = cls;
+  pill.innerHTML = '<span class="status-dot"></span>' + label;
+
+  if (sub) {
+    sub.textContent = ids.length + ' table' + (ids.length === 1 ? '' : 's') +
+      (deadCount ? ' — ' + deadCount + ' dead' : '');
+  }
+}
+
+// ── Main refresh loop ──
+function refreshAll() {
+  var liveCount = 0, deadCount = 0, offCount = 0;
   WATCH_IDS.forEach(id => {
-    const pill = document.getElementById('pill-' + id);
-    if (!pill) return;
-    if (pill.classList.contains('live')) live++;
-    if (pill.classList.contains('dead')) dead++;
+    loadStatus(id);
   });
-  const sl = document.getElementById('sum-live');
-  const sd = document.getElementById('sum-dead');
-  if (sl) sl.textContent = live;
-  if (sd) sd.textContent = dead;
+  setTimeout(() => {
+    Object.values(WATCH_STATE).forEach(s => {
+      if (!s.monitoring) offCount++;
+      else if (s.is_dead) deadCount++;
+      else liveCount++;
+    });
+    var elLive = document.getElementById('stat-live');
+    var elDead = document.getElementById('stat-dead');
+    var elOff  = document.getElementById('stat-off');
+    if (elLive) elLive.textContent = liveCount;
+    if (elDead) elDead.textContent = deadCount;
+    if (elOff)  elOff.textContent  = offCount;
+  }, 600);
 }
-
-async function testConn(id) {
-  const el = document.getElementById('conn-st-' + id);
-  el.textContent = 'Testing…';
-  el.className = 'badge badge-info';
-  const r = await fetch('/dbmonitor/connection/' + id + '/test');
-  const d = await r.json();
-  el.textContent = d.ok ? 'OK' : ('✕ ' + (d.error || '?').slice(0, 28));
-  el.className   = d.ok ? 'badge badge-online' : 'badge badge-offline';
-}
-
-// Close modals on backdrop click
-['modal-conn','modal-watch'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener('click', function(e) {
-    if (e.target === this) this.classList.remove('open');
-  });
-});
-
-if (WATCH_IDS.length) {
-  refreshAll();
-  setInterval(refreshAll, 10000);  // poll every 10s
-}
+refreshAll();
+setInterval(refreshAll, 10000);  // poll every 10s
 </script>
 {% endblock %}
