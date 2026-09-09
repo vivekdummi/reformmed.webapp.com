@@ -1,44 +1,21 @@
 services:
 
-  postgres:
-    image: postgres:16-alpine
-    container_name: reformmed_postgres
-    environment:
-      POSTGRES_USER:     ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB:       ${POSTGRES_DB}
-      TZ:                Asia/Kolkata
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
   api:
     build:
       context: ./server
     container_name: reformmed_api
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
+    network_mode: "host"
     environment:
-      POSTGRES_HOST:     reformmed_postgres
+      POSTGRES_HOST:     ${POSTGRES_HOST}
       POSTGRES_USER:     ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB:       ${POSTGRES_DB}
-      POSTGRES_PORT:     5432
+      POSTGRES_PORT:     ${POSTGRES_PORT:-5432}
       API_SECRET:        ${API_SECRET}
       API_HOST:          0.0.0.0
       API_PORT:          8000
       TZ:                Asia/Kolkata
-    ports:
-      - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
 
   webapp:
@@ -46,11 +23,13 @@ services:
       context: .
     container_name: reformmed_webapp
     command: python app.py
+    network_mode: "host"
     environment:
-      POSTGRES_HOST:     reformmed_postgres
+      POSTGRES_HOST:     ${POSTGRES_HOST}
       POSTGRES_USER:     ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB:       ${POSTGRES_DB}
+      POSTGRES_PORT:     ${POSTGRES_PORT:-5432}
       FLASK_SECRET:      ${FLASK_SECRET}
       FLASK_DEBUG:       "0"
       GMAIL_USER:        ${GMAIL_USER}
@@ -59,11 +38,7 @@ services:
       SMTP_PORT:         "465"
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       TZ:                Asia/Kolkata
-    ports:
-      - "5000:5000"
     depends_on:
-      postgres:
-        condition: service_healthy
       api:
         condition: service_started
     restart: unless-stopped
@@ -73,11 +48,13 @@ services:
       context: .
     container_name: reformmed_checker
     command: python offline_checker.py
+    network_mode: "host"
     environment:
-      POSTGRES_HOST:       reformmed_postgres
+      POSTGRES_HOST:       ${POSTGRES_HOST}
       POSTGRES_USER:       ${POSTGRES_USER}
       POSTGRES_PASSWORD:   ${POSTGRES_PASSWORD}
       POSTGRES_DB:         ${POSTGRES_DB}
+      POSTGRES_PORT:       ${POSTGRES_PORT:-5432}
       GMAIL_USER:          ${GMAIL_USER}
       GMAIL_APP_PASS:      ${GMAIL_APP_PASS}
       SMTP_HOST:           smtp.gmail.com
@@ -85,10 +62,4 @@ services:
       OFFLINE_AFTER_SECS:  "60"
       CHECK_INTERVAL_SECS: "15"
       TZ:                  Asia/Kolkata
-    depends_on:
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
-
-volumes:
-  postgres_data:
