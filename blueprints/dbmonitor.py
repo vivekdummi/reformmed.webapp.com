@@ -304,10 +304,16 @@ def index():
 
     existing_group_names = sorted({g["name"] for g in groups if g["name"]})
 
+    # {group_name: [watch_id, ...]} — lets the "+ Hospital Group" modal
+    # pre-check the right tables the instant you pick an existing group,
+    # with no extra AJAX round-trip.
+    group_members = {g["name"]: [w["id"] for w in g["watches"]] for g in groups if g["name"]}
+
     return render_template(
         "dbmonitor.html", connections=connections, watches=watches,
         groups=groups, group_watch_ids=group_watch_ids,
         existing_group_names=existing_group_names,
+        group_members=group_members,
         recipients=list_alert_recipients(),
     )
 
@@ -434,6 +440,51 @@ def update_group(watch_id):
     if request.is_json:
         return jsonify({"ok": True})
     flash("Group updated.", "success")
+    return redirect(url_for("dbmonitor.index"))
+
+
+@dbmonitor_bp.route("/group/save", methods=["POST"])
+@login_required
+def save_group():
+    """
+    Create or edit a hospital group's membership in one shot — powers the
+    dedicated "+ Hospital Group" modal (which replaced the per-table group
+    picker). Reuses _resolve_group_name() so this stays consistent with
+    update_group() above: whichever checked watch_ids come in become this
+    group's exact membership — anything previously in the group that got
+    unchecked has its group_name cleared, and everything checked gets set.
+    """
+    _admin_required()
+    group_name = _resolve_group_name(request.form)
+    if not group_name:
+        flash("Group name is required.", "danger")
+        return redirect(url_for("dbmonitor.index"))
+
+    try:
+        watch_ids = [int(x) for x in request.form.getlist("watch_ids")]
+    except ValueError:
+        watch_ids = []
+
+    with get_db() as conn:
+        cur = conn.cursor()
+        if watch_ids:
+            cur.execute(
+                "UPDATE dbmon_watches SET group_name=NULL "
+                "WHERE group_name=%s AND id != ALL(%s)",
+                (group_name, watch_ids)
+            )
+            cur.execute(
+                "UPDATE dbmon_watches SET group_name=%s WHERE id = ANY(%s)",
+                (group_name, watch_ids)
+            )
+        else:
+            # Nothing checked — this group ends up with no members
+            cur.execute(
+                "UPDATE dbmon_watches SET group_name=NULL WHERE group_name=%s",
+                (group_name,)
+            )
+
+    flash(f"Hospital group '{group_name}' saved.", "success")
     return redirect(url_for("dbmonitor.index"))
 
 
