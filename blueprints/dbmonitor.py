@@ -13,12 +13,13 @@ and tracks live/dead + alert state for each one independently
 (dbmon_watch_locations table).
 """
 import smtplib
+import ssl
 import os
 from email.mime.text import MIMEText
 from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort
 from flask_login import login_required, current_user
-from db import get_db, list_alert_recipients
+from db import get_db, list_alert_recipients, alerts_master_enabled, get_encrypted_setting, get_setting
 import psycopg2
 import psycopg2.extras
 
@@ -229,29 +230,45 @@ def _send_alert(watch_row, subject, body, machine_key=None, alert_emails=None):
     machine_key / alert_emails let callers override the defaults derived from
     watch_row — used for per-location alerts (e.g. "bodycraft.bodycraft_hospital_data:Bodycraft Sadashiva Nagar").
     """
+    if not alerts_master_enabled():
+        return  # app-wide kill-switch — Settings → General → Alerts Master Switch
+
     emails_src = alert_emails if alert_emails is not None else watch_row.get("alert_emails")
     emails = [e.strip() for e in (emails_src or "").split(",") if e.strip()]
     ok = False
     if emails:
-        smtp_host = os.getenv("SMTP_HOST", "")
-        smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        smtp_user = os.getenv("SMTP_USER", "")
-        smtp_pass = os.getenv("SMTP_PASS", "")
-        from_addr = os.getenv("ALERT_FROM", smtp_user)
-        if smtp_host:
+        # SMTP config now comes from Settings → Email/SMTP (DB-backed,
+        # password encrypted) — falls back to GMAIL_USER/GMAIL_APP_PASS in
+        # .env for anyone who hasn't set DB-based credentials yet. This also
+        # fixes a pre-existing bug: this function used to read
+        # SMTP_HOST/SMTP_USER/SMTP_PASS/ALERT_FROM env vars that were never
+        # actually set anywhere in this app's .env, so DB Monitor alert
+        # emails could never have sent successfully before this change.
+        smtp_host = get_setting("smtp_host", "smtp.gmail.com")
+        try:
+            smtp_port = int(get_setting("smtp_port", "465"))
+        except ValueError:
+            smtp_port = 465
+        smtp_user = get_encrypted_setting("smtp_username", "") or os.getenv("GMAIL_USER", "")
+        smtp_pass = get_encrypted_setting("smtp_password", "") or os.getenv("GMAIL_APP_PASS", "")
+        from_addr = get_setting("alert_from_email", "") or smtp_user
+
+        if smtp_host and smtp_user and smtp_pass:
             try:
                 msg = MIMEText(body, "plain")
                 msg["Subject"] = subject
                 msg["From"]    = from_addr
                 msg["To"]      = ", ".join(emails)
-                with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as s:
-                    s.starttls()
-                    if smtp_user:
-                        s.login(smtp_user, smtp_pass)
+                ctx = ssl.create_default_context()
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10, context=ctx) as s:
+                    s.login(smtp_user, smtp_pass)
                     s.sendmail(from_addr, emails, msg.as_string())
                 ok = True
             except Exception as e:
                 print(f"[dbmonitor] alert email failed: {e}")
+        else:
+            print("[dbmonitor] alert email skipped — SMTP not configured "
+                  "(Settings → Email/SMTP, or GMAIL_USER/GMAIL_APP_PASS in .env)")
     # Log to unified alert_log
     if machine_key is None:
         machine_key = f"{watch_row.get('schema_name','')}.{watch_row.get('table_name','')}"

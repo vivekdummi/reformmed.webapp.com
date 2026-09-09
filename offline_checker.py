@@ -59,11 +59,86 @@ def _mark_sent(machine_key: str, alert_type: str):
 import ssl, smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from cryptography.fernet import Fernet, InvalidToken
 
-GMAIL_USER = os.getenv("GMAIL_USER", "")
-GMAIL_PASS = os.getenv("GMAIL_APP_PASS", "")
-SMTP_HOST  = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT  = int(os.getenv("SMTP_PORT", "465"))
+# Fallback-only — the real source of truth is the DB (app_settings, refreshed
+# every cycle in main() so an admin's change takes effect without restarting
+# this container). These envs only matter until someone sets DB-based
+# credentials for the first time via Settings → Email/SMTP.
+_ENV_GMAIL_USER = os.getenv("GMAIL_USER", "")
+_ENV_GMAIL_PASS = os.getenv("GMAIL_APP_PASS", "")
+_ENV_SMTP_HOST  = os.getenv("SMTP_HOST", "smtp.gmail.com")
+_ENV_SMTP_PORT  = int(os.getenv("SMTP_PORT", "465"))
+
+_fernet = None
+if os.getenv("SETTINGS_ENCRYPTION_KEY"):
+    try:
+        _fernet = Fernet(os.getenv("SETTINGS_ENCRYPTION_KEY").encode())
+    except Exception as e:
+        log.error("SETTINGS_ENCRYPTION_KEY is invalid: %s", e)
+
+# Refreshed once per poll cycle by main() — _send_email() always reads
+# from here, never straight from env, so a password/host change in
+# Settings takes effect on the next cycle with no restart needed.
+_smtp_runtime = {
+    "host": _ENV_SMTP_HOST, "port": _ENV_SMTP_PORT,
+    "user": _ENV_GMAIL_USER, "password": _ENV_GMAIL_PASS,
+    "from_addr": _ENV_GMAIL_USER,
+}
+# Also refreshed each cycle — a second, independent check inside _alert()
+# itself, so the kill-switch still holds even if some future caller forgets
+# to check alerts_master_enabled() before invoking it.
+_master_enabled_cache = True
+
+
+async def _refresh_smtp_and_master_switch(conn):
+    """
+    Pulls the current alerts_master_enabled flag + SMTP credentials from
+    app_settings (decrypting the password with the same Fernet key the
+    Flask side uses) and updates the module-level runtime dict in place.
+    Falls back to the .env values above for anything not yet set in the DB,
+    so upgrading doesn't silently break alerting until someone visits
+    Settings → Email/SMTP.
+    Returns the master-enabled bool.
+    """
+    rows = await conn.fetch("SELECT key, value FROM app_settings")
+    settings = {r["key"]: r["value"] for r in rows}
+
+    master_enabled = settings.get("alerts_master_enabled", "1") == "1"
+
+    host = settings.get("smtp_host") or _ENV_SMTP_HOST
+    try:
+        port = int(settings.get("smtp_port") or _ENV_SMTP_PORT)
+    except ValueError:
+        port = _ENV_SMTP_PORT
+
+    username = _ENV_GMAIL_USER
+    password = _ENV_GMAIL_PASS
+    if _fernet is not None:
+        enc_user = settings.get("smtp_username")
+        enc_pass = settings.get("smtp_password")
+        if enc_user:
+            try:
+                username = _fernet.decrypt(enc_user.encode()).decode()
+            except (InvalidToken, Exception) as e:
+                log.error("Failed to decrypt smtp_username, using .env fallback: %s", e)
+        if enc_pass:
+            try:
+                password = _fernet.decrypt(enc_pass.encode()).decode()
+            except (InvalidToken, Exception) as e:
+                log.error("Failed to decrypt smtp_password, using .env fallback: %s", e)
+
+    from_addr = settings.get("alert_from_email") or username or _ENV_GMAIL_USER
+
+    _smtp_runtime.update({
+        "host": host, "port": port,
+        "user": username, "password": password,
+        "from_addr": from_addr,
+    })
+
+    global _master_enabled_cache
+    _master_enabled_cache = master_enabled
+    return master_enabled
 
 # Per-alert-type look (accent color + icon) for the HTML card
 _ALERT_STYLE = {
@@ -126,20 +201,22 @@ def _render_alert(alert_type: str, system_name: str, location: str,
 
 
 def _send_email(subject: str, plain: str, html: str, to_list: list[str]) -> bool:
-    if not GMAIL_USER or not GMAIL_PASS or not to_list:
+    user = _smtp_runtime["user"]
+    password = _smtp_runtime["password"]
+    if not user or not password or not to_list:
         log.warning("Email not configured or no recipients — skipping: %s", subject)
         return False
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = f"[REFORMMED] {subject}"
-        msg["From"]    = GMAIL_USER
+        msg["From"]    = _smtp_runtime["from_addr"] or user
         msg["To"]      = ", ".join(to_list)
         msg.attach(MIMEText(plain, "plain"))
         msg.attach(MIMEText(html, "html"))
         ctx = ssl.create_default_context()
-        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx) as srv:
-            srv.login(GMAIL_USER, GMAIL_PASS)
-            srv.sendmail(GMAIL_USER, to_list, msg.as_string())
+        with smtplib.SMTP_SSL(_smtp_runtime["host"], _smtp_runtime["port"], context=ctx) as srv:
+            srv.login(user, password)
+            srv.sendmail(user, to_list, msg.as_string())
         log.info("📧 Alert sent: %s", subject)
         return True
     except Exception as e:
@@ -202,6 +279,8 @@ def _recipients(config: dict, atype: str) -> list[str]:
 
 async def _alert(conn, config: dict, machine_key: str, alert_type: str,
                   system_name: str, location: str, rows: list[tuple[str, str]]):
+    if not _master_enabled_cache:
+        return  # kill-switch — defense-in-depth, main() already checks this too
     cfg = config.get(alert_type, {})
     if not cfg.get("enabled", True):
         return
@@ -284,6 +363,11 @@ async def main():
     while True:
         try:
             async with pool.acquire() as conn:
+                master_enabled = await _refresh_smtp_and_master_switch(conn)
+                if not master_enabled:
+                    log.info("🔕 Alerts master switch is OFF — skipping this cycle's alert checks "
+                             "(status tracking still runs normally)")
+
                 config    = await _get_alert_config(conn)
                 overrides = await _get_machine_overrides(conn)
                 machines = await conn.fetch("SELECT * FROM machine_registry")
@@ -313,9 +397,12 @@ async def main():
                             "UPDATE machine_registry SET status=$1 WHERE system_name=$2 AND location=$3",
                             new_status, system_name, location,
                         )
-                        # Status always updates so the dashboard reflects reality —
-                        # alerts_enabled only controls whether we email about it.
-                        if not alerts_enabled:
+                        # Status ALWAYS updates so the dashboard reflects reality,
+                        # even with the master switch off — only the EMAIL below
+                        # is gated by it.
+                        if not master_enabled:
+                            pass
+                        elif not alerts_enabled:
                             log.info("🔕 %s (%s) → %s (alerts muted for this machine)",
                                      system_name, location, new_status)
                         elif new_status == "offline" and offline_cfg.get("enabled", True):
@@ -327,7 +414,7 @@ async def main():
                             await _alert(conn, effective_cfg, key, "online", system_name, location,
                                          [("Back online since", _fmt_ist(now))])
 
-                    if new_status == "online":
+                    if new_status == "online" and master_enabled:
                         await check_metrics(conn, machine, effective_cfg, alerts_enabled)
 
             await asyncio.sleep(CHECK_INTERVAL_SECS)

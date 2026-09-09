@@ -8,6 +8,7 @@ import logging
 import psycopg2
 import psycopg2.extras
 from contextlib import contextmanager
+from cryptography.fernet import Fernet, InvalidToken
 
 log = logging.getLogger(__name__)
 
@@ -182,6 +183,10 @@ def init_db():
             ("alert_from_email",    ""),
             ("app_name",            "REFORMMED Monitor"),
             ("sidebar_default",     "expanded"),
+            # Master alert kill-switch — checked before every single alert
+            # send, across System/Machine/DVR/DB Monitor alike. "0" mutes
+            # the whole app regardless of any individual alert's own setting.
+            ("alerts_master_enabled", "1"),
         ]
         for k, v in default_settings:
             cur.execute("""
@@ -224,6 +229,75 @@ def get_setting(key, default=""):
         cur.execute("SELECT value FROM app_settings WHERE key=%s", (key,))
         row = cur.fetchone()
     return row["value"] if row else default
+
+
+def alerts_master_enabled() -> bool:
+    """
+    The one kill-switch checked before every alert send, everywhere in the
+    app (System Alerts, Machine Alerts, DVR, DB Monitor). When this is off,
+    nothing sends — regardless of what any individual alert type/machine/
+    table has configured. Defaults to enabled if the row is somehow missing.
+    """
+    return get_setting("alerts_master_enabled", "1") == "1"
+
+
+# ── Encrypted settings (SMTP password, etc.) ────────────────────────────────
+# Values are encrypted with a key that lives OUTSIDE the database — in
+# SETTINGS_ENCRYPTION_KEY (.env). This is the same reasoning FLASK_SECRET
+# already follows: an encryption key has to live somewhere outside the
+# thing it protects. What this DOES achieve: the actual SMTP password no
+# longer sits in a plaintext DB column visible to anyone with read access
+# to app_settings, or in .env where it was before.
+
+def _get_fernet():
+    key = os.getenv("SETTINGS_ENCRYPTION_KEY", "")
+    if not key:
+        log.warning(
+            "SETTINGS_ENCRYPTION_KEY is not set — encrypted settings (SMTP "
+            "password) can't be read or written until it is. Generate one "
+            "with: python3 -c \"from cryptography.fernet import Fernet; "
+            "print(Fernet.generate_key().decode())\" and add it to .env."
+        )
+        return None
+    try:
+        return Fernet(key.encode())
+    except Exception as e:
+        log.error("SETTINGS_ENCRYPTION_KEY is invalid: %s", e)
+        return None
+
+
+def set_encrypted_setting(key, value):
+    """Encrypt `value` and store it in app_settings under `key`. No-op (with
+    a warning already logged by _get_fernet) if no encryption key is set."""
+    f = _get_fernet()
+    if f is None:
+        return False
+    token = f.encrypt(value.encode()).decode()
+    with get_db() as conn:
+        conn.cursor().execute("""
+            INSERT INTO app_settings (key, value) VALUES (%s, %s)
+            ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value
+        """, (key, token))
+    return True
+
+
+def get_encrypted_setting(key, default=""):
+    """Decrypt and return the value stored under `key`, or `default` if
+    missing/undecryptable (e.g. no encryption key configured yet)."""
+    f = _get_fernet()
+    if f is None:
+        return default
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT value FROM app_settings WHERE key=%s", (key,))
+        row = cur.fetchone()
+    if not row:
+        return default
+    try:
+        return f.decrypt(row["value"].encode()).decode()
+    except (InvalidToken, Exception) as e:
+        log.error("Failed to decrypt setting '%s': %s", key, e)
+        return default
 
 
 def list_alert_recipients():

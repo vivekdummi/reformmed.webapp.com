@@ -8,7 +8,12 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort
 from flask_login import login_required, current_user
-from db import get_db, list_alert_recipients
+from db import (
+    get_db, list_alert_recipients,
+    alerts_master_enabled as _alerts_master_enabled,
+    get_encrypted_setting as _get_encrypted_setting,
+    get_setting as _get_app_setting,
+)
 
 dvr_bp = Blueprint("dvr", __name__, url_prefix="/dvr")
 
@@ -162,26 +167,38 @@ def _render_dvr_alert(kind, hospital, location, dvr_name, ip, port, rows, now=No
 
 def _send_alert(kind, hospital, location, dvr_name, ip, port, rows=None, machine_key="dvr"):
     """Send the styled DVR alert email and log it to the unified alert_log."""
+    if not _alerts_master_enabled():
+        return False  # app-wide kill-switch — Settings → General → Alerts Master Switch
+
     subject, plain, html = _render_dvr_alert(kind, hospital, location, dvr_name, ip, port, rows or [])
 
     emails = get_setting("alert_emails", "")
-    gmail_user = os.getenv("GMAIL_USER", "")
-    gmail_pass = os.getenv("GMAIL_APP_PASS", "")
+    # SMTP config now comes from Settings → Email/SMTP (DB-backed, password
+    # encrypted) — falls back to GMAIL_USER/GMAIL_APP_PASS in .env for
+    # anyone who hasn't set DB-based credentials yet.
+    gmail_user = _get_encrypted_setting("smtp_username", "") or os.getenv("GMAIL_USER", "")
+    gmail_pass = _get_encrypted_setting("smtp_password", "") or os.getenv("GMAIL_APP_PASS", "")
+    smtp_host  = _get_app_setting("smtp_host", "smtp.gmail.com") or os.getenv("SMTP_HOST", "smtp.gmail.com")
+    try:
+        smtp_port = int(_get_app_setting("smtp_port", "465") or os.getenv("SMTP_PORT", "465"))
+    except ValueError:
+        smtp_port = 465
+    from_addr = _get_app_setting("alert_from_email", "") or gmail_user
+
     recipients = [e.strip() for e in emails.split(",") if e.strip()]
     ok = False
     if gmail_user and gmail_pass and recipients:
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = f"[REFORMMED] {subject}"
-            msg["From"] = gmail_user
+            msg["From"] = from_addr
             msg["To"] = ", ".join(recipients)
             msg.attach(MIMEText(plain, "plain"))
             msg.attach(MIMEText(html, "html"))
             ctx = ssl.create_default_context()
-            with smtplib.SMTP_SSL(os.getenv("SMTP_HOST", "smtp.gmail.com"),
-                                   int(os.getenv("SMTP_PORT", "465")), context=ctx) as srv:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=ctx) as srv:
                 srv.login(gmail_user, gmail_pass)
-                srv.sendmail(gmail_user, recipients, msg.as_string())
+                srv.sendmail(from_addr, recipients, msg.as_string())
             ok = True
         except Exception as e:
             print(f"DVR alert failed: {e}")
