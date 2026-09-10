@@ -271,12 +271,15 @@ def agent_context():
 @api_bp.route("/agent/chat", methods=["POST"])
 @login_required
 def agent_chat():
-    """Simple (non-streaming) Claude response for the AI agent popup."""
+    """Simple (non-streaming) Gemini response for the AI agent popup."""
     import json, urllib.request, urllib.error, os
     from flask import request
 
+    GEMINI_MODEL   = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
     body = request.get_json(silent=True) or {}
-    messages  = body.get("messages", [])   # full conversation history
+    messages  = body.get("messages", [])   # full conversation history (Anthropic-style: [{role, content}])
     context   = body.get("context",  {})   # DB snapshot passed from frontend
 
     # Build system prompt with live context
@@ -326,38 +329,43 @@ You can answer questions about:
 
 Be concise, direct, and use bullet points for lists. For normal conversation, reply in 1-3 sentences. Always reference actual data from the context above when answering infrastructure questions."""
 
+    # Gemini has no "assistant" role and no separate top-level "content" string —
+    # convert the Anthropic-style [{role, content}] history into Gemini's
+    # [{role, parts:[{text}]}] shape ("assistant" -> "model").
+    contents = []
+    for m in messages:
+        role = "model" if m.get("role") == "assistant" else "user"
+        contents.append({"role": role, "parts": [{"text": m.get("content", "")}]})
+
     payload = json.dumps({
-        "model":      "claude-sonnet-5",
-        "max_tokens": 800,
-        "stream":     True,
-        "system":     system,
-        "messages":   messages,
+        "contents": contents,
+        "systemInstruction": {"parts": [{"text": system}]},
+        "generationConfig": {"maxOutputTokens": 2048},
     }).encode()
 
     try:
-        # Non-streaming request
-        payload_ns = json.loads(payload.decode())
-        payload_ns["stream"] = False
         req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=json.dumps(payload_ns).encode(),
+            f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent",
+            data=payload,
             headers={
-                "x-api-key":         os.getenv("ANTHROPIC_API_KEY",""),
-                "anthropic-version": "2023-06-01",
-                "content-type":      "application/json",
+                "x-goog-api-key": GEMINI_API_KEY,
+                "content-type":   "application/json",
             },
         )
         with urllib.request.urlopen(req, timeout=60) as resp:
             data = json.loads(resp.read().decode())
-            text = data.get("content",[{}])[0].get("text","")
+            try:
+                text = data["candidates"][0]["content"]["parts"][0].get("text", "")
+            except (KeyError, IndexError, TypeError):
+                text = ""
             return jsonify({"text": text})
     except urllib.error.HTTPError as e:
         try:
             body = e.read().decode()
         except Exception:
             body = ""
-        print(f"[api/aria] Anthropic API error {e.code}: {body}")
-        return jsonify({"error": f"Anthropic API error {e.code}: {body}"}), 500
+        print(f"[api/aria] Gemini API error {e.code}: {body}")
+        return jsonify({"error": f"Gemini API error {e.code}: {body}"}), 500
     except Exception as e:
         # Catch-all so we can never lose visibility into what actually
         # failed — includes network errors (DNS/timeout/connection refused),

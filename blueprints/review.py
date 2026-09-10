@@ -1,13 +1,46 @@
 """
-AI Review blueprint — Claude-powered infrastructure summary.
+AI Review blueprint — Gemini-powered infrastructure summary.
 Pulls live data from PostgreSQL and streams an AI analysis.
 """
 import json
+import os
 from flask import Blueprint, render_template, Response, stream_with_context, abort, jsonify
 from flask_login import login_required, current_user
 from db import get_db
 
 review_bp = Blueprint("review", __name__, url_prefix="/review")
+
+# ── Gemini config (Google AI Studio — no GCP project/billing required) ──────
+# Get a free key at https://aistudio.google.com/apikey — overridable via .env.
+GEMINI_MODEL   = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+
+def _gemini_url(stream: bool) -> str:
+    method = "streamGenerateContent?alt=sse" if stream else "generateContent"
+    return f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:{method}"
+
+
+def _gemini_payload(prompt: str) -> bytes:
+    return json.dumps({
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"maxOutputTokens": 4096},
+    }).encode()
+
+
+def _gemini_headers() -> dict:
+    return {
+        "x-goog-api-key": GEMINI_API_KEY,
+        "content-type":   "application/json",
+    }
+
+
+def _extract_gemini_text(obj: dict) -> str:
+    """Pull the text delta out of one Gemini response object, if present."""
+    try:
+        return obj["candidates"][0]["content"]["parts"][0].get("text", "")
+    except (KeyError, IndexError, TypeError):
+        return ""
 
 
 def _collect_data():
@@ -190,27 +223,15 @@ def stream():
     def generate():
         import urllib.request
         import urllib.error
-        import os
 
         try:
             data   = _collect_data()
             prompt = _build_prompt(data)
 
-            payload = json.dumps({
-                "model":      "claude-sonnet-5",
-                "max_tokens": 1024,
-                "stream":     True,
-                "messages":   [{"role": "user", "content": prompt}],
-            }).encode()
-
             req = urllib.request.Request(
-                "https://api.anthropic.com/v1/messages",
-                data=payload,
-                headers={
-                    "x-api-key":         os.getenv("ANTHROPIC_API_KEY", ""),
-                    "anthropic-version": "2023-06-01",
-                    "content-type":      "application/json",
-                },
+                _gemini_url(stream=True),
+                data=_gemini_payload(prompt),
+                headers=_gemini_headers(),
             )
             with urllib.request.urlopen(req, timeout=60) as resp:
                 for raw_line in resp:
@@ -218,11 +239,11 @@ def stream():
                     if not line.startswith("data:"):
                         continue
                     chunk = line[5:].strip()
-                    if chunk == "[DONE]":
-                        break
+                    if not chunk:
+                        continue
                     try:
                         obj = json.loads(chunk)
-                        delta = (obj.get("delta") or {}).get("text", "")
+                        delta = _extract_gemini_text(obj)
                         if delta:
                             yield f"data:{json.dumps({'text': delta})}\n\n"
                     except Exception:
@@ -235,8 +256,8 @@ def stream():
                     body = e.read().decode()
                 except Exception:
                     body = ""
-                print(f"[review stream] Anthropic API error {e.code}: {body}")
-                yield f"data:{json.dumps({'error': f'Anthropic API error {e.code}: {body}'})}\n\n"
+                print(f"[review stream] Gemini API error {e.code}: {body}")
+                yield f"data:{json.dumps({'error': f'Gemini API error {e.code}: {body}'})}\n\n"
             else:
                 print(f"[review stream] Non-HTTP error ({type(e).__name__}): {e}")
                 yield f"data:{json.dumps({'error': f'{type(e).__name__}: {e}'})}\n\n"
@@ -257,38 +278,28 @@ def run():
     """Non-streaming review endpoint — avoids nginx SSE buffering issues."""
     if not current_user.is_admin:
         abort(403)
-    import json, urllib.request, urllib.error, os
+    import urllib.request, urllib.error
     try:
         data   = _collect_data()
         prompt = _build_prompt(data)
-        payload = json.dumps({
-            "model":      "claude-sonnet-5",
-            "max_tokens": 1500,
-            "stream":     False,
-            "messages":   [{"role": "user", "content": prompt}],
-        }).encode()
         req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=payload,
-            headers={
-                "x-api-key":         os.getenv("ANTHROPIC_API_KEY", ""),
-                "anthropic-version": "2023-06-01",
-                "content-type":      "application/json",
-            },
+            _gemini_url(stream=False),
+            data=_gemini_payload(prompt),
+            headers=_gemini_headers(),
         )
         with urllib.request.urlopen(req, timeout=120) as resp:
             result = json.loads(resp.read().decode())
-            text = result.get("content", [{}])[0].get("text", "")
+            text = _extract_gemini_text(result)
             return jsonify({"text": text})
     except urllib.error.HTTPError as e:
-        # Anthropic's real reason lives in the response body, not in str(e)
+        # Gemini's real reason lives in the response body, not in str(e)
         # (which is just the generic "HTTP Error 400: Bad Request").
         try:
             body = e.read().decode()
         except Exception:
             body = ""
-        print(f"[review] Anthropic API error {e.code}: {body}")
-        return jsonify({"error": f"Anthropic API error {e.code}: {body}"}), 500
+        print(f"[review] Gemini API error {e.code}: {body}")
+        return jsonify({"error": f"Gemini API error {e.code}: {body}"}), 500
     except Exception as e:
         print(f"[review] Non-HTTP error ({type(e).__name__}): {e}")
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500

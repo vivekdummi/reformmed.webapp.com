@@ -323,6 +323,11 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
       <span class="nav-label">Servers</span>
     </a>
+    <a href="{{ url_for('reports.index') }}" data-label="Reports"
+       class="nav-item {% if 'reports' in request.endpoint %}active{% endif %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <span class="nav-label">Reports</span>
+    </a>
     {% endif %}
     {% if current_user.is_admin or current_user.can_view_dvr %}
     <a href="{{ url_for('dvr.index') }}" data-label="DVRs"
@@ -351,11 +356,6 @@
        class="nav-item {% if 'users' in request.endpoint %}active{% endif %}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
       <span class="nav-label">Users</span>
-    </a>
-    <a href="{{ url_for('terminal.index') }}" data-label="Terminal"
-       class="nav-item {% if 'terminal' in request.endpoint %}active{% endif %}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-      <span class="nav-label">Terminal</span>
     </a>
     <a href="{{ url_for('review.index') }}" data-label="AI Review"
        class="nav-item {% if 'review' in request.endpoint %}active{% endif %}">

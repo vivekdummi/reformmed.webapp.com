@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% block title %}Reports — REFORMMED{% endblock %}
+{% block page_title %}Reports{% endblock %}
+
+{% block extra_css %}
+<style>
+.rep-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+@media(max-width:900px){.rep-grid{grid-template-columns:1fr;}}
+.rep-card-title{font-weight:700;font-size:14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;}
+.rep-list{max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+.rep-check-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;font-size:13px;cursor:pointer;user-select:none;}
+.rep-check-row:hover{background:var(--bg3,rgba(255,255,255,.03));}
+.rep-check-row input{width:auto;margin:0;flex-shrink:0;}
+.rep-sub{font-size:11px;color:var(--text-muted);margin-left:auto;font-family:'JetBrains Mono',monospace;}
+.rep-select-all{font-size:11px;color:var(--accent);cursor:pointer;background:none;border:none;font-family:inherit;padding:0;}
+.rep-actions{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+.rep-status{font-size:13px;color:var(--text-muted);}
+.rep-status.err{color:var(--red,#ef4444);}
+.rep-table-wrap{overflow-x:auto;}
+.rep-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.rep-table th,.rep-table td{padding:9px 12px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border);}
+.rep-table th{color:var(--text-muted);font-weight:600;text-transform:uppercase;font-size:10.5px;letter-spacing:.5px;position:sticky;top:0;background:var(--bg2);}
+.rep-table tbody tr:hover{background:var(--bg3,rgba(255,255,255,.03));}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div><h1>Reports</h1><p>Pick machines and metrics, preview the report, then download it</p></div>
+</div>
+
+{% if not machines %}
+<div class="card" style="text-align:center;padding:48px;">
+  <div style="font-weight:600;font-size:16px;margin-bottom:6px;">No machines available</div>
+  <div class="text-muted" style="font-size:13px;">You don't have access to any machines yet.</div>
+</div>
+{% else %}
+
+<div class="rep-grid">
+  <div class="card">
+    <div class="rep-card-title">
+      <span>1. Machines</span>
+      <button type="button" class="rep-select-all" onclick="toggleAllMachines()">Select / clear all</button>
+    </div>
+    <div class="rep-list" id="rep-machine-list">
+      {% for m in machines %}
+      <label class="rep-check-row">
+        <input type="checkbox" class="rep-machine-cb" value="{{ m.table_name }}">
+        <span>{{ m.system_name }}</span>
+        <span class="rep-sub">{{ m.location }} — {{ m.status }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card" id="rep-metrics-card">
+    <div class="rep-card-title">
+      <span>2. Metrics</span>
+      <button type="button" class="rep-select-all" onclick="toggleAllMetrics()">Select / clear all</button>
+    </div>
+    <div class="rep-list">
+      {% for mid, label in metrics %}
+      <label class="rep-check-row">
+        <input type="checkbox" class="rep-metric-cb" value="{{ mid }}" {% if mid in ('status','cpu','ram') %}checked{% endif %}>
+        <span>{{ label }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:16px;">
+  <div class="rep-card-title"><span>3. Time Range</span></div>
+  <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end;">
+    <label class="rep-check-row" style="padding:0;">
+      <input type="radio" name="rep-mode" value="latest" checked onchange="onModeChange()">
+      <span>Latest snapshot (current status)</span>
+    </label>
+    <label class="rep-check-row" style="padding:0;">
+      <input type="radio" name="rep-mode" value="range" onchange="onModeChange()">
+      <span>Date &amp; time range — raw readings (history)</span>
+    </label>
+    <label class="rep-check-row" style="padding:0;">
+      <input type="radio" name="rep-mode" value="events" onchange="onModeChange()">
+      <span>Date &amp; time range — events (offline/online, high CPU/RAM/disk)</span>
+    </label>
+  </div>
+  <div id="rep-range-wrap" style="display:none;margin-top:14px;gap:16px;flex-wrap:wrap;">
+    <div>
+      <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;">Start</label>
+      <input type="datetime-local" id="rep-range-start" style="padding:8px 12px;font-size:13px;">
+    </div>
+    <div>
+      <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;">End</label>
+      <input type="datetime-local" id="rep-range-end" style="padding:8px 12px;font-size:13px;">
+    </div>
+  </div>
+</div>
+
+<div class="rep-actions">
+  <button class="btn btn-primary" onclick="generateReport()">4. Generate Report</button>
+  <button class="btn btn-ghost" id="rep-download-btn" onclick="downloadReport()" style="display:none;">Download CSV</button>
+  <span class="rep-status" id="rep-status"></span>
+</div>
+
+<div class="card" id="rep-preview-card" style="display:none;">
+  <div class="rep-card-title"><span>Preview</span></div>
+  <div class="rep-table-wrap">
+    <table class="rep-table" id="rep-table">
+      <thead><tr id="rep-thead-row"></tr></thead>
+      <tbody id="rep-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAllMachines() {
+  const boxes = document.querySelectorAll('.rep-machine-cb');
+  const anyUnchecked = Array.from(boxes).some(b => !b.checked);
+  boxes.forEach(b => b.checked = anyUnchecked);
+}
+function toggleAllMetrics() {
+  const boxes = document.querySelectorAll('.rep-metric-cb');
+  const anyUnchecked = Array.from(boxes).some(b => !b.checked);
+  boxes.forEach(b => b.checked = anyUnchecked);
+}
+function selectedMode() {
+  return document.querySelector('input[name="rep-mode"]:checked').value;
+}
+function onModeChange() {
+  const mode = selectedMode();
+  document.getElementById('rep-range-wrap').style.display = (mode === 'latest') ? 'none' : 'flex';
+  document.getElementById('rep-metrics-card').style.display = (mode === 'events') ? 'none' : '';
+}
+function reportPayload() {
+  const payload = {table_names: selectedMachines(), mode: selectedMode()};
+  if (payload.mode !== 'events') payload.metrics = selectedMetrics();
+  if (payload.mode !== 'latest') {
+    payload.start = document.getElementById('rep-range-start').value;
+    payload.end   = document.getElementById('rep-range-end').value;
+  }
+  return payload;
+}
+// Default the range pickers to "last 24 hours" so switching to range mode
+// already has a sensible starting point instead of two empty fields.
+(function prefillRange() {
+  const end = new Date();
+  const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+  const toLocal = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  document.getElementById('rep-range-start').value = toLocal(start);
+  document.getElementById('rep-range-end').value = toLocal(end);
+})();
+function selectedMachines() {
+  return Array.from(document.querySelectorAll('.rep-machine-cb:checked')).map(b => b.value);
+}
+function selectedMetrics() {
+  return Array.from(document.querySelectorAll('.rep-metric-cb:checked')).map(b => b.value);
+}
+function setStatus(msg, isErr) {
+  const el = document.getElementById('rep-status');
+  el.textContent = msg || '';
+  el.className = 'rep-status' + (isErr ? ' err' : '');
+}
+
+async function generateReport() {
+  const payload = reportPayload();
+  if (!payload.table_names.length) { setStatus('Select at least one machine.', true); return; }
+  if (payload.mode !== 'events' && !payload.metrics.length) { setStatus('Select at least one metric.', true); return; }
+  if (payload.mode !== 'latest' && (!payload.start || !payload.end)) {
+    setStatus('Pick both a start and end date/time.', true); return;
+  }
+
+  setStatus('Generating…', false);
+  document.getElementById('rep-download-btn').style.display = 'none';
+  try {
+    const res = await fetch('/reports/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) { setStatus(data.error || 'Failed to generate report.', true); return; }
+
+    const theadRow = document.getElementById('rep-thead-row');
+    const tbody = document.getElementById('rep-tbody');
+    theadRow.innerHTML = data.columns.map(c => `<th>${escapeHtml(c)}</th>`).join('');
+    tbody.innerHTML = data.rows.map(row =>
+      '<tr>' + row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('') + '</tr>'
+    ).join('') || `<tr><td colspan="${data.columns.length}" style="text-align:center;color:var(--text-muted);">No data</td></tr>`;
+
+    document.getElementById('rep-preview-card').style.display = '';
+    document.getElementById('rep-download-btn').style.display = '';
+    let msg = `${data.rows.length} row(s) — ${data.columns.length - 1} column(s).`;
+    if (data.truncated) msg += ' Some machines had more readings than the 1000-row cap — narrow the range for full detail.';
+    setStatus(msg, false);
+  } catch (e) {
+    setStatus('Network error while generating report.', true);
+  }
+}
+
+async function downloadReport() {
+  const payload = reportPayload();
+  if (!payload.table_names.length) { setStatus('Select at least one machine.', true); return; }
+  if (payload.mode !== 'events' && !payload.metrics.length) { setStatus('Select at least one metric.', true); return; }
+  if (payload.mode !== 'latest' && (!payload.start || !payload.end)) {
+    setStatus('Pick both a start and end date/time.', true); return;
+  }
+
+  setStatus('Preparing download…', false);
+  try {
+    const res = await fetch('/reports/download', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setStatus(data.error || 'Failed to download report.', true);
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const cd = res.headers.get('Content-Disposition') || '';
+    const match = cd.match(/filename="?([^"]+)"?/);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = match ? match[1] : 'report.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setStatus('Downloaded.', false);
+  } catch (e) {
+    setStatus('Network error while downloading report.', true);
+  }
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+</script>
+{% endblock %}

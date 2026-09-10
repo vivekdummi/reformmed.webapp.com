@@ -2,6 +2,9 @@
 REFORMMED Monitor — Flask Web Dashboard
 """
 import os
+from dotenv import load_dotenv
+load_dotenv()  # no-op in Docker (env already set by compose); fills gaps when run directly
+
 from flask import Flask
 from flask_login import LoginManager
 from db import init_db, get_db
@@ -41,7 +44,7 @@ def create_app():
     from blueprints.dbmonitor import dbmonitor_bp
     from blueprints.settings import settings_bp
     from blueprints.review    import review_bp
-    from blueprints.terminal  import terminal_bp
+    from blueprints.reports  import reports_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(home_bp)
@@ -53,7 +56,7 @@ def create_app():
     app.register_blueprint(dbmonitor_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(review_bp)
-    app.register_blueprint(terminal_bp)
+    app.register_blueprint(reports_bp)
 
     return app
 
