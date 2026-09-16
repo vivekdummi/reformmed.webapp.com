@@ -12,7 +12,7 @@
 </div>
 
 <div class="card" style="max-width:720px">
-  <form method="POST">
+  <form method="POST" id="edit-user-form">
     <div class="grid-2">
       <div class="form-group">
         <label>Username</label>
@@ -103,6 +103,30 @@
       <a href="{{ url_for('users.index') }}" class="btn btn-ghost">Cancel</a>
     </div>
   </form>
+
+  <hr class="divider">
+  <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Two-Factor Authentication</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+    <div style="font-size:13px;">
+      Status:
+      {% if user.totp_enabled %}
+        <span class="badge badge-online">Enabled</span>
+      {% else %}
+        <span class="badge" style="background:rgba(100,116,139,.15);color:var(--text-muted);">Not set up</span>
+      {% endif %}
+      <label style="display:inline-flex;align-items:center;gap:6px;margin-left:18px;font-size:13px;cursor:pointer;">
+        <input type="checkbox" name="totp_required" value="1" form="edit-user-form"
+               {% if user.totp_required %}checked{% endif %} style="width:auto;margin:0;">
+        Require 2FA for this user
+      </label>
+    </div>
+    {% if user.totp_enabled %}
+    <form method="POST" action="{{ url_for('users.reset_2fa', user_id=user.id) }}"
+          onsubmit="return confirm('Reset 2FA for {{ user.username }}? They will need to set it up again on next login.');">
+      <button type="submit" class="btn btn-ghost">Reset 2FA</button>
+    </form>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}
 

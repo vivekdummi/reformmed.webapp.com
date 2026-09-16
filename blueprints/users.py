@@ -118,6 +118,7 @@ def edit(user_id):
 
         try:
             User.update(user_id, **updates)
+            User.set_totp_required(user_id, request.form.get("totp_required") == "1")
             selected = request.form.getlist("server_access")
             User.set_server_access(user_id, selected)
             hosp_selected = [int(h) for h in request.form.getlist("hospital_access")]
@@ -131,6 +132,18 @@ def edit(user_id):
         "user_edit.html", user=user, servers=servers, current_access=current_access,
         hospitals=hospitals, current_hospital_access=current_hospital_access,
     )
+
+
+@users_bp.route("/<int:user_id>/reset-2fa", methods=["POST"])
+@login_required
+def reset_2fa(user_id):
+    _admin_required()
+    user = User.get_by_id(user_id)
+    if not user:
+        abort(404)
+    User.disable_totp(user_id)
+    flash(f"2FA reset for '{user.username}' — they'll need to set it up again.", "success")
+    return redirect(url_for("users.edit", user_id=user_id))
 
 
 @users_bp.route("/<int:user_id>/delete", methods=["POST"])

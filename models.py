@@ -4,6 +4,7 @@ User model — Flask-Login compatible.
 
 from flask_login import UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
+import pyotp
 from db import get_db
 
 
@@ -20,6 +21,10 @@ class User(UserMixin):
         self.can_view_dbmon   = row.get("can_view_dbmon",   False)
         self.can_view_alerts  = row.get("can_view_alerts",  True)
         self.can_view_servers = row.get("can_view_servers", True)
+        # Two-factor auth
+        self.totp_secret   = row.get("totp_secret")
+        self.totp_enabled  = row.get("totp_enabled",  False)
+        self.totp_required = row.get("totp_required", False)
 
     @property
     def is_active(self):
@@ -161,3 +166,50 @@ class User(UserMixin):
                     "INSERT INTO user_hospital_access (user_id, hospital_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                     (user_id, hid)
                 )
+
+    # ── Two-factor auth (TOTP) ───────────────────────────────────────────────
+
+    def check_totp(self, code):
+        """Verify a 6-digit code against this user's secret. False if 2FA isn't set up."""
+        if not self.totp_secret:
+            return False
+        return pyotp.TOTP(self.totp_secret).verify(str(code).strip(), valid_window=1)
+
+    def totp_provisioning_uri(self, secret):
+        """otpauth:// URI for a QR code, using a given (possibly not-yet-saved) secret."""
+        return pyotp.TOTP(secret).provisioning_uri(name=self.email, issuer_name="REFORMMED Monitor")
+
+    @staticmethod
+    def start_totp_setup(user_id, secret):
+        """Store a freshly generated secret, unconfirmed — totp_enabled stays False
+        until the user proves they can generate a matching code."""
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE webapp_users SET totp_secret=%s, totp_enabled=FALSE WHERE id=%s",
+                (secret, user_id)
+            )
+
+    @staticmethod
+    def confirm_totp_setup(user_id):
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("UPDATE webapp_users SET totp_enabled=TRUE WHERE id=%s", (user_id,))
+
+    @staticmethod
+    def disable_totp(user_id):
+        """Used both by a user turning their own 2FA off, and by an admin
+        resetting a user's 2FA (e.g. after a lost device)."""
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE webapp_users SET totp_secret=NULL, totp_enabled=FALSE WHERE id=%s",
+                (user_id,)
+            )
+
+    @staticmethod
+    def set_totp_required(user_id, required: bool):
+        """Admin-only: force (or stop forcing) this user to set up 2FA."""
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("UPDATE webapp_users SET totp_required=%s WHERE id=%s", (required, user_id))

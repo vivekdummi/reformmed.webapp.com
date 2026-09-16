@@ -36,7 +36,10 @@ services:
       GMAIL_APP_PASS:    ${GMAIL_APP_PASS}
       SMTP_HOST:         smtp.gmail.com
       SMTP_PORT:         "465"
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GEMINI_MODEL:      ${GEMINI_MODEL:-gemini-2.0-flash}
+      GEMINI_API_KEY:    ${GEMINI_API_KEY}
+      GOOGLE_CLIENT_ID:     ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       TZ:                Asia/Kolkata
     depends_on:
       api:

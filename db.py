@@ -79,6 +79,13 @@ def init_db():
             "ALTER TABLE webapp_users ADD COLUMN IF NOT EXISTS can_view_dbmon   BOOLEAN NOT NULL DEFAULT FALSE",
             "ALTER TABLE webapp_users ADD COLUMN IF NOT EXISTS can_view_alerts  BOOLEAN NOT NULL DEFAULT TRUE",
             "ALTER TABLE webapp_users ADD COLUMN IF NOT EXISTS can_view_servers BOOLEAN NOT NULL DEFAULT TRUE",
+            # Two-factor auth (TOTP): totp_secret is set once the user starts
+            # setup; totp_enabled flips TRUE only after they confirm a code
+            # (so login isn't gated on an unconfirmed secret); totp_required
+            # is an admin-set flag that forces setup on next login.
+            "ALTER TABLE webapp_users ADD COLUMN IF NOT EXISTS totp_secret      TEXT",
+            "ALTER TABLE webapp_users ADD COLUMN IF NOT EXISTS totp_enabled     BOOLEAN NOT NULL DEFAULT FALSE",
+            "ALTER TABLE webapp_users ADD COLUMN IF NOT EXISTS totp_required    BOOLEAN NOT NULL DEFAULT FALSE",
         ]:
             try:
                 cur.execute(col_sql)

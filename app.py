@@ -2,20 +2,37 @@
 REFORMMED Monitor — Flask Web Dashboard
 """
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
 load_dotenv()  # no-op in Docker (env already set by compose); fills gaps when run directly
 
-from flask import Flask
-from flask_login import LoginManager
+from flask import Flask, redirect, request, url_for
+from flask_login import LoginManager, current_user
 from db import init_db, get_db
 from models import User
+from oauth import init_oauth
 
 login_manager = LoginManager()
+
+# Endpoints reachable even when 2FA setup is being force-enforced below —
+# otherwise a user with totp_required could never reach the page that lets
+# them set it up (or log out) in the first place.
+_TOTP_SETUP_EXEMPT_ENDPOINTS = {
+    "auth.login", "auth.logout", "auth.google_login", "auth.google_callback",
+    "auth.verify_2fa", "auth.profile", "auth.totp_setup", "auth.totp_confirm",
+    "static",
+}
 
 
 def create_app():
     app = Flask(__name__)
     app.secret_key = os.getenv("FLASK_SECRET", "change-me-in-production")
+    # 7-day auto-logout: covers both the "remember me" cookie (survives
+    # browser close) and the regular session cookie, so either way a login
+    # stops working exactly 7 days after it started.
+    app.config["REMEMBER_COOKIE_DURATION"] = timedelta(days=7)
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
+    init_oauth(app)
 
     # ── Init DB ──────────────────────────────────────────────────────────────
     init_db()
@@ -32,6 +49,21 @@ def create_app():
     @login_manager.user_loader
     def load_user(user_id):
         return User.get_by_id(int(user_id))
+
+    # An admin can mark a user as totp_required — this catches every request
+    # from that user until they've actually completed 2FA setup, and bounces
+    # them to the setup page instead of letting them use the rest of the app.
+    @app.before_request
+    def _enforce_totp_required():
+        if not current_user.is_authenticated:
+            return
+        if not getattr(current_user, "totp_required", False):
+            return
+        if current_user.totp_enabled:
+            return
+        if request.endpoint in _TOTP_SETUP_EXEMPT_ENDPOINTS:
+            return
+        return redirect(url_for("auth.profile"))
 
     # ── Blueprints ───────────────────────────────────────────────────────────
     from blueprints.auth     import auth_bp

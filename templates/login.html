@@ -109,6 +109,41 @@
       font-family: inherit;
     }
     .btn-login:hover { background: #00b8d9; }
+    .btn-google {
+      width: 100%;
+      padding: 11px;
+      background: var(--bg3);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-decoration: none;
+      font-family: inherit;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn-google:hover { border-color: var(--accent); background: #21263a; }
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+      color: var(--text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
     .alert-danger {
       background: rgba(239,68,68,.12);
       border: 1px solid rgba(239,68,68,.3);
@@ -154,6 +189,14 @@
         </div>
         <button type="submit" class="btn-login">Sign in →</button>
       </form>
+
+      {% if google_sso_enabled %}
+      <div class="divider">or</div>
+      <a href="{{ url_for('auth.google_login') }}" class="btn-google">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.5 29.3 35.5 24 35.5c-6.4 0-11.5-5.1-11.5-11.5S17.6 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.9 6.5 29.2 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.4-.3-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.6 18.9 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.9 6.5 29.2 4.5 24 4.5c-7.7 0-14.4 4.4-17.7 10.2z"/><path fill="#4CAF50" d="M24 43.5c5.1 0 9.8-2 13.3-5.2l-6.1-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.3 0-9.7-3.5-11.3-8.3l-6.5 5c3.3 6.5 10 11.3 17.8 11.3z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.7l6.1 5.2c-.4.4 6.7-4.9 6.7-14.9 0-1.2-.1-2.4-.3-3.5z"/></svg>
+        Sign in with Google
+      </a>
+      {% endif %}
     </div>
     <div class="footer-note">
       <span class="dot"></span> REFORMMED Monitor v2
