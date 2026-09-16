@@ -49,7 +49,13 @@ def login():
 def google_login():
     if current_user.is_authenticated:
         return redirect(url_for("home.index"))
-    redirect_uri = url_for("auth.google_callback", _external=True)
+    # _scheme forces https regardless of what Flask thinks the incoming
+    # request's scheme was — if this app sits behind a reverse proxy doing
+    # SSL termination (nginx/certbot), Flask only sees plain HTTP from the
+    # proxy unless it's told to trust X-Forwarded-Proto, so url_for would
+    # otherwise build an http:// callback URL and Google rejects it outright
+    # since only the https:// version is registered in Cloud Console.
+    redirect_uri = url_for("auth.google_callback", _external=True, _scheme="https")
     return oauth.google.authorize_redirect(redirect_uri)
 
 
