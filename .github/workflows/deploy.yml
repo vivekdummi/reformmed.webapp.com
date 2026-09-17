@@ -19,7 +19,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: 22
           script: |
-            cd ~/reformmed.webapp.com
+            cd /opt/reformmed.webapp.com
 
             echo "📥 Pulling latest code..."
             cp .env /tmp/.env.backup

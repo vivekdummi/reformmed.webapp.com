@@ -86,6 +86,9 @@ def init_db():
             "ALTER TABLE webapp_users ADD COLUMN IF NOT EXISTS totp_secret      TEXT",
             "ALTER TABLE webapp_users ADD COLUMN IF NOT EXISTS totp_enabled     BOOLEAN NOT NULL DEFAULT FALSE",
             "ALTER TABLE webapp_users ADD COLUMN IF NOT EXISTS totp_required    BOOLEAN NOT NULL DEFAULT FALSE",
+            # Forgot-password OTP: hashed (not plaintext) 6-digit code + expiry.
+            "ALTER TABLE webapp_users ADD COLUMN IF NOT EXISTS reset_otp_hash    TEXT",
+            "ALTER TABLE webapp_users ADD COLUMN IF NOT EXISTS reset_otp_expires TIMESTAMPTZ",
         ]:
             try:
                 cur.execute(col_sql)

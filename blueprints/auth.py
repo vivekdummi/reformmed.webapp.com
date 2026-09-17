@@ -1,13 +1,16 @@
 import base64
 import io
+import json
 import os
+import random
 
 import pyotp
 import qrcode
-from flask import Blueprint, render_template, redirect, url_for, request, flash, session
+from flask import Blueprint, render_template, redirect, url_for, request, flash, session, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from models import User
 from oauth import oauth
+from alert_sender import send_alert_email
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -28,8 +31,6 @@ def _complete_login(user):
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
-    if current_user.is_authenticated:
-        return redirect(url_for("home.index"))
     if request.method == "POST":
         identifier = request.form.get("username", "").strip()
         password   = request.form.get("password", "")
@@ -49,13 +50,18 @@ def login():
 def google_login():
     if current_user.is_authenticated:
         return redirect(url_for("home.index"))
-    # _scheme forces https regardless of what Flask thinks the incoming
-    # request's scheme was — if this app sits behind a reverse proxy doing
-    # SSL termination (nginx/certbot), Flask only sees plain HTTP from the
-    # proxy unless it's told to trust X-Forwarded-Proto, so url_for would
-    # otherwise build an http:// callback URL and Google rejects it outright
-    # since only the https:// version is registered in Cloud Console.
-    redirect_uri = url_for("auth.google_callback", _external=True, _scheme="https")
+    # Force https for the callback URL EXCEPT on localhost — production sits
+    # behind a reverse proxy doing SSL termination, so Flask only sees plain
+    # HTTP from the proxy unless told otherwise, and Google only has the
+    # https://infra.reformmed.tech/... redirect URI registered. Locally,
+    # though, there's no proxy and no https at all, so forcing https there
+    # would build a URL Google doesn't have registered and that wouldn't
+    # work even if it did.
+    is_local = request.host.split(":")[0] in ("127.0.0.1", "localhost")
+    if is_local:
+        redirect_uri = url_for("auth.google_callback", _external=True)
+    else:
+        redirect_uri = url_for("auth.google_callback", _external=True, _scheme="https")
     return oauth.google.authorize_redirect(redirect_uri)
 
 
@@ -119,6 +125,69 @@ def verify_2fa():
 def logout():
     logout_user()
     return redirect(url_for("auth.login"))
+
+
+# ── Forgot password (single-page: email → OTP → new password, all AJAX) ─────
+
+@auth_bp.route("/forgot-password")
+def forgot_password():
+    if current_user.is_authenticated:
+        return redirect(url_for("home.index"))
+    return render_template("forgot_password.html")
+
+
+@auth_bp.route("/forgot-password/send", methods=["POST"])
+def forgot_password_send():
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip()
+    user = User.get_by_email(email)
+    if user and user.is_active:
+        otp = f"{random.randint(0, 999999):06d}"
+        User.set_reset_otp(user.id, otp)
+        send_alert_email(
+            "REFORMMED Monitor — Password Reset Code",
+            f"Your password reset code is: {otp}\n\n"
+            f"This code expires in 15 minutes. If you didn't request this, "
+            f"you can safely ignore this email.",
+            user.email,
+        )
+    # Same response whether or not the email is registered — otherwise this
+    # endpoint becomes a way to check which emails have accounts.
+    return jsonify({"ok": True})
+
+
+@auth_bp.route("/forgot-password/verify", methods=["POST"])
+def forgot_password_verify():
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip()
+    code  = (data.get("code") or "").strip()
+    user = User.get_by_email(email)
+    if not user or not user.check_reset_otp(code):
+        return jsonify({"ok": False, "error": "Invalid or expired code."}), 400
+    # Not consumed here — /forgot-password/reset re-checks it before actually
+    # changing the password, so the code stays valid until it's actually used.
+    return jsonify({"ok": True})
+
+
+@auth_bp.route("/forgot-password/reset", methods=["POST"])
+def forgot_password_reset():
+    data = request.get_json(silent=True) or {}
+    email    = (data.get("email") or "").strip()
+    code     = (data.get("code") or "").strip()
+    password = data.get("password") or ""
+    confirm  = data.get("confirm") or ""
+
+    user = User.get_by_email(email)
+    if not user or not user.check_reset_otp(code):
+        return jsonify({"ok": False, "error": "Invalid or expired code."}), 400
+    if len(password) < 8:
+        return jsonify({"ok": False, "error": "Password must be at least 8 characters."}), 400
+    if password != confirm:
+        return jsonify({"ok": False, "error": "Passwords don't match."}), 400
+
+    User.update(user.id, password=password)
+    User.clear_reset_otp(user.id)
+    return jsonify({"ok": True})
 
 
 @auth_bp.route("/profile", methods=["GET", "POST"])

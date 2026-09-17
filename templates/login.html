@@ -1,15 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login — REFORMMED Monitor</title>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    :root {
+    :root, [data-theme="dark"] {
       --bg: #0d0f14; --bg2: #141720; --bg3: #1c2030;
       --border: #252a3a; --accent: #00d4ff; --text: #e2e8f0;
       --text-muted: #64748b; --red: #ef4444; --green: #22c55e;
+    }
+    [data-theme="light"] {
+      --bg: #f0f2f7; --bg2: #ffffff; --bg3: #e8eaf0;
+      --border: #d1d5e0; --accent: #0284c7; --text: #0f172a;
+      --text-muted: #64748b; --red: #dc2626; --green: #16a34a;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -20,15 +25,52 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: background .2s, color .2s;
+    }
+    #themeBtn {
+      position: fixed; top: 18px; right: 18px;
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--bg2); border: 1px solid var(--border);
+      color: var(--text); font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
     }
     body::before {
       content: '';
       position: fixed;
-      inset: 0;
+      inset: -20%;
       background:
-        radial-gradient(ellipse 600px 400px at 20% 50%, rgba(0,212,255,0.04) 0%, transparent 70%),
-        radial-gradient(ellipse 500px 400px at 80% 50%, rgba(124,58,237,0.04) 0%, transparent 70%);
+        radial-gradient(ellipse 500px 400px at 20% 30%, rgba(0,212,255,0.10) 0%, transparent 70%),
+        radial-gradient(ellipse 450px 380px at 80% 70%, rgba(124,58,237,0.10) 0%, transparent 70%),
+        radial-gradient(ellipse 380px 320px at 50% 90%, rgba(0,212,255,0.06) 0%, transparent 70%);
       pointer-events: none;
+      animation: driftBg 18s ease-in-out infinite alternate;
+    }
+    [data-theme="light"] body::before {
+      background:
+        radial-gradient(ellipse 500px 400px at 20% 30%, rgba(2,132,199,0.08) 0%, transparent 70%),
+        radial-gradient(ellipse 450px 380px at 80% 70%, rgba(124,58,237,0.08) 0%, transparent 70%),
+        radial-gradient(ellipse 380px 320px at 50% 90%, rgba(2,132,199,0.05) 0%, transparent 70%);
+    }
+    @keyframes driftBg {
+      0%   { transform: translate(0, 0) scale(1); }
+      50%  { transform: translate(-3%, 2%) scale(1.06); }
+      100% { transform: translate(3%, -2%) scale(1.02); }
+    }
+    .particle {
+      position: fixed;
+      bottom: -10px;
+      width: 3px; height: 3px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0;
+      pointer-events: none;
+      animation: floatUp linear infinite;
+    }
+    @keyframes floatUp {
+      0%   { transform: translateY(0) translateX(0); opacity: 0; }
+      10%  { opacity: .5; }
+      90%  { opacity: .5; }
+      100% { transform: translateY(-110vh) translateX(var(--drift, 20px)); opacity: 0; }
     }
     .login-wrap {
       width: 400px;
@@ -163,6 +205,7 @@
   </style>
 </head>
 <body>
+  <button id="themeBtn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
   <div class="login-wrap">
     <div class="brand-area">
       <div class="brand-name">REFORMMED</div>
@@ -189,6 +232,9 @@
         </div>
         <button type="submit" class="btn-login">Sign in →</button>
       </form>
+      <div style="text-align:center;margin-top:14px;">
+        <a href="{{ url_for('auth.forgot_password') }}" style="font-size:12px;color:var(--text-muted);text-decoration:none;">Forgot password?</a>
+      </div>
 
       {% if google_sso_enabled %}
       <div class="divider">or</div>
@@ -202,5 +248,32 @@
       <span class="dot"></span> REFORMMED Monitor v2
     </div>
   </div>
+  <script>
+    var _dark = (localStorage.getItem('rmTheme') || 'dark') === 'dark';
+    function applyTheme() {
+      document.documentElement.setAttribute('data-theme', _dark ? 'dark' : 'light');
+      document.getElementById('themeBtn').textContent = _dark ? '🌙' : '☀️';
+    }
+    function toggleTheme() {
+      _dark = !_dark;
+      localStorage.setItem('rmTheme', _dark ? 'dark' : 'light');
+      applyTheme();
+    }
+    applyTheme();
+
+    // Gentle rising particles behind the login card — purely decorative.
+    (function spawnParticles() {
+      var n = 16;
+      for (var i = 0; i < n; i++) {
+        var p = document.createElement('div');
+        p.className = 'particle';
+        p.style.left = (Math.random() * 100) + 'vw';
+        p.style.setProperty('--drift', (Math.random() * 60 - 30) + 'px');
+        p.style.animationDuration = (14 + Math.random() * 12) + 's';
+        p.style.animationDelay = (Math.random() * 18) + 's';
+        document.body.appendChild(p);
+      }
+    })();
+  </script>
 </body>
 </html>

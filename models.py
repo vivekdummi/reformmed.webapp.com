@@ -25,6 +25,9 @@ class User(UserMixin):
         self.totp_secret   = row.get("totp_secret")
         self.totp_enabled  = row.get("totp_enabled",  False)
         self.totp_required = row.get("totp_required", False)
+        # Forgot-password OTP (hashed)
+        self.reset_otp_hash    = row.get("reset_otp_hash")
+        self.reset_otp_expires = row.get("reset_otp_expires")
 
     @property
     def is_active(self):
@@ -213,3 +216,36 @@ class User(UserMixin):
         with get_db() as conn:
             cur = conn.cursor()
             cur.execute("UPDATE webapp_users SET totp_required=%s WHERE id=%s", (required, user_id))
+
+    # ── Forgot-password OTP ──────────────────────────────────────────────────
+
+    @staticmethod
+    def set_reset_otp(user_id, otp, minutes_valid=15):
+        from datetime import datetime, timedelta, timezone
+        expires = datetime.now(timezone.utc) + timedelta(minutes=minutes_valid)
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE webapp_users SET reset_otp_hash=%s, reset_otp_expires=%s WHERE id=%s",
+                (generate_password_hash(otp), expires, user_id)
+            )
+
+    def check_reset_otp(self, otp):
+        """True only if a code was issued, hasn't expired, and matches."""
+        from datetime import datetime, timezone
+        if not self.reset_otp_hash or not self.reset_otp_expires:
+            return False
+        expires = self.reset_otp_expires
+        now = datetime.now(timezone.utc) if expires.tzinfo is not None else datetime.utcnow()
+        if now > expires:
+            return False
+        return check_password_hash(self.reset_otp_hash, str(otp).strip())
+
+    @staticmethod
+    def clear_reset_otp(user_id):
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE webapp_users SET reset_otp_hash=NULL, reset_otp_expires=NULL WHERE id=%s",
+                (user_id,)
+            )
