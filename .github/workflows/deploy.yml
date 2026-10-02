@@ -3,7 +3,8 @@ name: Deploy — REFORMMED Monitor
 on:
   push:
     branches:
-      - 'feature/main-prod-*'
+#      - 'feature/main-prod-*'
+      - 'feature/ui-redesign-and-security'
       - main
 
 jobs:
