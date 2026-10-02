@@ -4,7 +4,7 @@ Settings blueprint — app-wide configuration via UI.
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort
 from flask_login import login_required, current_user
 from db import (
-    get_db, purge_old_data, list_alert_recipients,
+    get_db, purge_old_data, list_alert_recipients, RETENTION_MIN_DAYS, RETENTION_MAX_DAYS,
     alerts_master_enabled, set_encrypted_setting, get_encrypted_setting,
 )
 
@@ -77,6 +77,16 @@ def save():
         "smtp_host", "smtp_port", "alert_from_email",
         "app_name", "sidebar_default",
     ]
+    ret = request.form.get("data_retention_days", "").strip()
+    if ret:
+        try:
+            ret_days = int(ret)
+        except ValueError:
+            ret_days = 0
+        if not (RETENTION_MIN_DAYS <= ret_days <= RETENTION_MAX_DAYS):
+            flash(f"Data retention must be a whole number of days between "
+                  f"{RETENTION_MIN_DAYS} and {RETENTION_MAX_DAYS}.", "danger")
+            return redirect(url_for("settings.index") + "#data")
     with get_db() as conn:
         cur = conn.cursor()
         for k in keys:
@@ -108,11 +118,15 @@ def save():
 def purge_now():
     _admin_required()
     try:
-        purge_old_data()
-        flash("Old data purged successfully.", "success")
+        r = purge_old_data()
+        msg = (f"Purge complete — removed {r['metric_rows']:,} metric rows from {r['tables']} "
+               f"tables and {r['alert_rows']:,} alert log entries older than {r['days']} days.")
+        if r["errors"]:
+            msg += f" {r['errors']} table(s) were skipped (see the webapp log)."
+        flash(msg, "warning" if r["errors"] else "success")
     except Exception as e:
         flash(f"Purge failed: {e}", "danger")
-    return redirect(url_for("settings.index"))
+    return redirect(url_for("settings.index") + "#data")
 
 
 # ── Alert Recipients (centralized address book) ────────────────────────────

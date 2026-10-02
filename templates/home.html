@@ -1,151 +1,401 @@
 {% extends "base.html" %}
-{% block title %}Home — REFORMMED Monitor{% endblock %}
+{% block title %}Home — Reformmed INFRA Monitor{% endblock %}
 {% block page_title %}Overview{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Overview dashboard ── */
+.ov-head-chip{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:99px;background:var(--bg2);border:1px solid var(--border);font-size:13px;font-weight:600;color:var(--text-muted);}
+.big-num{font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.4px;}
+
+.donut-wrap{display:flex;align-items:center;gap:18px;}
+@media(max-width:420px){.donut-wrap{flex-direction:column;}}
+.type-list{flex:1;display:flex;flex-direction:column;gap:9px;min-width:0;}
+.type-row{display:flex;align-items:center;gap:8px;font-size:13px;}
+.type-row i{width:10px;height:10px;border-radius:4px;flex-shrink:0;}
+.type-row .t{flex:1;color:var(--text-muted);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.type-row b{font-variant-numeric:tabular-nums;font-weight:700;}
+.delivery{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);}
+.delivery b{color:var(--text);}
+
+.health-rings{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.hring{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;}
+.hring-box{position:relative;width:100%;max-width:120px;aspect-ratio:1;}
+.hring-box .donut-mid b{font-size:20px;}
+.hring-lbl{font-size:13px;font-weight:700;}
+.hring-sub{font-size:11px;color:var(--text-muted);margin-top:-6px;}
+.health-list{margin-top:16px;display:flex;flex-direction:column;gap:10px;}
+.health-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:12px;background:var(--bg3);font-size:13px;}
+.health-item .hl{display:flex;align-items:center;gap:8px;font-weight:600;}
+.health-item .dotx{width:8px;height:8px;border-radius:50%;}
+
+.kpi-link{cursor:pointer;}
+.kpi-link .kpi-label::after{content:'→';margin-left:6px;opacity:0;transition:opacity .15s,margin .15s;}
+.kpi-link:hover .kpi-label::after{opacity:.8;margin-left:8px;}
+a.health-item{color:inherit;text-decoration:none;transition:background .15s;}
+a.health-item:hover{background:var(--bg-hover);}
+
+/* ── Needs attention ── */
+.attn-panel{margin-bottom:16px;}
+.attn-ico{width:30px;height:30px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;color:#fff;}
+.attn-ico svg{width:16px;height:16px;}
+.attn-ico.crit{background:linear-gradient(135deg,#ff8a8a,#e5484d);}
+.attn-ico.warn{background:var(--g-sunset);}
+.attn-ico.ok{background:var(--g-mint);}
+.attn-count{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:99px;font-size:12px;font-weight:600;}
+.attn-count b{font-family:var(--font-head);font-size:14px;}
+.attn-count.crit{background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red);}
+.attn-count.warn{background:color-mix(in srgb,var(--yellow) 16%,transparent);color:var(--yellow);}
+.attn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
+.attn-card{position:relative;display:flex;flex-direction:column;gap:12px;padding:16px 16px 14px 20px;border-radius:16px;background:var(--bg3);border:1px solid var(--border);color:inherit;text-decoration:none;overflow:hidden;transition:transform .15s,border-color .15s,box-shadow .15s;}
+.attn-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;}
+.attn-card.critical::before{background:linear-gradient(180deg,#ff8a8a,#e5484d);}
+.attn-card.warning::before{background:var(--g-sunset);}
+.attn-card:hover{transform:translateY(-2px);border-color:var(--border-strong);box-shadow:var(--shadow-1);}
+.attn-top{display:flex;align-items:center;gap:10px;}
+.attn-srv-ico{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:var(--bg2);color:var(--text-muted);flex-shrink:0;}
+.attn-card.critical .attn-srv-ico{color:var(--red);}
+.attn-card.warning .attn-srv-ico{color:var(--yellow);}
+.attn-srv-ico svg{width:18px;height:18px;}
+.attn-id{min-width:0;flex:1;}
+.attn-name{font-family:var(--font-head);font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.attn-meta{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.attn-sev{font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;padding:4px 10px;border-radius:99px;flex-shrink:0;}
+.attn-sev.critical{background:color-mix(in srgb,var(--red) 16%,transparent);color:var(--red);}
+.attn-sev.warning{background:color-mix(in srgb,var(--yellow) 18%,transparent);color:var(--yellow);}
+.attn-issues{display:flex;flex-direction:column;gap:10px;}
+.attn-issue-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;}
+.attn-metric{color:var(--text-muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.attn-val{font-family:var(--font-head);font-weight:800;font-size:16px;font-variant-numeric:tabular-nums;}
+.attn-val.critical{color:var(--red);} .attn-val.warning{color:var(--yellow);}
+.attn-meter{position:relative;height:8px;border-radius:99px;background:var(--chart-track);margin-top:6px;}
+.attn-meter i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;}
+.attn-meter i.critical{background:linear-gradient(90deg,#ffb36b,#e5484d);}
+.attn-meter i.warning{background:var(--g-sunset);}
+.attn-limit{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;border-radius:2px;background:var(--text);opacity:.7;}
+.attn-th{font-size:11px;color:var(--text-muted);margin-top:5px;}
+.attn-more{font-size:12px;color:var(--text-muted);font-weight:600;}
+.attn-offline{display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;background:color-mix(in srgb,var(--red) 10%,transparent);color:var(--red);font-size:13px;font-weight:600;}
+.attn-offline svg{width:18px;height:18px;flex-shrink:0;}
+.attn-foot{margin-top:auto;font-size:12px;font-weight:700;color:var(--accent);}
+.attn-clear{display:flex;flex-direction:column;align-items:center;gap:4px;padding:28px;border-radius:14px;background:color-mix(in srgb,var(--green) 8%,transparent);text-align:center;}
+.attn-clear b{font-family:var(--font-head);font-size:16px;color:var(--green);}
+.attn-clear span{font-size:13px;color:var(--text-muted);}
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
     <h1>Infrastructure Overview</h1>
-    <p>Real-time status — auto-refreshing data every <span id="refresh-interval">2</span>s</p>
+    <p>Servers, alerts and data feeds at a glance — live data refreshes every <span id="refresh-interval">2</span>s</p>
   </div>
+  <span class="ov-head-chip"><span class="pulse"></span> Live</span>
 </div>
 
-<!-- Stat cards — updated via JS partial refresh -->
-<div class="stat-grid">
-  <div class="stat-card total">
-    <div class="stat-value" style="color:var(--accent)" id="stat-total">{{ total }}</div>
-    <div class="stat-label">Total Machines</div>
-  </div>
-  <div class="stat-card online">
-    <div class="stat-value" style="color:var(--green)" id="stat-online">{{ online }}</div>
-    <div class="stat-label">Online</div>
-  </div>
-  <div class="stat-card offline">
-    <div class="stat-value" style="color:var(--red)" id="stat-offline">{{ offline }}</div>
-    <div class="stat-label">Offline</div>
-  </div>
-  <div class="stat-card warning">
-    <div class="stat-value" style="color:var(--yellow)" id="stat-alerts">—</div>
-    <div class="stat-label">Alerts Today</div>
-  </div>
-  {% if dvr_summary and dvr_summary.total %}
-  <a href="{{ url_for('dvr.index') }}" class="stat-card total" style="text-decoration:none;display:block;">
-    <div class="stat-value" style="color:var(--accent)">{{ dvr_summary.online }}<span style="font-size:14px;color:var(--text-muted);">/{{ dvr_summary.total }}</span></div>
-    <div class="stat-label">DVRs Online</div>
+<!-- ═══ KPI tiles (each opens the matching filtered page) ═══ -->
+{% set avail = ((online / total * 100) if total else 0) %}
+{% set can_srv = current_user.is_admin or current_user.can_view_servers %}
+{% set can_alerts = current_user.is_admin or current_user.can_view_alerts %}
+{% set n_hot = attention|rejectattr('offline')|list|length %}
+<div class="kpi-grid">
+  <a class="kpi k-ocean kpi-link" href="{{ url_for('servers.index', filter='online') if can_srv else '#' }}" title="Show online servers">
+    <div class="kpi-top"><span class="kpi-label">Servers online</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span></div>
+    <div class="kpi-value"><span id="stat-online">{{ online }}</span><small>/ <span id="stat-total">{{ total }}</span></small></div>
+    <div class="kpi-bar"><i id="avail-bar" style="width:{{ '%.0f'|format(avail) }}%"></i></div>
+    <div class="kpi-sub"><span id="avail-pct">{{ '%.0f'|format(avail) }}%</span> availability</div>
   </a>
-  {% endif %}
+  <a class="kpi k-red kpi-link" href="{{ url_for('servers.index', filter='offline') if can_srv else '#' }}" title="Show offline servers">
+    <div class="kpi-top"><span class="kpi-label">Servers offline</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l22 22"/><path d="M16.72 11.06A10.94 10.94 0 0119 12.55"/><path d="M5 12.55a10.94 10.94 0 015.17-2.39"/><path d="M10.71 5.05A16 16 0 0122.58 9"/><path d="M1.42 9a15.91 15.91 0 014.7-2.88"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg></span></div>
+    <div class="kpi-value" id="stat-offline">{{ offline }}</div>
+    <div class="kpi-sub">{{ n_hot }} more over alert thresholds</div>
+  </a>
+  <a class="kpi k-ocean kpi-link" href="{{ url_for('servers.index', filter='hot') if can_srv else '#' }}" title="Show servers over thresholds">
+    <div class="kpi-top"><span class="kpi-label">Avg CPU</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg></span></div>
+    <div class="kpi-value">{{ '%.1f'|format(fleet_avg.cpu) }}<small>%</small></div>
+    <div class="kpi-bar"><i style="width:{{ [fleet_avg.cpu,100]|min }}%"></i></div>
+    <div class="kpi-sub">across {{ fleet|length }} online server{{ '' if fleet|length == 1 else 's' }}</div>
+  </a>
+  <a class="kpi k-violet kpi-link" href="{{ url_for('servers.index', filter='hot') if can_srv else '#' }}" title="Show servers over thresholds">
+    <div class="kpi-top"><span class="kpi-label">Avg memory</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="10" rx="1"/><line x1="6" y1="7" x2="6" y2="17"/><line x1="10" y1="7" x2="10" y2="17"/><line x1="14" y1="7" x2="14" y2="17"/><line x1="18" y1="7" x2="18" y2="17"/></svg></span></div>
+    <div class="kpi-value">{{ '%.1f'|format(fleet_avg.ram) }}<small>%</small></div>
+    <div class="kpi-bar"><i style="width:{{ [fleet_avg.ram,100]|min }}%"></i></div>
+    <div class="kpi-sub">fullest disk avg {{ '%.0f'|format(fleet_avg.disk) }}%</div>
+  </a>
+  <a class="kpi k-sunset kpi-link" href="{{ (url_for('alerts.index') ~ '#log') if can_alerts else '#' }}" title="Open the alert log">
+    <div class="kpi-top"><span class="kpi-label">Alerts today</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></span></div>
+    <div class="kpi-value" id="stat-alerts">—</div>
+    <div class="kpi-sub">{{ alert_stats.total if alert_stats else 0 }} in the last 7 days</div>
+  </a>
   {% if dbmon_summary and dbmon_summary.total %}
-  <a href="{{ url_for('dbmonitor.index') }}" class="stat-card total" style="text-decoration:none;display:block;">
-    <div class="stat-value" style="color:var(--accent)">{{ dbmon_summary.total }}</div>
-    <div class="stat-label">DB Tables Watched</div>
+  <a class="kpi k-mint kpi-link" href="{{ url_for('dbmonitor.index', filter='dead') if dbmon_summary.dead else url_for('dbmonitor.index') }}" title="{{ 'Show stopped feeds' if dbmon_summary.dead else 'Open DB Monitor' }}">
+    <div class="kpi-top"><span class="kpi-label">Data feeds live</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span></div>
+    <div class="kpi-value">{{ dbmon_summary.live or 0 }}<small>/ {{ dbmon_summary.total }}</small></div>
+    <div class="kpi-sub">{{ dbmon_summary.dead or 0 }} stopped · {{ dbmon_summary.paused or 0 }} paused</div>
+  </a>
+  {% else %}
+  <a class="kpi k-mint kpi-link" href="{{ (url_for('alerts.index', filter='failed') ~ '#log') if can_alerts else '#' }}" title="Show failed alert emails">
+    <div class="kpi-top"><span class="kpi-label">Alert delivery</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg></span></div>
+    <div class="kpi-value">{% if alert_stats and alert_stats.total %}{{ '%.0f'|format(alert_stats.sent / alert_stats.total * 100) }}{% else %}—{% endif %}<small>%</small></div>
+    <div class="kpi-sub">emails delivered (7 days)</div>
   </a>
   {% endif %}
 </div>
 
-{% if attention %}
-<!-- Machines needing attention -->
-<div class="card mb-2">
-  <div class="card-title" style="display:flex;align-items:center;gap:8px;">
-    <span style="color:var(--yellow);">⚠</span> Needs Attention
-    <span style="font-size:11px;color:var(--text-muted);font-weight:400;">(CPU/RAM/disk ≥ 90%, temp ≥ 80°C — checked on page load)</span>
+<!-- ═══ Alerts: activity + types ═══ -->
+<div class="ov-grid">
+  <div class="panel">
+    <div class="panel-head">
+      <div><div class="panel-title">Alert activity</div><div class="panel-sub">Alerts per day, last 7 days, by source</div></div>
+      <div class="legend">
+        <span><i style="background:var(--g-ocean)"></i>Servers</span>
+        <span><i style="background:var(--g-violet)"></i>DB Monitor</span>
+      </div>
+    </div>
+    <div style="height:260px;position:relative;">
+      {% if alert_stats and alert_stats.total %}<canvas id="ch-alert-days"></canvas>
+      {% else %}<div class="empty-chart"><b>No alerts in the last 7 days</b>Everything has been quiet.</div>{% endif %}
+    </div>
   </div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Machine</th><th class="hide-mobile">Location</th><th>Why</th><th></th></tr></thead>
-      <tbody>
-        {% for a in attention %}
-        <tr>
-          <td><span class="mono" style="font-size:12px">{{ a.system_name }}</span></td>
-          <td class="text-muted hide-mobile">{{ a.location }}</td>
-          <td>
-            {% for reason in a.reasons %}<span class="badge badge-offline" style="margin-right:4px;">{{ reason }}</span>{% endfor %}
-          </td>
-          <td><a href="{{ url_for('servers.detail', table_name=a.table_name) }}" class="btn btn-ghost btn-sm">View →</a></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-{% endif %}
-
-<!-- Recent machines -->
-<div class="card mb-2">
-  <div class="card-title">Recently Active Machines</div>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Machine</th>
-          <th class="hide-mobile">Location</th>
-          <th>Status</th>
-          <th class="hide-mobile">Hostname</th>
-          <th class="hide-mobile">IP</th>
-          <th>Last Seen</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="machines-tbody">
-        {% for m in recent %}
-        <tr>
-          <td><span class="mono" style="font-size:12px">{{ m.system_name }}</span></td>
-          <td class="text-muted hide-mobile">{{ m.location }}</td>
-          <td>
-            <span class="status-dot {{ m.status }}"></span>
-            <span class="badge badge-{{ 'online' if m.status=='online' else 'offline' }}">{{ m.status }}</span>
-          </td>
-          <td class="mono text-muted hide-mobile" style="font-size:12px">{{ m.hostname or '—' }}</td>
-          <td class="mono text-muted hide-mobile" style="font-size:12px">{{ m.public_ip or '—' }}</td>
-          <td class="text-muted" style="font-size:12px">
-            {{ m.last_seen.strftime('%m-%d %H:%M:%S') if m.last_seen else '—' }}
-          </td>
-          <td><a href="{{ url_for('servers.detail', table_name=m.table_name) }}" class="btn btn-ghost btn-sm">View →</a></td>
-        </tr>
-        {% else %}
-        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">No machines registered yet.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="panel">
+    <div class="panel-head"><div><div class="panel-title">Alerts by type</div><div class="panel-sub">Last 7 days</div></div></div>
+    {% if alert_stats and alert_stats.total %}
+    <div class="donut-wrap">
+      <div class="donut-box"><canvas id="ch-alert-types"></canvas>
+        <div class="donut-mid"><b>{{ alert_stats.total }}</b><span>alerts</span></div></div>
+      <div class="type-list" id="type-list"></div>
+    </div>
+    <div class="delivery">
+      <span>Delivered <b>{{ alert_stats.sent }}</b></span>
+      <span>Failed <b style="color:{{ 'var(--red)' if alert_stats.failed else 'var(--text)' }}">{{ alert_stats.failed }}</b></span>
+      <span>Success <b>{{ '%.0f'|format(alert_stats.sent / alert_stats.total * 100) }}%</b></span>
+    </div>
+    {% else %}<div class="empty-chart">No alert data yet.</div>{% endif %}
   </div>
 </div>
 
-<!-- Recent alerts -->
-<div class="card">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-    <div class="card-title" style="margin:0">Recent Alerts</div>
-    <a href="{{ url_for('alerts.index') }}" class="btn btn-ghost btn-sm">View All</a>
+<!-- ═══ Resources + health ═══ -->
+<div class="ov-grid">
+  <div class="panel">
+    <div class="panel-head">
+      <div><div class="panel-title">Server resource usage</div><div class="panel-sub">Latest reading per online server · busiest first</div></div>
+      <div class="legend">
+        <span><i style="background:var(--g-ocean)"></i>CPU</span>
+        <span><i style="background:var(--g-violet)"></i>RAM</span>
+        <span><i style="background:var(--g-sunset)"></i>Fullest disk</span>
+      </div>
+    </div>
+    {% set rows = [fleet|length, 10]|min %}
+    <div style="height:{{ [rows * 44 + 40, 220]|max }}px;position:relative;">
+      {% if fleet %}<canvas id="ch-fleet"></canvas>
+      {% else %}<div class="empty-chart"><b>No live metrics</b>No online servers have reported yet.</div>{% endif %}
+    </div>
   </div>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr><th>Type</th><th class="hide-mobile">Source</th><th>Machine</th><th>Subject</th><th class="hide-mobile">Time</th><th>Status</th></tr>
-      </thead>
-      <tbody id="alerts-tbody">
-        {% for a in alerts %}
-        <tr>
-          <td><span class="badge badge-warning">{{ a.alert_type }}</span></td>
-          <td class="hide-mobile"><span class="badge badge-info">{{ a.get('source','system') }}</span></td>
-          <td class="mono" style="font-size:12px">{{ a.machine_key }}</td>
-          <td style="font-size:12px">{{ a.subject }}</td>
-          <td class="text-muted hide-mobile" style="font-size:12px">{{ a.sent_at.strftime('%m-%d %H:%M') if a.sent_at else '—' }}</td>
-          <td>
-            {% if a.success %}<span class="badge badge-online">sent</span>
-            {% else %}<span class="badge badge-offline">failed</span>{% endif %}
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No alerts yet.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="panel">
+    <div class="panel-head"><div><div class="panel-title">Health at a glance</div><div class="panel-sub">Share of each fleet that is up right now</div></div></div>
+    <div class="health-rings">
+      <div class="hring"><div class="hring-box"><canvas id="ring-servers"></canvas><div class="donut-mid"><b>{{ '%.0f'|format(avail) }}%</b></div></div>
+        <div class="hring-lbl">Servers</div><div class="hring-sub">{{ online }} of {{ total }} up</div></div>
+      {% if dbmon_summary and dbmon_summary.total %}
+      {% set mon = (dbmon_summary.total - (dbmon_summary.paused or 0)) %}
+      {% set db_pct = ((dbmon_summary.live or 0) / mon * 100) if mon else 0 %}
+      <div class="hring"><div class="hring-box"><canvas id="ring-db"></canvas><div class="donut-mid"><b>{{ '%.0f'|format(db_pct) }}%</b></div></div>
+        <div class="hring-lbl">Data feeds</div><div class="hring-sub">{{ dbmon_summary.live or 0 }} of {{ mon }} live</div></div>
+      {% endif %}
+    </div>
+    <div class="health-list">
+      <a class="health-item" href="{{ url_for('servers.index', filter='offline') if can_srv else '#' }}"><span class="hl"><i class="dotx" style="background:var(--red)"></i>Servers offline</span><b>{{ offline }}</b></a>
+      {% if dbmon_summary and dbmon_summary.total %}<a class="health-item" href="{{ url_for('dbmonitor.index', filter='dead') }}"><span class="hl"><i class="dotx" style="background:var(--red)"></i>Feeds stopped (tables / locations)</span><b>{{ dbmon_summary.dead or 0 }} / {{ dbmon_summary.locations_dead or 0 }}</b></a>{% endif %}
+      <a class="health-item" href="{{ url_for('servers.index', filter='hot') if can_srv else '#' }}"><span class="hl"><i class="dotx" style="background:var(--yellow)"></i>Servers over alert thresholds</span><b>{{ n_hot }}</b></a>
+    </div>
   </div>
 </div>
+
+<!-- ═══ Needs attention ═══ -->
+{% set n_crit = attention|selectattr('severity', 'equalto', 'critical')|list|length %}
+<div class="panel attn-panel">
+  <div class="panel-head">
+    <div>
+      <div class="panel-title" style="display:flex;align-items:center;gap:10px;">
+        <span class="attn-ico {{ 'crit' if n_crit else ('warn' if attention else 'ok') }}">
+          {% if attention %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          {% else %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg>{% endif %}
+        </span>
+        Needs attention
+      </div>
+      <div class="panel-sub">Offline servers and readings over the System Alerts thresholds · checked when the page loads</div>
+    </div>
+    {% if attention %}
+    <div class="legend">
+      <span class="attn-count crit"><b>{{ n_crit }}</b> critical</span>
+      <span class="attn-count warn"><b>{{ attention|length - n_crit }}</b> warning</span>
+      {% if can_srv %}<a class="btn btn-ghost btn-sm" href="{{ url_for('servers.index', filter='hot') }}">All over threshold</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {% if attention %}
+  <div class="attn-grid">
+    {% for a in attention %}
+    <a class="attn-card {{ a.severity }}" href="{{ url_for('servers.detail', table_name=a.table_name) if can_srv else '#' }}">
+      <div class="attn-top">
+        <span class="attn-srv-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        </span>
+        <div class="attn-id">
+          <div class="attn-name">{{ a.system_name }}</div>
+          <div class="attn-meta">{{ a.location }} · seen {{ a.last_seen }}</div>
+        </div>
+        <span class="attn-sev {{ a.severity }}">{{ 'Offline' if a.offline else a.severity|capitalize }}</span>
+      </div>
+      {% if a.offline %}
+      <div class="attn-offline">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l22 22"/><path d="M16.72 11.06A10.94 10.94 0 0119 12.55"/><path d="M5 12.55a10.94 10.94 0 015.17-2.39"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+        Not reporting — last data {{ a.last_seen }}
+      </div>
+      {% else %}
+      <div class="attn-issues">
+        {% for i in a.issues[:4] %}
+        {% set scale = 100 if i.unit == '%' else ([i.value, i.threshold * 1.25, 100]|max) %}
+        <div class="attn-issue">
+          <div class="attn-issue-row">
+            <span class="attn-metric">{{ i.label }}</span>
+            <span class="attn-val {{ i.severity }}">{{ '%.0f'|format(i.value) }}{{ i.unit }}</span>
+          </div>
+          <div class="attn-meter">
+            <i class="{{ i.severity }}" style="width:{{ [i.value / scale * 100, 100]|min }}%"></i>
+            <span class="attn-limit" style="left:{{ [i.threshold / scale * 100, 100]|min }}%" title="Alert threshold {{ i.threshold }}{{ i.unit }}"></span>
+          </div>
+          <div class="attn-th">limit {{ '%.0f'|format(i.threshold) }}{{ i.unit }} · {{ '%+.0f'|format(i.value - i.threshold) }}{{ i.unit }} over</div>
+        </div>
+        {% endfor %}
+        {% if a.issues|length > 4 %}<div class="attn-more">+ {{ a.issues|length - 4 }} more</div>{% endif %}
+      </div>
+      {% endif %}
+      <div class="attn-foot">View server <span aria-hidden="true">→</span></div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="attn-clear">
+    <b>All clear</b>
+    <span>Every server is online and below its alert thresholds.</span>
+  </div>
+  {% endif %}
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
+{% set avail = ((online / total * 100) if total else 0) %}
 <script>
 var _refreshTimer = null;
 var _refreshSecs  = 2;
+
+// Machine names, hostnames, alert subjects etc. come from agents — always
+// escape them before they go into innerHTML.
+function esc(v){
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+// ── Overview charts (server-rendered data, drawn once on load) ──
+var ALERT_STATS = {{ alert_stats|tojson }};
+var FLEET       = {{ fleet|tojson }};
+var TYPE_GRADS  = ['g:sunset', 'g:ocean', 'g:violet', 'g:mint', 'g:pink'];
+var TYPE_NAMES  = { cpu: 'High CPU', ram: 'High RAM', disk: 'Disk full', temp: 'High temperature',
+                    offline: 'Server offline', online: 'Back online', db_dead: 'DB feed stopped',
+                    dvr_offline: 'DVR offline', other: 'Other' };
+function typeName(t) { return TYPE_NAMES[t] || String(t).replace(/_/g, ' '); }
+
+function ring(id, pct, grad) {
+  return RM.chart(id, {
+    type: 'doughnut',
+    data: { datasets: [{ data: [pct, Math.max(0, 100 - pct)], rm: { bg: [grad, '--chart-track'] }, borderRadius: 99, spacing: 2 }] },
+    options: { cutout: '78%', animation: false, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+  });
+}
+
+if (ALERT_STATS && ALERT_STATS.total) {
+  // Alerts per day, stacked by source
+  RM.chart('ch-alert-days', {
+    type: 'bar',
+    data: {
+      labels: ALERT_STATS.labels,
+      datasets: [
+        { label: 'Servers',    data: ALERT_STATS.by_day.system,    rm: { bg: 'g:ocean' },  borderRadius: 8, maxBarThickness: 40 },
+        { label: 'DB Monitor', data: ALERT_STATS.by_day.dbmonitor, rm: { bg: 'g:violet' }, borderRadius: 8, maxBarThickness: 40 }
+      ]
+    },
+    options: {
+      animation: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: { legend: { display: false },
+        tooltip: { filter: function(i) { return i.raw > 0; } } },
+      scales: {
+        x: { stacked: true, grid: { display: false }, border: { display: false } },
+        y: { stacked: true, beginAtZero: true, border: { display: false }, ticks: { precision: 0, maxTicksLimit: 5 } }
+      }
+    }
+  });
+
+  // Alerts by type
+  var types = ALERT_STATS.types || [];
+  RM.chart('ch-alert-types', {
+    type: 'doughnut',
+    data: { labels: types.map(function(t) { return typeName(t.type); }),
+            datasets: [{ data: types.map(function(t) { return t.count; }), rm: { bg: types.map(function(_, i) { return TYPE_GRADS[i % TYPE_GRADS.length]; }) },
+                         borderRadius: 8, spacing: 3 }] },
+    options: { cutout: '72%', animation: false, plugins: { legend: { display: false } } }
+  });
+  var tl = document.getElementById('type-list');
+  if (tl) tl.innerHTML = types.map(function(t, i) {
+    return '<div class="type-row"><i style="background:' + RM.cssBg(TYPE_GRADS[i % TYPE_GRADS.length]) + '"></i>' +
+           '<span class="t">' + esc(typeName(t.type)) + '</span><b>' + t.count + '</b></div>';
+  }).join('');
+}
+
+if (FLEET && FLEET.length) {
+  // Busiest first: rank by the highest of CPU / RAM / disk, show busiest 10
+  var busiest = FLEET.slice().sort(function(a, b) {
+    return Math.max(b.cpu, b.ram, b.disk) - Math.max(a.cpu, a.ram, a.disk);
+  }).slice(0, 10);
+  var fleetChart = RM.chart('ch-fleet', {
+    type: 'bar',
+    data: {
+      labels: busiest.map(function(m) { return m.name; }),
+      datasets: [
+        { label: 'CPU',          data: busiest.map(function(m) { return m.cpu; }),  rm: { bg: 'g:ocean',  mode: 'h' }, barPercentage: .8, categoryPercentage: .78, maxBarThickness: 12 },
+        { label: 'RAM',          data: busiest.map(function(m) { return m.ram; }),  rm: { bg: 'g:violet', mode: 'h' }, barPercentage: .8, categoryPercentage: .78, maxBarThickness: 12 },
+        { label: 'Fullest disk', data: busiest.map(function(m) { return m.disk; }), rm: { bg: 'g:sunset', mode: 'h' }, barPercentage: .8, categoryPercentage: .78, maxBarThickness: 12 }
+      ]
+    },
+    options: {
+      indexAxis: 'y', animation: false,
+      interaction: { intersect: false, mode: 'index', axis: 'y' },
+      onClick: function(e, els) {
+        if (els.length) window.location.href = '/servers/' + encodeURIComponent(busiest[els[0].index].table_name);
+      },
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: function(c) { return ' ' + c.dataset.label + ': ' + (+c.raw).toFixed(1) + '%'; } } } },
+      scales: {
+        x: { min: 0, max: 100, border: { display: false }, ticks: { maxTicksLimit: 6, callback: function(v) { return v + '%'; } } },
+        y: { grid: { display: false }, border: { display: false }, ticks: { font: { weight: '600' } } }
+      }
+    }
+  });
+}
+
+ring('ring-servers', {{ '%.1f'|format(avail) }}, 'g:ocean');
+{% if dbmon_summary and dbmon_summary.total %}{% set mon = (dbmon_summary.total - (dbmon_summary.paused or 0)) %}ring('ring-db', {{ '%.1f'|format(((dbmon_summary.live or 0) / mon * 100) if mon else 0) }}, 'g:mint');{% endif %}
 
 function fmtDate(s){
   if(!s||s==='None')return '—';
@@ -171,43 +421,11 @@ function applyHomeData(d){
   setIfChanged('stat-online',  d.online);
   setIfChanged('stat-offline', d.offline);
   setIfChanged('stat-alerts',  d.alerts_today);
+  var pct = d.total ? Math.round(d.online / d.total * 100) : 0;
+  setIfChanged('avail-pct', pct + '%');
+  var bar = document.getElementById('avail-bar');
+  if (bar) bar.style.width = pct + '%';
 
-  // Machines table — only rewrite if row count changed or status changed
-  var mtb = document.getElementById('machines-tbody');
-  if(d.recent && d.recent.length){
-    var newHtml = d.recent.map(function(m){
-      var sc = m.status==='online'?'online':'offline';
-      return '<tr>'+
-        '<td><span class="mono" style="font-size:12px">'+m.system_name+'</span></td>'+
-        '<td class="text-muted hide-mobile">'+m.location+'</td>'+
-        '<td><span class="status-dot '+sc+'"></span> <span class="badge badge-'+sc+'">'+m.status+'</span></td>'+
-        '<td class="mono text-muted hide-mobile" style="font-size:12px">'+(m.hostname||'—')+'</td>'+
-        '<td class="mono text-muted hide-mobile" style="font-size:12px">'+(m.public_ip||'—')+'</td>'+
-        '<td class="text-muted" style="font-size:12px">'+fmtDate(m.last_seen)+'</td>'+
-        '<td><a href="/servers/'+m.table_name+'" class="btn btn-ghost btn-sm">View →</a></td>'+
-      '</tr>';
-    }).join('');
-    if(mtb.innerHTML !== newHtml) mtb.innerHTML = newHtml;
-  }
-  // Don't overwrite with "No machines" if we already have rows rendered by SSR
-
-  // Alerts table
-  var atb = document.getElementById('alerts-tbody');
-  if(d.alerts && d.alerts.length){
-    var newAlerts = d.alerts.map(function(a){
-      var src=a.source||'system';
-      return '<tr>'+
-        '<td><span class="badge badge-warning">'+a.alert_type+'</span></td>'+
-        '<td class="hide-mobile"><span class="badge badge-info">'+src+'</span></td>'+
-        '<td class="mono" style="font-size:12px">'+a.machine_key+'</td>'+
-        '<td style="font-size:12px">'+a.subject+'</td>'+
-        '<td class="text-muted hide-mobile" style="font-size:12px">'+fmtDate(a.sent_at)+'</td>'+
-        '<td><span class="badge badge-'+(a.success?'online':'offline')+'">'+(a.success?'sent':'failed')+'</span></td>'+
-      '</tr>';
-    }).join('');
-    if(atb.innerHTML !== newAlerts) atb.innerHTML = newAlerts;
-  }
-  // Don't overwrite alerts with "No alerts" if SSR already rendered them
 }
 
 function updateHome(){
@@ -222,9 +440,10 @@ function startRefreshTimer(secs){
   _refreshTimer = setInterval(updateHome, secs * 1000);
 }
 
+updateHome();
 // Load settings first, THEN start the timer — no double-timer problem
 fetch('/api/settings')
-  .then(function(r){ return r.json(); })
+  .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
   .then(function(s){
     if(s && s.home_refresh_secs){
       _refreshSecs = parseInt(s.home_refresh_secs) || 2;

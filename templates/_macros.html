@@ -20,3 +20,15 @@
   </span>
   {% endif %}
 {% endmacro %}
+{# Profile photo, or a gradient circle with the user's initial.
+   Works with User objects and plain DB rows (needs id, username, avatar_ver). #}
+{% macro avatar(user, size=36, cls='') %}
+  {%- set ver = user.avatar_ver or 0 -%}
+  {%- if ver -%}
+  <img class="avatar {{ cls }}" src="{{ url_for('auth.avatar', user_id=user.id, v=ver) }}" alt="{{ user.username }}"
+       width="{{ size }}" height="{{ size }}" style="width:{{ size }}px;height:{{ size }}px;">
+  {%- else -%}
+  <span class="avatar avatar-initial {{ cls }}" aria-hidden="true"
+        style="width:{{ size }}px;height:{{ size }}px;font-size:{{ (size * 0.42)|round|int }}px;">{{ (user.username or '?')[:1]|upper }}</span>
+  {%- endif -%}
+{% endmacro %}

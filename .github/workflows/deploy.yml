@@ -13,7 +13,12 @@ jobs:
     steps:
       - name: Pull, rebuild, migrate
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          # Passed as an env var, not interpolated into the script, so a crafted
+          # branch name can't inject shell commands on the server.
+          DEPLOY_REF: ${{ github.ref_name }}
         with:
+          envs: DEPLOY_REF
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
@@ -24,8 +29,8 @@ jobs:
             echo "📥 Pulling latest code..."
             cp .env /tmp/.env.backup
             git fetch origin
-            git checkout ${{ github.ref_name }}
-            git pull origin ${{ github.ref_name }}
+            git checkout "$DEPLOY_REF"
+            git pull origin "$DEPLOY_REF"
             cp /tmp/.env.backup .env
 
             echo "🐳 Rebuilding containers..."

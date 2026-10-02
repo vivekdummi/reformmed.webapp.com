@@ -1,202 +1,290 @@
 {% extends "base.html" %}
-{% block title %}Settings — REFORMMED Monitor{% endblock %}
+{% block title %}Settings — Reformmed INFRA Monitor{% endblock %}
 {% block page_title %}Settings{% endblock %}
+
+{% block extra_css %}
+<style>
+.st-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;align-items:start;}
+@media(max-width:1000px){.st-grid{grid-template-columns:1fr;}}
+.st-col{display:flex;flex-direction:column;gap:16px;min-width:0;}
+.field-hint{font-size:12px;color:var(--text-muted);margin-top:5px;line-height:1.45;}
+.panel-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:8px;}
+.master{display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
+.master-icon{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;}
+.master-icon svg{width:26px;height:26px;}
+.master-text{flex:1;min-width:220px;}
+.master-text b{font-family:var(--font-head);font-size:17px;display:block;margin-bottom:2px;}
+.master-text span{font-size:13px;color:var(--text-muted);}
+.panel.danger-on{border-color:color-mix(in srgb,var(--red) 45%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--red) 10%,transparent);}
+.info-list{display:flex;flex-direction:column;gap:10px;}
+.info-item{display:flex;gap:12px;align-items:flex-start;padding:12px;border-radius:12px;background:var(--bg3);font-size:13px;}
+.info-item .dotx{width:28px;height:28px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;}
+.info-item .dotx svg{width:15px;height:15px;}
+.info-item b{display:block;font-size:13px;margin-bottom:1px;}
+.info-item span{color:var(--text-muted);font-size:12px;}
+.secure-note{display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--green) 12%,transparent);font-size:13px;margin-bottom:16px;}
+.secure-note svg{color:var(--green);flex-shrink:0;}
+.status-pill{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border-radius:99px;font-size:12px;font-weight:700;}
+.status-pill.on{background:color-mix(in srgb,var(--green) 16%,transparent);color:var(--green);}
+.status-pill.off{background:color-mix(in srgb,var(--red) 16%,transparent);color:var(--red);}
+.status-pill::before{content:'';width:8px;height:8px;border-radius:50%;background:currentColor;}
+.rcp-add{display:grid;grid-template-columns:1fr 1.3fr auto;gap:10px;align-items:end;margin-bottom:18px;}
+@media(max-width:640px){.rcp-add{grid-template-columns:1fr;}}
+.rcp-add .form-group{margin:0;}
+.rcp-list{display:flex;flex-direction:column;gap:8px;max-height:460px;overflow-y:auto;}
+.rcp{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:14px;background:var(--bg3);}
+.rcp-av{width:36px;height:36px;border-radius:50%;background:var(--g-ocean);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-family:var(--font-head);flex-shrink:0;}
+.rcp-name{font-weight:700;font-size:14px;}
+.rcp-mail{font-family:var(--mono);font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;}
+.rcp .btn-del{width:34px;height:34px;padding:0;border-radius:50%;}
+.big-stat{font-family:var(--font-head);font-size:34px;font-weight:800;letter-spacing:-.8px;line-height:1;}
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
     <h1>Settings</h1>
-    <p>App-wide configuration — all settings stored in database</p>
+    <p>App-wide configuration for alerts, data retention and email delivery</p>
   </div>
+  <span class="status-pill {{ 'on' if alerts_master_enabled else 'off' }}">{{ 'Alerts on' if alerts_master_enabled else 'All alerts off' }}</span>
 </div>
 
 <div class="tabs">
   <button class="tab-btn active" data-tabgroup="settings" data-tabid="general" onclick="showTab('settings','general')">General</button>
-  <button class="tab-btn" data-tabgroup="settings" data-tabid="data" onclick="showTab('settings','data')">Data Retention</button>
+  <button class="tab-btn" data-tabgroup="settings" data-tabid="data" onclick="showTab('settings','data')">Data retention</button>
   <button class="tab-btn" data-tabgroup="settings" data-tabid="email" onclick="showTab('settings','email')">Email / SMTP</button>
-  <button class="tab-btn" data-tabgroup="settings" data-tabid="recipients" onclick="showTab('settings','recipients')">Alert Recipients</button>
+  <button class="tab-btn" data-tabgroup="settings" data-tabid="recipients" onclick="showTab('settings','recipients')">Alert recipients</button>
 </div>
 
 <!-- ── GENERAL ── -->
 <div class="tab-panel active" data-tabpanel="settings" data-panelid="general">
+  <div class="st-grid">
+    <div class="st-col">
+      <!-- Master alert kill-switch — overrides every other alert setting -->
+      <div class="panel {{ '' if alerts_master_enabled else 'danger-on' }}">
+        <div class="master">
+          <span class="master-icon" style="background:{{ 'var(--g-mint)' if alerts_master_enabled else 'linear-gradient(135deg,#ff8a8a,#e5484d)' }};">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>{% if not alerts_master_enabled %}<line x1="2" y1="2" x2="22" y2="22"/>{% endif %}</svg>
+          </span>
+          <div class="master-text">
+            <b>Alerts master switch</b>
+            <span>Turns every alert email in the app on or off — system, machine and DB Monitor alerts alike. When off, nothing is sent regardless of any other setting.</span>
+          </div>
+          <form method="POST" action="{{ url_for('settings.toggle_alerts_master') }}">
+            <button type="submit" class="btn {{ 'btn-danger' if alerts_master_enabled else 'btn-primary' }}">
+              {% if alerts_master_enabled %}Turn all alerts off{% else %}Turn alerts back on{% endif %}
+            </button>
+          </form>
+        </div>
+      </div>
 
-  <!-- Master alert kill-switch — deliberately its own card, visually
-       distinct, since it overrides every other alert setting in the app. -->
-  <div class="card" style="max-width:560px;border-color:{{ 'rgba(239,68,68,.4)' if not alerts_master_enabled else 'var(--border)' }};margin-bottom:16px;">
-    <div class="card-title" style="display:flex;align-items:center;gap:8px;">
-      🚨 Alerts Master Switch
-    </div>
-    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">
-      Turns ALL alert emails on or off across the entire app — System Alerts, Machine Alerts,
-      DVR, and DB Monitor alike. When this is off, nothing sends no matter what any individual
-      alert type or machine has configured.
-    </div>
-    <form method="POST" action="{{ url_for('settings.toggle_alerts_master') }}">
-      <div style="display:flex;align-items:center;gap:12px;">
-        <button type="submit" class="btn {{ 'btn-danger' if alerts_master_enabled else 'btn-primary' }}">
-          {% if alerts_master_enabled %}Turn All Alerts OFF{% else %}Turn All Alerts ON{% endif %}
-        </button>
-        <span style="font-size:13px;font-weight:700;color:{{ 'var(--green)' if alerts_master_enabled else 'var(--red)' }};">
-          {% if alerts_master_enabled %}● Alerts are ON{% else %}● Alerts are OFF app-wide{% endif %}
-        </span>
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">General</div><div class="panel-sub">Naming and refresh behaviour</div></div></div>
+        <form method="POST" action="{{ url_for('settings.save') }}">
+          <div class="form-group">
+            <label for="st-name">App name</label>
+            <input type="text" id="st-name" name="app_name" value="{{ s.get('app_name','Reformmed INFRA Monitor') }}">
+            <div class="field-hint">Shown in the browser title bar.</div>
+          </div>
+          <div class="form-group">
+            <label for="st-refresh">Home page refresh interval (seconds)</label>
+            <input type="number" id="st-refresh" name="home_refresh_secs" value="{{ s.get('home_refresh_secs','2') }}" min="1" max="60">
+            <div class="field-hint">How often the home page refreshes its live data. Minimum 1s, recommended 2–5s.</div>
+          </div>
+          <!-- Navigation is now top tabs; kept so saving this tab doesn't wipe the old value -->
+          <input type="hidden" name="sidebar_default" value="{{ s.get('sidebar_default','expanded') }}">
+          <!-- Hidden fields so other tab values aren't wiped -->
+          <input type="hidden" name="data_retention_days" value="{{ s.get('data_retention_days','7') }}">
+          <input type="hidden" name="smtp_host" value="{{ s.get('smtp_host','smtp.gmail.com') }}">
+          <input type="hidden" name="smtp_port" value="{{ s.get('smtp_port','465') }}">
+          <input type="hidden" name="alert_from_email" value="{{ s.get('alert_from_email','') }}">
+          <div class="panel-actions"><button type="submit" class="btn btn-primary">Save general settings</button></div>
+        </form>
       </div>
-    </form>
-  </div>
+    </div>
 
-  <div class="card" style="max-width:560px">
-    <div class="card-title">General Settings</div>
-    <form method="POST" action="{{ url_for('settings.save') }}">
-      <div class="form-group">
-        <label>App Name</label>
-        <input type="text" name="app_name" value="{{ s.get('app_name','REFORMMED Monitor') }}">
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Shown in the browser title bar</div>
+    <div class="st-col">
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">At a glance</div><div class="panel-sub">Current configuration</div></div></div>
+        <div class="info-list">
+          <div class="info-item"><span class="dotx" style="background:var(--g-ocean)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg></span>
+            <div><b>Home refresh every {{ s.get('home_refresh_secs','2') }}s</b><span>Live tiles and tables on Home</span></div></div>
+          <div class="info-item"><span class="dotx" style="background:var(--g-sunset)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+            <div><b>Keep data for {{ s.get('data_retention_days','7') }} days</b><span>Older metrics and alert logs are purged</span></div></div>
+          <div class="info-item"><span class="dotx" style="background:var(--g-violet)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
+            <div><b>{{ s.get('smtp_host','smtp.gmail.com') }}:{{ s.get('smtp_port','465') }}</b><span>{{ 'SMTP password saved' if smtp_password_is_set else 'No SMTP password saved yet' }}</span></div></div>
+          <div class="info-item"><span class="dotx" style="background:var(--g-mint)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></span>
+            <div><b>{{ recipients|length }} alert recipient{{ '' if recipients|length == 1 else 's' }}</b><span>Available in every alert picker</span></div></div>
+        </div>
       </div>
-      <div class="form-group">
-        <label>Home Page Refresh Interval (seconds)</label>
-        <input type="number" name="home_refresh_secs" value="{{ s.get('home_refresh_secs','2') }}" min="1" max="60">
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">How often the home page data auto-refreshes. Min 1s, recommended 2–5s.</div>
-      </div>
-      <div class="form-group">
-        <label>Default Sidebar State</label>
-        <select name="sidebar_default">
-          <option value="expanded" {% if s.get('sidebar_default','expanded')=='expanded' %}selected{% endif %}>Expanded</option>
-          <option value="collapsed" {% if s.get('sidebar_default','expanded')=='collapsed' %}selected{% endif %}>Collapsed (mini)</option>
-        </select>
-      </div>
-      <!-- Hidden fields so other tab values aren't wiped -->
-      <input type="hidden" name="data_retention_days" value="{{ s.get('data_retention_days','7') }}">
-      <input type="hidden" name="smtp_host" value="{{ s.get('smtp_host','smtp.gmail.com') }}">
-      <input type="hidden" name="smtp_port" value="{{ s.get('smtp_port','465') }}">
-      <input type="hidden" name="alert_from_email" value="{{ s.get('alert_from_email','') }}">
-      <button type="submit" class="btn btn-primary mt-2">Save General Settings</button>
-    </form>
+    </div>
   </div>
 </div>
 
 <!-- ── DATA RETENTION ── -->
 <div class="tab-panel" data-tabpanel="settings" data-panelid="data">
-  <div class="card" style="max-width:560px">
-    <div class="card-title">Data Retention</div>
-    <form method="POST" action="{{ url_for('settings.save') }}">
-      <div class="form-group">
-        <label>Retention Period (days)</label>
-        <input type="number" name="data_retention_days" value="{{ s.get('data_retention_days','7') }}" min="1" max="365">
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-          Metric rows and alert logs older than this are deleted automatically.
-          Default: <strong>7 days</strong>. Reduces DB size significantly.
-        </div>
-      </div>
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">
-        <div style="font-size:12px;font-weight:600;margin-bottom:6px">What gets purged</div>
-        <ul style="font-size:12px;color:var(--text-muted);list-style:disc;padding-left:18px;line-height:1.8">
-          <li>Machine metric rows older than retention days (from each machine's table)</li>
-          <li>Alert log entries older than retention days</li>
-          <li>Machine registry, DVR devices, and DB Monitor watches are never deleted</li>
-        </ul>
-      </div>
-      <!-- Hidden fields -->
-      <input type="hidden" name="app_name" value="{{ s.get('app_name','REFORMMED Monitor') }}">
-      <input type="hidden" name="home_refresh_secs" value="{{ s.get('home_refresh_secs','2') }}">
-      <input type="hidden" name="sidebar_default" value="{{ s.get('sidebar_default','expanded') }}">
-      <input type="hidden" name="smtp_host" value="{{ s.get('smtp_host','smtp.gmail.com') }}">
-      <input type="hidden" name="smtp_port" value="{{ s.get('smtp_port','465') }}">
-      <input type="hidden" name="alert_from_email" value="{{ s.get('alert_from_email','') }}">
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <button type="submit" class="btn btn-primary">Save Retention Settings</button>
-        <form method="POST" action="{{ url_for('settings.purge_now') }}" onsubmit="return confirm('Run data purge now? This deletes old metric rows and alert logs permanently.')">
-          <button type="submit" class="btn btn-danger">Purge Old Data Now</button>
+  <div class="st-grid">
+    <div class="st-col">
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">Data retention</div><div class="panel-sub">How long metrics and alert history are kept</div></div></div>
+        <form method="POST" action="{{ url_for('settings.save') }}">
+          <div class="form-group">
+            <label for="st-ret">Retention period (days)</label>
+            <input type="number" id="st-ret" name="data_retention_days" value="{{ s.get('data_retention_days','7') }}" min="1" max="3650" step="1" required>
+            <div class="field-hint">Metric rows and alert logs older than this are deleted automatically by the background checker every 6 hours (and right after it starts). Default: <strong>7 days</strong>.</div>
+          </div>
+          <!-- Hidden fields -->
+          <input type="hidden" name="app_name" value="{{ s.get('app_name','Reformmed INFRA Monitor') }}">
+          <input type="hidden" name="home_refresh_secs" value="{{ s.get('home_refresh_secs','2') }}">
+          <input type="hidden" name="sidebar_default" value="{{ s.get('sidebar_default','expanded') }}">
+          <input type="hidden" name="smtp_host" value="{{ s.get('smtp_host','smtp.gmail.com') }}">
+          <input type="hidden" name="smtp_port" value="{{ s.get('smtp_port','465') }}">
+          <input type="hidden" name="alert_from_email" value="{{ s.get('alert_from_email','') }}">
+          <div class="panel-actions"><button type="submit" class="btn btn-primary">Save retention settings</button></div>
         </form>
       </div>
-    </form>
+      <div class="panel" style="border-color:color-mix(in srgb,var(--red) 35%,transparent);">
+        <div class="panel-head"><div><div class="panel-title">Purge now</div><div class="panel-sub">Run the clean-up immediately instead of waiting for the schedule</div></div></div>
+        <!-- Separate form: it used to be nested inside the save form, which made
+             this button submit "Save" instead of purging. -->
+        <form method="POST" action="{{ url_for('settings.purge_now') }}" data-msg="Run data purge now? This permanently deletes old metric rows and alert logs." onsubmit="return confirm(this.dataset.msg)">
+          <div class="panel-actions" style="justify-content:flex-start;margin-top:0;"><button type="submit" class="btn btn-danger">Purge old data now</button></div>
+        </form>
+      </div>
+    </div>
+    <div class="st-col">
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">What gets purged</div></div></div>
+        <div class="big-stat">{{ s.get('data_retention_days','7') }} <span style="font-size:15px;color:var(--text-muted);font-weight:600;letter-spacing:0;">days kept</span></div>
+        <div class="info-list" style="margin-top:12px;">
+          <div class="info-item"><span class="dotx" style="background:var(--g-ocean)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+            <div><b>Last purge</b>
+              {% if s.get('last_purge_at') %}
+              <span>{{ s.get('last_purge_at')[:16]|replace('T', ' ') }} UTC · removed {{ '{:,}'.format(s.get('last_purge_rows','0')|int) }} rows{% if (s.get('last_purge_errors','0')|int) > 0 %} · <b style="color:var(--red)">{{ s.get('last_purge_errors') }} table(s) skipped</b>{% endif %}</span>
+              {% else %}<span>Not run yet — it runs automatically once the checker service is up.</span>{% endif %}
+            </div></div>
+        </div>
+        <div class="info-list" style="margin-top:16px;">
+          <div class="info-item"><span class="dotx" style="background:linear-gradient(135deg,#ff8a8a,#e5484d)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg></span>
+            <div><b>Deleted</b><span>Machine metric rows and alert log entries older than the retention period</span></div></div>
+          <div class="info-item"><span class="dotx" style="background:var(--g-mint)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+            <div><b>Never deleted</b><span>Machine registry, users, settings and DB Monitor watches</span></div></div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
 <!-- ── EMAIL / SMTP ── -->
 <div class="tab-panel" data-tabpanel="settings" data-panelid="email">
-  <div class="card" style="max-width:560px">
-    <div class="card-title">Email / SMTP Settings</div>
-    <div style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--green)">
-      🔒 Username and password below are encrypted before being stored — the database never holds them in plain text.
+  <div class="st-grid">
+    <div class="st-col">
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">Email / SMTP</div><div class="panel-sub">The mail server used to send every alert</div></div></div>
+        <div class="secure-note">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          Username and password are encrypted before they are stored — the database never holds them in plain text.
+        </div>
+        <form method="POST" action="{{ url_for('settings.save') }}">
+          <div class="grid-2">
+            <div class="form-group">
+              <label for="st-host">SMTP host</label>
+              <input type="text" id="st-host" name="smtp_host" value="{{ s.get('smtp_host','smtp.gmail.com') }}" placeholder="smtp.gmail.com">
+            </div>
+            <div class="form-group">
+              <label for="st-port">SMTP port</label>
+              <input type="number" id="st-port" name="smtp_port" value="{{ s.get('smtp_port','465') }}" placeholder="465">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label for="st-user">SMTP username</label>
+              <input type="text" id="st-user" name="smtp_username" value="{{ smtp_username }}" placeholder="you@example.com" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label for="st-pass">SMTP password</label>
+              <input type="password" id="st-pass" name="smtp_password" autocomplete="new-password"
+                     placeholder="{% if smtp_password_is_set %}•••••••• saved — leave blank to keep{% else %}Not set yet{% endif %}">
+            </div>
+          </div>
+          <div class="field-hint" style="margin:-8px 0 14px;">The password field is always blank when the page loads — it is never sent back to your browser. Only fill it in to change it.</div>
+          <div class="form-group">
+            <label for="st-from">From email (sender)</label>
+            <input type="email" id="st-from" name="alert_from_email" value="{{ s.get('alert_from_email','') }}" placeholder="info@reformmed.ai">
+            <div class="field-hint">If blank, the SMTP username is used.</div>
+          </div>
+          <!-- Hidden fields -->
+          <input type="hidden" name="app_name" value="{{ s.get('app_name','Reformmed INFRA Monitor') }}">
+          <input type="hidden" name="home_refresh_secs" value="{{ s.get('home_refresh_secs','2') }}">
+          <input type="hidden" name="sidebar_default" value="{{ s.get('sidebar_default','expanded') }}">
+          <input type="hidden" name="data_retention_days" value="{{ s.get('data_retention_days','7') }}">
+          <div class="panel-actions"><button type="submit" class="btn btn-primary">Save email settings</button></div>
+        </form>
+      </div>
     </div>
-    <form method="POST" action="{{ url_for('settings.save') }}">
-      <div class="grid-2">
-        <div class="form-group">
-          <label>SMTP Host</label>
-          <input type="text" name="smtp_host" value="{{ s.get('smtp_host','smtp.gmail.com') }}" placeholder="smtp.gmail.com">
-        </div>
-        <div class="form-group">
-          <label>SMTP Port</label>
-          <input type="number" name="smtp_port" value="{{ s.get('smtp_port','465') }}" placeholder="465">
-        </div>
-      </div>
-      <div class="form-group">
-        <label>SMTP Username</label>
-        <input type="text" name="smtp_username" value="{{ smtp_username }}" placeholder="you@example.com">
-      </div>
-      <div class="form-group">
-        <label>SMTP Password</label>
-        <input type="password" name="smtp_password" autocomplete="new-password"
-               placeholder="{% if smtp_password_is_set %}•••••••• (saved — leave blank to keep it){% else %}Not set yet{% endif %}">
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-          This field is always blank when the page loads — it's never sent back to your browser.
-          Only fill it in when you want to change it.
+    <div class="st-col">
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">Delivery status</div></div></div>
+        <div class="info-list">
+          <div class="info-item"><span class="dotx" style="background:{{ 'var(--g-mint)' if smtp_password_is_set else 'var(--g-sunset)' }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span>
+            <div><b>{{ 'Credentials saved' if smtp_password_is_set else 'No password saved' }}</b><span>{{ smtp_username or 'No username set' }}</span></div></div>
+          <div class="info-item"><span class="dotx" style="background:var(--g-ocean)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg></span>
+            <div><b>Gmail tip</b><span>Use an App Password (Google Account → Security → App passwords), port 465.</span></div></div>
         </div>
       </div>
-      <div class="form-group">
-        <label>From Email (sender)</label>
-        <input type="email" name="alert_from_email" value="{{ s.get('alert_from_email','') }}" placeholder="info@reformmed.ai">
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">If blank, falls back to the SMTP username above.</div>
-      </div>
-      <!-- Hidden fields -->
-      <input type="hidden" name="app_name" value="{{ s.get('app_name','REFORMMED Monitor') }}">
-      <input type="hidden" name="home_refresh_secs" value="{{ s.get('home_refresh_secs','2') }}">
-      <input type="hidden" name="sidebar_default" value="{{ s.get('sidebar_default','expanded') }}">
-      <input type="hidden" name="data_retention_days" value="{{ s.get('data_retention_days','7') }}">
-      <button type="submit" class="btn btn-primary mt-2">Save Email Settings</button>
-    </form>
+    </div>
   </div>
 </div>
 
 <!-- ── ALERT RECIPIENTS ── -->
 <div class="tab-panel" data-tabpanel="settings" data-panelid="recipients">
-  <div class="card" style="max-width:640px">
-    <div class="card-title">Alert Recipients</div>
-    <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">
-      This is the master address book. Add or remove people here once — every
-      alert email picker across the app (Servers, DVR Monitor, DB Monitor,
-      Alerts) reads from this list, so you assign "send to this person: yes/no"
-      instead of retyping addresses each time.
-    </div>
-
-    <form method="POST" action="{{ url_for('settings.add_recipient') }}"
-          style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;align-items:flex-end;">
-      <div class="form-group" style="flex:1;min-width:160px;margin-bottom:0;">
-        <label>Name (optional)</label>
-        <input type="text" name="label" placeholder="Ops Team">
-      </div>
-      <div class="form-group" style="flex:1;min-width:200px;margin-bottom:0;">
-        <label>Email</label>
-        <input type="email" name="email" placeholder="ops@example.com" required>
-      </div>
-      <button type="submit" class="btn btn-primary">Add Recipient</button>
-    </form>
-
-    <div style="max-height:320px;overflow-y:auto;">
-      {% for r in recipients %}
-      <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;
-                  border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg3);">
-        <div style="flex:1;min-width:0;">
-          {% if r.label %}<div style="font-weight:600;font-size:13px;">{{ r.label }}</div>{% endif %}
-          <div class="mono text-muted" style="font-size:12px;">{{ r.email }}</div>
+  <div class="st-grid">
+    <div class="st-col">
+      <div class="panel">
+        <div class="panel-head">
+          <div><div class="panel-title">Alert recipients</div><div class="panel-sub">The address book every alert picker in the app reads from</div></div>
+          <span class="badge badge-info">{{ recipients|length }} saved</span>
         </div>
-        <form method="POST" action="{{ url_for('settings.delete_recipient', recipient_id=r.id) }}"
-              onsubmit="return confirm('Remove {{ r.email }} from the recipient list?')">
-          <button type="submit" class="btn btn-danger btn-sm">✕</button>
+        <form method="POST" action="{{ url_for('settings.add_recipient') }}" class="rcp-add">
+          <div class="form-group">
+            <label for="rc-label">Name (optional)</label>
+            <input type="text" id="rc-label" name="label" placeholder="Ops Team">
+          </div>
+          <div class="form-group">
+            <label for="rc-mail">Email</label>
+            <input type="email" id="rc-mail" name="email" placeholder="ops@example.com" required>
+          </div>
+          <button type="submit" class="btn btn-primary">Add</button>
         </form>
+        <div class="rcp-list">
+          {% for r in recipients %}
+          <div class="rcp">
+            <span class="rcp-av">{{ (r.label or r.email)[:1]|upper }}</span>
+            <div style="flex:1;min-width:0;">
+              <div class="rcp-name">{{ r.label or r.email.split('@')[0] }}</div>
+              <div class="rcp-mail">{{ r.email }}</div>
+            </div>
+            <form method="POST" action="{{ url_for('settings.delete_recipient', recipient_id=r.id) }}"
+                  data-msg="Remove {{ r.email }} from the recipient list?" onsubmit="return confirm(this.dataset.msg)">
+              <button type="submit" class="btn btn-danger btn-del" aria-label="Remove {{ r.email }}">✕</button>
+            </form>
+          </div>
+          {% else %}
+          <div class="empty-chart" style="min-height:140px;"><b>No recipients yet</b>Add the first person above.</div>
+          {% endfor %}
+        </div>
       </div>
-      {% else %}
-      <span class="text-muted" style="font-size:13px;">No recipients added yet.</span>
-      {% endfor %}
+    </div>
+    <div class="st-col">
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">How recipients work</div></div></div>
+        <div class="info-list">
+          <div class="info-item"><span class="dotx" style="background:var(--g-ocean)">1</span><div><b>Add people once</b><span>Keep every alert email address in this list.</span></div></div>
+          <div class="info-item"><span class="dotx" style="background:var(--g-violet)">2</span><div><b>Pick per alert</b><span>Machine alerts and DB Monitor alerts let you tick who gets each alert.</span></div></div>
+          <div class="info-item"><span class="dotx" style="background:var(--g-mint)">3</span><div><b>Fallback</b><span>Machines without their own recipients use ALERT_TO from the server config.</span></div></div>
+        </div>
+      </div>
     </div>
   </div>
 </div>

@@ -1,45 +1,64 @@
 {% extends "base.html" %}
 {% import "_macros.html" as macros %}
-{% block title %}DB Monitor — REFORMMED{% endblock %}
+{% block title %}DB Monitor — Reformmed INFRA Monitor{% endblock %}
 {% block page_title %}DB Monitor{% endblock %}
 
 {% block extra_css %}
 <style>
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
-.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;}
-.stat-value{font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;}
-.stat-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px;}
+/* ── Overview panels ── */
+.dbm-grid{display:grid;grid-template-columns:1fr 1.4fr 1.4fr;gap:16px;margin-bottom:22px;}
+@media(max-width:1200px){.dbm-grid{grid-template-columns:1fr 1fr;}.dbm-grid .panel:first-child{grid-column:1/-1;}}
+@media(max-width:720px){.dbm-grid{grid-template-columns:1fr;}}
+.health-legend{display:flex;flex-direction:column;gap:10px;flex:1;min-width:0;}
+.hl-row{display:flex;align-items:center;gap:8px;font-size:13px;}
+.hl-row i{width:10px;height:10px;border-radius:4px;flex-shrink:0;}
+.hl-row span{flex:1;color:var(--text-muted);font-weight:500;}
+.hl-row b{font-variant-numeric:tabular-nums;}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 0 12px;flex-wrap:wrap;}
+.section-head h2{font-size:18px;font-weight:700;letter-spacing:-.2px;}
+.filter-chips{display:flex;gap:6px;flex-wrap:wrap;}
+.fchip{height:32px;padding:0 14px;border-radius:99px;border:1px solid var(--border);background:var(--bg2);color:var(--text-muted);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+.fchip:hover{color:var(--text);border-color:var(--border-strong);}
+.fchip.active{background:var(--accent-soft);color:var(--accent);border-color:transparent;}
+.wcard.hidden-by-filter,.wgroup-card.hidden-by-filter{display:none;}
 
-.wcard{background:var(--bg2);border:1px solid var(--border);border-radius:14px;margin-bottom:14px;overflow:hidden;transition:border-color .2s;}
-.wcard.live{border-color:rgba(34,197,94,.35);}
-.wcard.dead{border-color:rgba(239,68,68,.4);}
-.wcard-main{display:flex;align-items:center;gap:18px;padding:16px 20px;flex-wrap:wrap;}
-.status-pill{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:99px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.5px;flex-shrink:0;}
-.status-pill.loading{background:rgba(148,163,184,.12);color:var(--text-muted);}
-.status-pill.live{background:rgba(34,197,94,.12);color:var(--green);}
-.status-pill.dead{background:rgba(239,68,68,.12);color:var(--red);}
+/* ── Watch cards ── */
+.wcard{position:relative;background:var(--bg2);border:1px solid var(--border);border-radius:16px;margin-bottom:12px;overflow:hidden;transition:border-color .2s,box-shadow .2s;box-shadow:var(--shadow-1);}
+.wcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--border-strong);}
+.wcard.live::before{background:linear-gradient(180deg,#43f2c2,#0fa58f);}
+.wcard.dead::before{background:linear-gradient(180deg,#ff8a8a,#e5484d);}
+.wcard.dead{border-color:color-mix(in srgb,var(--red) 40%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--red) 10%,transparent);}
+.wcard-main{display:flex;align-items:center;gap:20px;padding:16px 20px 16px 24px;flex-wrap:wrap;}
+.wspark{width:150px;height:42px;flex-shrink:0;}
+@media(max-width:900px){.wspark{display:none;}}
+.status-pill.paused{background:color-mix(in srgb,var(--yellow) 14%,transparent);color:var(--yellow);}
+.status-pill{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:99px;font-size:11px;font-weight:800;letter-spacing:.6px;flex-shrink:0;min-width:72px;justify-content:center;}
+.status-pill.loading{background:color-mix(in srgb,var(--text-muted) 12%,transparent);color:var(--text-muted);}
+.status-pill.live{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green);}
+.status-pill.dead{background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red);}
 .status-dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
 .wcard-info{flex:1;min-width:180px;}
-.wcard-name-click{font-weight:700;font-size:14px;display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;}
+.wcard-name-click{font-family:var(--font-head);font-weight:700;font-size:15px;display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;}
 .wcard-name-click:hover{color:var(--accent);}
 .wcard-name-click .chev{transition:transform .15s;display:inline-block;font-size:11px;color:var(--text-muted);}
 .wcard-name-click.open .chev{transform:rotate(90deg);}
 .name-sub-lbl{font-size:11px;font-weight:500;color:var(--text-muted);margin-left:4px;}
-.wcard-sub{font-size:11px;color:var(--text-muted);margin-top:3px;font-family:'JetBrains Mono',monospace;}
-.wcard-stats{display:flex;gap:26px;flex-wrap:wrap;}
-.wstat{text-align:center;min-width:70px;}
-.wstat-val{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;}
-.wstat-lbl{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-top:2px;}
-.dead-since{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--red);}
+.wcard-sub{font-size:12px;color:var(--text-muted);margin-top:3px;font-family:var(--mono);}
+.wcard-stats{display:flex;gap:10px;flex-wrap:wrap;}
+.wstat{text-align:left;min-width:84px;padding:8px 12px;border-radius:12px;background:var(--bg3);}
+.wstat-val{font-family:var(--font-head);font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;}
+.wstat-lbl{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-top:2px;font-weight:700;}
+.dead-since{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--red);}
 .toggles{display:flex;align-items:center;gap:14px;}
 .toggle-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;}
 .toggle-lbl{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;}
 .toggle-form{margin:0;}
-.tog{background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--text-muted);cursor:pointer;}
-.tog.on-monitor{color:var(--accent);border-color:var(--accent);}
-.tog.on-alert{color:var(--yellow);border-color:var(--yellow);}
-.btn-remove{background:none;border:1px solid var(--border);border-radius:7px;color:var(--text-muted);font-size:13px;padding:5px 9px;cursor:pointer;}
-.btn-remove:hover{background:rgba(239,68,68,.1);color:var(--red);border-color:var(--red);}
+.tog{background:none;border:1px solid var(--border);border-radius:99px;height:30px;padding:0 12px;font-size:12px;font-weight:700;font-family:inherit;color:var(--text-muted);cursor:pointer;}
+.tog:hover{border-color:var(--border-strong);color:var(--text);}
+.tog.on-monitor{color:var(--accent);border-color:transparent;background:var(--accent-soft);}
+.tog.on-alert{color:var(--yellow);border-color:transparent;background:color-mix(in srgb,var(--yellow) 14%,transparent);}
+.btn-remove{background:none;border:1px solid var(--border);border-radius:50%;width:32px;height:32px;color:var(--text-muted);font-size:13px;cursor:pointer;}
+.btn-remove:hover{background:color-mix(in srgb,var(--red) 10%,transparent);color:var(--red);border-color:var(--red);}
 
 /* ── History range filter bar ── */
 .history-bar{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:0;margin-bottom:14px;overflow:hidden;}
@@ -51,7 +70,7 @@
 .history-presets{display:flex;gap:8px;flex-wrap:wrap;}
 .hist-preset-btn{background:var(--bg3);border:1px solid var(--border);border-radius:99px;color:var(--text-muted);font-size:12px;padding:6px 14px;cursor:pointer;transition:.15s;font-family:inherit;}
 .hist-preset-btn:hover{border-color:var(--accent);color:var(--text);}
-.hist-preset-btn.active{background:rgba(56,189,248,.12);border-color:var(--accent);color:var(--accent);font-weight:600;}
+.hist-preset-btn.active{background:color-mix(in srgb,var(--accent) 12%,transparent);border-color:var(--accent);color:var(--accent);font-weight:600;}
 .history-bar-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
 .history-custom-range{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;}
 .history-field{display:flex;flex-direction:column;gap:5px;}
@@ -59,19 +78,19 @@
 .history-field input{padding:8px 12px;font-size:12.5px;min-width:200px;}
 .history-divider{width:1px;align-self:stretch;background:var(--border);margin:0 2px;}
 .history-status{font-size:12px;color:var(--text-muted);}
-.history-status.warn{color:#f59e0b;}
-.history-status.err{color:#ef4444;}
-.history-status.ok{color:#22c55e;}
+.history-status.warn{color:var(--yellow);}
+.history-status.err{color:var(--red);}
+.history-status.ok{color:var(--green);}
 
 /* ── Location expand panel ── */
 .wcard-expand-btn{background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-size:11px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;}
 .wcard-expand-btn:hover{color:var(--text);border-color:var(--accent);}
-.wloc-panel{display:none;border-top:1px solid var(--border);padding:14px 20px;background:var(--bg1, rgba(0,0,0,.15));}
+.wloc-panel{display:none;border-top:1px solid var(--border);padding:14px 20px 14px 24px;background:var(--bg3);}
 .wloc-panel.open{display:block;}
 .wloc-panel-title{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;}
-.wloc-row{display:flex;flex-direction:column;align-items:stretch;padding:9px 12px;border-radius:8px;background:var(--bg2);border:1px solid var(--border);margin-bottom:6px;}
-.wloc-row.dead{border-color:rgba(239,68,68,.35);}
-.wloc-row.live{border-color:rgba(34,197,94,.25);}
+.wloc-row{display:flex;flex-direction:column;align-items:stretch;padding:10px 14px;border-radius:12px;background:var(--bg2);border:1px solid var(--border);margin-bottom:6px;}
+.wloc-row.dead{border-color:color-mix(in srgb,var(--red) 35%,transparent);}
+.wloc-row.live{border-color:color-mix(in srgb,var(--green) 25%,transparent);}
 .wloc-row-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
 .wloc-info{flex:1;min-width:140px;}
 .wloc-name-click{font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px;}
@@ -79,44 +98,44 @@
 .wloc-name-click.clickable:hover{color:var(--accent);}
 .wloc-name-click .chev{transition:transform .15s;display:inline-block;font-size:10px;color:var(--text-muted);flex-shrink:0;}
 .wloc-name-click.open .chev{transform:rotate(90deg);}
-.wloc-sub{font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono', monospace;}
-.wloc-pill{font-family:'JetBrains Mono', monospace;font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px;letter-spacing:.4px;}
-.wloc-pill.live{background:rgba(34,197,94,.12);color:var(--green);}
-.wloc-pill.dead{background:rgba(239,68,68,.12);color:var(--red);}
-.wloc-pill.paused{background:rgba(245,158,11,.1);color:var(--yellow);}
+.wloc-sub{font-size:10px;color:var(--text-muted);font-family:var(--mono);}
+.wloc-pill{font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px;letter-spacing:.4px;}
+.wloc-pill.live{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green);}
+.wloc-pill.dead{background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red);}
+.wloc-pill.paused{background:color-mix(in srgb,var(--yellow) 10%,transparent);color:var(--yellow);}
 .wloc-toggles{display:flex;gap:6px;}
-.wloc-tog{border:1px solid var(--border);background:none;border-radius:6px;font-size:10px;padding:4px 8px;cursor:pointer;color:var(--text-muted);font-family:'JetBrains Mono', monospace;}
+.wloc-tog{border:1px solid var(--border);background:none;border-radius:6px;font-size:10px;padding:4px 8px;cursor:pointer;color:var(--text-muted);font-family:var(--mono);}
 .wloc-tog.on-monitor{color:var(--accent);border-color:var(--accent);}
 .wloc-tog.on-alert{color:var(--yellow);border-color:var(--yellow);}
 .warea-panel{display:none;margin-top:8px;padding-left:18px;border-left:2px solid var(--border);}
 .warea-panel.open{display:block;}
-.warea-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 10px;border-radius:6px;background:var(--bg1, rgba(0,0,0,.15));margin-bottom:4px;font-size:12px;}
-.warea-row.dead{outline:1px solid rgba(239,68,68,.3);}
+.warea-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 10px;border-radius:8px;background:var(--bg3);margin-bottom:4px;font-size:12px;}
+.warea-row.dead{outline:1px solid color-mix(in srgb,var(--red) 30%,transparent);}
 .warea-name{flex:1;min-width:120px;font-weight:500;}
-.warea-sub{font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono', monospace;}
-.warea-pill{font-family:'JetBrains Mono', monospace;font-size:9px;font-weight:700;padding:2px 7px;border-radius:99px;}
-.warea-pill.live{background:rgba(34,197,94,.12);color:var(--green);}
-.warea-pill.dead{background:rgba(239,68,68,.12);color:var(--red);}
-.warea-pill.paused{background:rgba(245,158,11,.1);color:var(--yellow);}
-.warea-tog{border:1px solid var(--border);background:none;border-radius:5px;font-size:9px;padding:3px 7px;cursor:pointer;color:var(--text-muted);font-family:'JetBrains Mono', monospace;}
+.warea-sub{font-size:10px;color:var(--text-muted);font-family:var(--mono);}
+.warea-pill{font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 7px;border-radius:99px;}
+.warea-pill.live{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green);}
+.warea-pill.dead{background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red);}
+.warea-pill.paused{background:color-mix(in srgb,var(--yellow) 10%,transparent);color:var(--yellow);}
+.warea-tog{border:1px solid var(--border);background:none;border-radius:5px;font-size:9px;padding:3px 7px;cursor:pointer;color:var(--text-muted);font-family:var(--mono);}
 .warea-tog.on-monitor{color:var(--accent);border-color:var(--accent);}
 .warea-tog.on-alert{color:var(--yellow);border-color:var(--yellow);}
 
 /* ── Hospital group card ── */
-.wgroup-card{border:1px solid var(--border);border-radius:12px;margin-bottom:16px;background:var(--bg2, rgba(255,255,255,.02));overflow:hidden;}
-.wgroup-header{display:flex;align-items:center;gap:12px;padding:14px 20px;cursor:pointer;user-select:none;background:var(--bg3, rgba(255,255,255,.03));}
-.wgroup-header:hover{background:var(--bg4, rgba(255,255,255,.05));}
+.wgroup-card{border:1px solid var(--border);border-radius:18px;margin-bottom:16px;background:var(--bg2);overflow:hidden;box-shadow:var(--shadow-1);}
+.wgroup-header{display:flex;align-items:center;gap:12px;padding:16px 20px;cursor:pointer;user-select:none;background:linear-gradient(90deg,var(--accent-soft),transparent 70%);border-bottom:1px solid var(--border);}
+.wgroup-header:hover{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 22%,transparent),transparent 70%);}
 .wgroup-header .chev{transition:transform .15s;display:inline-block;font-size:12px;color:var(--text-muted);}
 .wgroup-header.open .chev{transform:rotate(90deg);}
-.wgroup-name{font-weight:700;font-size:15px;flex:1;}
+.wgroup-name{font-family:var(--font-head);font-weight:800;font-size:16px;flex:1;letter-spacing:-.2px;}
 .wgroup-sub{font-size:12px;color:var(--text-muted);}
-.wgroup-pill{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;font-family:'JetBrains Mono', monospace;font-size:10px;font-weight:700;background:rgba(148,163,184,.12);color:var(--text-muted);}
+.wgroup-pill{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;font-family:var(--mono);font-size:10px;font-weight:700;background:color-mix(in srgb,var(--text-muted) 12%,transparent);color:var(--text-muted);}
 .wgroup-pill .status-dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
-.wgroup-pill.live{background:rgba(34,197,94,.12);color:var(--green);}
-.wgroup-pill.dead{background:rgba(239,68,68,.12);color:var(--red);}
-.wgroup-body{display:none;padding:14px;padding-top:4px;}
+.wgroup-pill.live{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green);}
+.wgroup-pill.dead{background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red);}
+.wgroup-body{display:none;padding:14px;}
 .wgroup-body.open{display:block;}
-.wgroup-body .wcard{margin-bottom:10px;}
+.wgroup-body .wcard{margin-bottom:10px;box-shadow:none;}
 .wgroup-body .wcard:last-child{margin-bottom:0;}
 
 /* conn table */
@@ -126,7 +145,7 @@
 
 {% block content %}
 <div class="page-header">
-  <div><h1>DB Monitor</h1><p>Live data flow status for external PostgreSQL tables</p></div>
+  <div><h1>DB Monitor</h1><p>Live data-flow health for external PostgreSQL feeds — updates every 10s · last check <span id="dbm-last-check">—</span></p></div>
   <div style="display:flex;gap:10px;">
     {% if current_user.is_admin %}
     <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-add-conn').classList.add('open')">+ Connection</button>
@@ -136,12 +155,86 @@
   </div>
 </div>
 
-<div class="stat-grid">
-  <div class="stat-card"><div class="stat-value" style="color:var(--accent)">{{ watches|length }}</div><div class="stat-label">Watching</div></div>
-  <div class="stat-card"><div class="stat-value" style="color:var(--green)" id="stat-live">–</div><div class="stat-label">Live</div></div>
-  <div class="stat-card"><div class="stat-value" style="color:var(--red)" id="stat-dead">–</div><div class="stat-label">Dead</div></div>
-  <div class="stat-card"><div class="stat-value" style="color:var(--yellow)" id="stat-off">–</div><div class="stat-label">Monitoring Off</div></div>
+<div class="kpi-grid">
+  <div class="kpi k-ocean">
+    <div class="kpi-top"><span class="kpi-label">Tables watched</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span></div>
+    <div class="kpi-value">{{ watches|length }}</div>
+    <div class="kpi-sub">{{ connections|length }} connection{{ '' if connections|length == 1 else 's' }}</div>
+  </div>
+  <div class="kpi k-mint">
+    <div class="kpi-top"><span class="kpi-label">Live</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span></div>
+    <div class="kpi-value" id="stat-live">–</div>
+    <div class="kpi-bar"><i id="kpi-live-bar" style="width:0%"></i></div>
+  </div>
+  <div class="kpi k-red">
+    <div class="kpi-top"><span class="kpi-label">Stopped</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span></div>
+    <div class="kpi-value" id="stat-dead">–</div>
+    <div class="kpi-sub" id="kpi-dead-sub">no new rows in 5+ min</div>
+  </div>
+  <div class="kpi k-sunset">
+    <div class="kpi-top"><span class="kpi-label">Paused</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg></span></div>
+    <div class="kpi-value" id="stat-off">–</div>
+    <div class="kpi-sub">monitoring turned off</div>
+  </div>
+  <div class="kpi k-violet">
+    <div class="kpi-top"><span class="kpi-label">Ingest rate</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v14"/><polyline points="7 11 12 16 17 11"/><line x1="4" y1="21" x2="20" y2="21"/></svg></span></div>
+    <div class="kpi-value" id="kpi-rpm">–</div>
+    <div class="kpi-sub">rows per minute, all tables</div>
+  </div>
+  <div class="kpi k-pink">
+    <div class="kpi-top"><span class="kpi-label">Total rows</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span></div>
+    <div class="kpi-value" id="kpi-rows">–</div>
+    <div class="kpi-sub">estimated, across watched tables</div>
+  </div>
 </div>
+
+{% if watches %}
+<div class="dbm-grid">
+  <div class="panel">
+    <div class="panel-head"><div><div class="panel-title">Feed health</div><div class="panel-sub">Status of every watched table</div></div></div>
+    <div class="donut-wrap" style="display:flex;align-items:center;gap:18px;">
+      <div class="donut-box" style="width:150px;height:150px;"><canvas id="ch-health"></canvas>
+        <div class="donut-mid"><b id="health-pct">–</b><span>live</span></div></div>
+      <div class="health-legend">
+        <div class="hl-row"><i style="background:var(--g-mint)"></i><span>Live</span><b id="hl-live">–</b></div>
+        <div class="hl-row"><i style="background:linear-gradient(90deg,#ff8a8a,#e5484d)"></i><span>Stopped</span><b id="hl-dead">–</b></div>
+        <div class="hl-row"><i style="background:var(--g-sunset)"></i><span>Paused</span><b id="hl-off">–</b></div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div><div class="panel-title">Ingest rate by table</div><div class="panel-sub">Rows in the last minute · top 8</div></div></div>
+    <div style="height:200px;position:relative;"><canvas id="ch-rpm"></canvas></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head">
+      <div><div class="panel-title">Ingest trend</div><div class="panel-sub">Total rows/min since this page opened</div></div>
+      <div class="big-num" id="trend-now" style="font-family:var(--font-head);font-size:22px;font-weight:800;">–</div>
+    </div>
+    <div style="height:200px;position:relative;"><canvas id="ch-trend"></canvas></div>
+  </div>
+</div>
+
+<div class="section-head">
+  <h2>Watched tables</h2>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+  <input type="search" id="feed-search" placeholder="Search tables, groups…" aria-label="Search watched tables"
+         style="width:240px;height:34px;border-radius:99px;padding:0 14px;">
+  <div class="filter-chips" id="filter-chips">
+    <button type="button" class="fchip active" data-filter="all">All</button>
+    <button type="button" class="fchip" data-filter="dead">Stopped</button>
+    <button type="button" class="fchip" data-filter="live">Live</button>
+    <button type="button" class="fchip" data-filter="paused">Paused</button>
+  </div>
+  </div>
+</div>
+{% endif %}
 
 {% if not watches %}
 <div class="card" style="text-align:center;padding:48px;">
@@ -170,6 +263,9 @@
       <div class="wcard-sub">{{ w.schema_name }}.{{ w.table_name }} &bull; {{ w.conn_name }}</div>
     </div>
 
+    <!-- Rows/min sparkline (history kept in the browser while the page is open) -->
+    <div class="wspark" title="Rows per minute, recent checks"><canvas id="spark-{{ w.id }}"></canvas></div>
+
     <!-- Stats -->
     <div class="wcard-stats">
       <div class="wstat">
@@ -177,7 +273,7 @@
         <div class="wstat-lbl">Total Rows</div>
       </div>
       <div class="wstat">
-        <div class="wstat-val" id="stat-rpm-{{ w.id }}" style="color:var(--green)">—</div>
+        <div class="wstat-val" id="stat-rpm-{{ w.id }}">—</div>
         <div class="wstat-lbl">Rows / min</div>
       </div>
       <div class="wstat">
@@ -467,6 +563,7 @@ async function loadStatus(id) {
     var card = document.getElementById('wcard-' + id);
     if (!pill) return;
 
+    LAST_STATUS[id] = d;
     if (d.error) {
       pill.className = 'status-pill dead';
       ptxt.textContent = 'ERROR';
@@ -512,8 +609,9 @@ async function loadStatus(id) {
     const rpmEl = document.getElementById('stat-rpm-' + id);
     if (rpmEl) {
       rpmEl.textContent = d.rows_last_1min !== undefined ? fmtNum(d.rows_last_1min) : '—';
-      rpmEl.style.color = d.rows_last_1min > 0 ? 'var(--green)' : 'var(--text-muted)';
+      rpmEl.style.color = d.rows_last_1min > 0 ? 'var(--text)' : 'var(--text-muted)';
     }
+    pushSpark(id, +d.rows_last_1min || 0, !!d.is_dead);
 
     renderLocations(id, d.location_col, d.locations || []);
 
@@ -735,25 +833,150 @@ function updateGroupPillFor(watchId) {
   }
 }
 
-// ── Main refresh loop ──
-function refreshAll() {
-  var liveCount = 0, deadCount = 0, offCount = 0;
-  WATCH_IDS.forEach(id => {
-    loadStatus(id);
-  });
-  setTimeout(() => {
-    Object.values(WATCH_STATE).forEach(s => {
-      if (!s.monitoring) offCount++;
-      else if (s.is_dead) deadCount++;
-      else liveCount++;
+// ── Overview: KPIs, health donut, ingest charts, per-card sparklines ──
+var LAST_STATUS = {};
+var SPARKS = {};
+var TREND = { labels: [], data: [] };
+var NAMES = {};
+document.querySelectorAll('[id^="wcard-name-"]').forEach(function(el) {
+  NAMES[el.id.replace('wcard-name-', '')] = el.textContent.replace('▸', '').trim();
+});
+
+function pushSpark(id, rpm, dead) {
+  var c = SPARKS[id];
+  if (!c) {
+    c = SPARKS[id] = RM.chart('spark-' + id, {
+      type: 'line',
+      data: { labels: [], datasets: [{ data: [], rm: { line: 'g:mint', fill: 'gradient' }, fill: 'origin', borderWidth: 2, cubicInterpolationMode: 'monotone',
+                                        pointRadius: function(c) { return c.dataset.data.length < 2 ? 3 : 0; } }] },
+      options: { animation: false, plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                 scales: { x: { display: false }, y: { display: false, beginAtZero: true } } }
     });
-    var elLive = document.getElementById('stat-live');
-    var elDead = document.getElementById('stat-dead');
-    var elOff  = document.getElementById('stat-off');
-    if (elLive) elLive.textContent = liveCount;
-    if (elDead) elDead.textContent = deadCount;
-    if (elOff)  elOff.textContent  = offCount;
-  }, 600);
+    if (!c) return;
+  }
+  var ds = c.data.datasets[0];
+  var want = dead ? 'g:sunset' : 'g:mint';
+  if (ds.rm.line !== want) { ds.rm.line = want; RM.recolor(c); }
+  c.data.labels.push(''); ds.data.push(rpm);
+  if (ds.data.length > 30) { c.data.labels.shift(); ds.data.shift(); }
+  c.update('none');
+}
+
+var healthChart = RM.chart('ch-health', {
+  type: 'doughnut',
+  data: { labels: ['Live', 'Stopped', 'Paused'],
+          datasets: [{ data: [0, 0, 0], rm: { bg: ['g:mint', '--red', 'g:sunset'] }, borderRadius: 8, spacing: 3 }] },
+  options: { cutout: '74%', animation: false, plugins: { legend: { display: false } } }
+});
+var rpmChart = RM.chart('ch-rpm', {
+  type: 'bar',
+  data: { labels: [], datasets: [{ label: 'Rows / min', data: [], rm: { bg: 'g:violet', mode: 'h' }, maxBarThickness: 14 }] },
+  options: { indexAxis: 'y', animation: false,
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return ' ' + fmtNum(c.raw) + ' rows/min'; } } } },
+    scales: { x: { beginAtZero: true, border: { display: false }, ticks: { maxTicksLimit: 5 } },
+              y: { grid: { display: false }, border: { display: false },
+                   ticks: { callback: function(v) { var l = this.getLabelForValue(v); return l.length > 18 ? l.slice(0, 17) + '…' : l; } } } }
+  }
+});
+var trendChart = RM.chart('ch-trend', {
+  type: 'line',
+  data: { labels: [], datasets: [{ label: 'Rows / min', data: [], rm: { line: 'g:ocean', fill: 'gradient' }, fill: 'origin', cubicInterpolationMode: 'monotone',
+                                    pointRadius: function(c) { return c.dataset.data.length < 2 ? 4 : 0; } }] },
+  options: { animation: false, interaction: { intersect: false, mode: 'index' },
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return ' ' + fmtNum(c.raw) + ' rows/min'; } } } },
+    scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 6, maxRotation: 0 } },
+              y: { beginAtZero: true, border: { display: false }, ticks: { maxTicksLimit: 4 } } }
+  }
+});
+
+function setTxt(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+
+function updateOverview() {
+  var live = 0, dead = 0, off = 0, rpm = 0, rows = 0, perTable = [];
+  WATCH_IDS.forEach(function(id) {
+    var s = WATCH_STATE[id], d = LAST_STATUS[id] || {};
+    if (!s) return;
+    if (!s.monitoring) off++;
+    else if (s.is_dead) dead++;
+    else live++;
+    if (s.monitoring && !d.error) {
+      rpm += +d.rows_last_1min || 0;
+      rows += +d.total_rows || 0;
+      perTable.push({ name: NAMES[id] || ('#' + id), rpm: +d.rows_last_1min || 0 });
+    }
+    var card = document.getElementById('wcard-' + id);
+    if (card) card.dataset.state = !s.monitoring ? 'paused' : (s.is_dead ? 'dead' : 'live');
+  });
+  var monitored = live + dead;
+  setTxt('stat-live', live); setTxt('stat-dead', dead); setTxt('stat-off', off);
+  setTxt('hl-live', live); setTxt('hl-dead', dead); setTxt('hl-off', off);
+  setTxt('kpi-rpm', fmtNum(rpm)); setTxt('kpi-rows', fmtNum(rows));
+  setTxt('health-pct', monitored ? Math.round(live / monitored * 100) + '%' : '–');
+  var bar = document.getElementById('kpi-live-bar');
+  if (bar) bar.style.width = (monitored ? live / monitored * 100 : 0) + '%';
+  setTxt('dbm-last-check', new Date().toLocaleTimeString());
+
+  if (healthChart) { healthChart.data.datasets[0].data = [live, dead, off]; healthChart.update('none'); }
+  if (rpmChart) {
+    perTable.sort(function(a, b) { return b.rpm - a.rpm; });
+    var topT = perTable.slice(0, 8);
+    rpmChart.data.labels = topT.map(function(t) { return t.name; });
+    rpmChart.data.datasets[0].data = topT.map(function(t) { return t.rpm; });
+    rpmChart.update('none');
+  }
+  if (trendChart) {
+    TREND.labels.push(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    TREND.data.push(rpm);
+    if (TREND.data.length > 60) { TREND.labels.shift(); TREND.data.shift(); }
+    trendChart.data.labels = TREND.labels.slice();
+    trendChart.data.datasets[0].data = TREND.data.slice();
+    trendChart.update('none');
+    setTxt('trend-now', fmtNum(rpm));
+  }
+  applyFilter();
+}
+
+// ── Status filter chips ──
+var CURRENT_FILTER = 'all';
+function applyFilter() {
+  var fs = document.getElementById('feed-search');
+  var q = fs ? fs.value.trim().toLowerCase() : '';
+  document.querySelectorAll('.wcard').forEach(function(card) {
+    var st = card.dataset.state || 'live';
+    var g = card.closest('.wgroup-card');
+    var text = (card.textContent + ' ' + (g ? g.querySelector('.wgroup-name').textContent : '')).toLowerCase();
+    card.classList.toggle('hidden-by-filter',
+      (CURRENT_FILTER !== 'all' && st !== CURRENT_FILTER) || (q && text.indexOf(q) === -1));
+  });
+  // hide a hospital group when none of its tables match
+  document.querySelectorAll('.wgroup-card').forEach(function(g) {
+    var any = g.querySelector('.wcard:not(.hidden-by-filter)');
+    g.classList.toggle('hidden-by-filter', !any);
+  });
+}
+var _fs = document.getElementById('feed-search');
+if (_fs) _fs.addEventListener('input', applyFilter);
+document.querySelectorAll('#filter-chips .fchip').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('#filter-chips .fchip').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    CURRENT_FILTER = btn.dataset.filter;
+    applyFilter();
+  });
+});
+
+// ── Main refresh loop — waits for every status call before summarising
+// (the old fixed 600ms timeout counted tables that hadn't answered yet) ──
+var _refreshing = false;
+async function refreshAll() {
+  if (_refreshing) return;
+  _refreshing = true;
+  try {
+    await Promise.all(WATCH_IDS.map(function(id) { return loadStatus(id); }));
+    updateOverview();
+  } finally {
+    _refreshing = false;
+  }
 }
 refreshAll();
 setInterval(refreshAll, 10000);  // poll every 10s

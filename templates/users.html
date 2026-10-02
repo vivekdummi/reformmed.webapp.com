@@ -1,76 +1,172 @@
 {% extends "base.html" %}
-{% block title %}Users — REFORMMED Monitor{% endblock %}
+{% import "_macros.html" as ui %}
+{% block title %}Users — Reformmed INFRA Monitor{% endblock %}
 {% block page_title %}User Management{% endblock %}
 
+{% block extra_css %}
+<style>
+.users-kpis{grid-template-columns:repeat(5,minmax(0,1fr));}
+@media(max-width:1100px){.users-kpis{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media(max-width:640px){.users-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+.search{position:relative;flex:1;max-width:360px;min-width:200px;}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted);pointer-events:none;}
+.search input{padding-left:38px;border-radius:99px;height:40px;}
+.fchips{display:flex;gap:6px;flex-wrap:wrap;}
+.fchip{height:34px;padding:0 14px;border-radius:99px;border:1px solid var(--border);background:var(--bg2);color:var(--text-muted);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+.fchip:hover{color:var(--text);border-color:var(--border-strong);}
+.fchip.active{background:var(--accent-soft);color:var(--accent);border-color:transparent;}
+.u-cell{display:flex;align-items:center;gap:12px;min-width:0;}
+.u-name{font-weight:700;font-size:14px;}
+.u-mail{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;}
+.pchip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;background:var(--bg3);color:var(--text-muted);margin:2px 4px 2px 0;}
+.pchip i{width:6px;height:6px;border-radius:50%;background:var(--g-ocean);}
+.row-actions{display:flex;gap:6px;justify-content:flex-end;}
+.users-table td{padding:12px 14px;}
+.users-table tr.inactive td{opacity:.6;}
+.empty-row{text-align:center;color:var(--text-muted);padding:36px!important;}
+
+/* create-user modal */
+.perm-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+@media(max-width:560px){.perm-cards{grid-template-columns:1fr;}}
+.perm-card{display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:14px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;margin:0;color:var(--text);font-size:13px;font-weight:600;transition:border-color .15s,background .15s;}
+.perm-card:has(input:checked){border-color:var(--accent);background:var(--accent-soft);}
+.perm-card .top{display:flex;align-items:center;justify-content:space-between;}
+.perm-card small{font-size:11px;color:var(--text-muted);font-weight:500;}
+.perm-card input{width:auto;margin:0;}
+.section-lbl{font-family:var(--font-head);font-size:14px;font-weight:700;margin:18px 0 8px;}
+.srv-box{max-height:180px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:6px;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;}
+.srv-chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:99px;border:1px solid var(--border-strong);font-size:12px;cursor:pointer;margin:0;color:var(--text);font-weight:600;}
+.srv-chip input{width:auto;margin:0;}
+.srv-chip:has(input:checked){background:var(--accent-soft);border-color:transparent;color:var(--accent);}
+.srv-chip span{color:var(--text-muted);font-weight:500;}
+</style>
+{% endblock %}
+
 {% block content %}
+{% set n_admin = users|selectattr('role', 'equalto', 'admin')|list|length %}
+{% set n_active = users|selectattr('is_active')|list|length %}
+{% set n_2fa = users|selectattr('totp_enabled')|list|length %}
 <div class="page-header">
   <div>
     <h1>Users</h1>
-    <p>Manage login accounts, roles, and feature permissions</p>
+    <p>Manage sign-in accounts, roles, feature permissions and server access</p>
   </div>
-  <button class="btn btn-primary" onclick="document.getElementById('modal-create').classList.add('open')">+ Create User</button>
+  <button class="btn btn-primary" onclick="document.getElementById('modal-create').classList.add('open')">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Create user
+  </button>
 </div>
 
-<div class="card">
+<div class="kpi-grid users-kpis">
+  <div class="kpi k-ocean">
+    <div class="kpi-top"><span class="kpi-label">Total users</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></span></div>
+    <div class="kpi-value">{{ users|length }}</div>
+    <div class="kpi-sub">{{ users|length - n_admin }} standard user{{ '' if (users|length - n_admin) == 1 else 's' }}</div>
+  </div>
+  <div class="kpi k-violet">
+    <div class="kpi-top"><span class="kpi-label">Admins</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span></div>
+    <div class="kpi-value">{{ n_admin }}</div>
+    <div class="kpi-sub">full access</div>
+  </div>
+  <div class="kpi k-mint">
+    <div class="kpi-top"><span class="kpi-label">Active</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></span></div>
+    <div class="kpi-value">{{ n_active }}</div>
+    <div class="kpi-bar"><i style="width:{{ (n_active / users|length * 100) if users else 0 }}%"></i></div>
+  </div>
+  <div class="kpi k-sunset">
+    <div class="kpi-top"><span class="kpi-label">2FA enabled</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span></div>
+    <div class="kpi-value">{{ n_2fa }}<small>/ {{ users|length }}</small></div>
+    <div class="kpi-bar"><i style="width:{{ (n_2fa / users|length * 100) if users else 0 }}%"></i></div>
+  </div>
+  <div class="kpi k-red">
+    <div class="kpi-top"><span class="kpi-label">Disabled</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></span></div>
+    <div class="kpi-value">{{ users|length - n_active }}</div>
+    <div class="kpi-sub">cannot sign in</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="toolbar">
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="search" id="user-search" placeholder="Search by name or email…" aria-label="Search users">
+    </div>
+    <div class="fchips" id="role-chips">
+      <button type="button" class="fchip active" data-role="all">All</button>
+      <button type="button" class="fchip" data-role="admin">Admins</button>
+      <button type="button" class="fchip" data-role="user">Users</button>
+      <button type="button" class="fchip" data-role="disabled">Disabled</button>
+    </div>
+  </div>
   <div class="table-wrap">
-    <table>
+    <table class="users-table">
       <thead>
         <tr>
-          <th>Username</th>
-          <th class="hide-mobile">Email</th>
+          <th>User</th>
           <th>Role</th>
-          <th>Status</th>
-          <th class="hide-mobile">Permissions</th>
-          <th class="hide-mobile">Last Login</th>
-          <th>Actions</th>
+          <th class="hide-mobile">Access</th>
+          <th class="hide-mobile">Security</th>
+          <th class="hide-mobile">Last sign-in</th>
+          <th style="text-align:right;">Actions</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="users-tbody">
         {% for u in users %}
-        <tr>
+        <tr class="{{ '' if u.is_active else 'inactive' }}"
+            data-search="{{ (u.username ~ ' ' ~ u.email)|lower }}" data-role="{{ u.role }}" data-active="{{ '1' if u.is_active else '0' }}">
           <td>
-            <div style="display:flex;align-items:center;gap:8px">
-              <div style="width:28px;height:28px;background:linear-gradient(135deg,#7c3aed,#00d4ff);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0;">
-                {{ u.username[0].upper() }}
+            <div class="u-cell">
+              {{ ui.avatar(u, 40) }}
+              <div style="min-width:0;">
+                <div class="u-name">{{ u.username }}{% if u.id == current_user.id %} <span class="text-muted" style="font-weight:500;font-size:12px;">(you)</span>{% endif %}</div>
+                <div class="u-mail">{{ u.email }}</div>
               </div>
-              <span class="mono" style="font-weight:600;font-size:13px">{{ u.username }}</span>
             </div>
           </td>
-          <td class="text-muted hide-mobile" style="font-size:13px">{{ u.email }}</td>
           <td>
-            {% if u.role=='admin' %}<span class="badge badge-admin">ADMIN</span>
-            {% else %}<span class="badge badge-info">USER</span>{% endif %}
+            {% if u.role=='admin' %}<span class="badge badge-admin">Admin</span>
+            {% else %}<span class="badge badge-info">User</span>{% endif %}
+            {% if not u.is_active %}<span class="badge badge-offline">Disabled</span>{% endif %}
           </td>
-          <td>
-            {% if u.is_active %}<span class="badge badge-online">Active</span>
-            {% else %}<span class="badge badge-offline">Disabled</span>{% endif %}
-          </td>
-          <td class="hide-mobile" style="font-size:11px">
+          <td class="hide-mobile">
             {% if u.role=='admin' %}
-              <span class="text-muted">Full access</span>
+              <span class="pchip"><i style="background:var(--g-violet)"></i>Everything</span>
             {% else %}
-              {% if u.can_view_servers %}<span class="badge badge-info" style="margin:1px">Servers</span>{% endif %}
-              {% if u.can_view_dvr %}<span class="badge badge-info" style="margin:1px">DVR</span>{% endif %}
-              {% if u.can_view_dbmon %}<span class="badge badge-info" style="margin:1px">DB Mon</span>{% endif %}
-              {% if u.can_view_alerts %}<span class="badge badge-info" style="margin:1px">Alerts</span>{% endif %}
+              {% if u.can_view_servers %}<span class="pchip"><i></i>Servers</span>{% endif %}
+              {% if u.can_view_dbmon %}<span class="pchip"><i style="background:var(--g-mint)"></i>DB Monitor</span>{% endif %}
+              {% if u.can_view_alerts %}<span class="pchip"><i style="background:var(--g-sunset)"></i>Alerts</span>{% endif %}
+              {% if not (u.can_view_servers or u.can_view_dbmon or u.can_view_alerts) %}<span class="text-muted" style="font-size:12px;">Home only</span>{% endif %}
             {% endif %}
           </td>
-          <td class="text-muted hide-mobile" style="font-size:12px">
-            {{ u.last_login.strftime('%Y-%m-%d %H:%M') if u.last_login else 'Never' }}
+          <td class="hide-mobile">
+            {% if u.totp_enabled %}<span class="badge badge-online">2FA on</span>
+            {% elif u.totp_required %}<span class="badge badge-warning">2FA required</span>
+            {% else %}<span class="badge" style="background:var(--bg3);color:var(--text-muted);">2FA off</span>{% endif %}
+          </td>
+          <td class="text-muted hide-mobile" style="font-size:13px;">
+            {% if u.last_login is defined and u.last_login %}{{ u.last_login.strftime('%d %b %Y, %H:%M') }}
+            {% elif u.last_login is defined %}Never{% else %}—{% endif %}
           </td>
           <td>
-            <div style="display:flex;gap:6px">
+            <div class="row-actions">
               <a href="{{ url_for('users.edit', user_id=u.id) }}" class="btn btn-ghost btn-sm">Edit</a>
               {% if u.id != current_user.id %}
               <form method="POST" action="{{ url_for('users.delete', user_id=u.id) }}"
-                    onsubmit="return confirm('Delete user {{ u.username }}?')">
-                <button type="submit" class="btn btn-danger btn-sm">Del</button>
+                    data-msg="Delete user {{ u.username }}? This cannot be undone." onsubmit="return confirm(this.dataset.msg)">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
               </form>
               {% endif %}
             </div>
           </td>
         </tr>
         {% endfor %}
+        <tr id="users-empty" style="display:none;"><td colspan="6" class="empty-row">No users match your search.</td></tr>
       </tbody>
     </table>
   </div>
@@ -78,26 +174,26 @@
 
 <!-- ── Create User Modal ── -->
 <div class="modal-backdrop" id="modal-create" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="modal">
-    <div class="modal-title">Create New User</div>
+  <div class="modal" style="width:640px;">
+    <div class="modal-title">Create new user</div>
     <form method="POST" action="{{ url_for('users.create') }}">
       <div class="grid-2">
         <div class="form-group">
-          <label>Username</label>
-          <input type="text" name="username" required placeholder="johndoe">
+          <label for="nu-name">Username</label>
+          <input type="text" id="nu-name" name="username" required placeholder="johndoe" autocomplete="off">
         </div>
         <div class="form-group">
-          <label>Email</label>
-          <input type="email" name="email" required placeholder="john@example.com">
+          <label for="nu-mail">Email</label>
+          <input type="email" id="nu-mail" name="email" required placeholder="john@example.com" autocomplete="off">
         </div>
       </div>
       <div class="grid-2">
         <div class="form-group">
-          <label>Password</label>
-          <input type="password" name="password" required placeholder="••••••••">
+          <label for="nu-pw">Password</label>
+          <input type="password" id="nu-pw" name="password" required placeholder="At least 8 characters" minlength="8" autocomplete="new-password">
         </div>
         <div class="form-group">
-          <label>Role</label>
+          <label for="new-role">Role</label>
           <select name="role" id="new-role" onchange="togglePermsSection(this.value,'new')">
             <option value="user">User (limited)</option>
             <option value="admin">Admin (full access)</option>
@@ -107,57 +203,29 @@
 
       <!-- Feature permissions (shown only for user role) -->
       <div id="new-perms-section">
-        <hr class="divider">
-        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Feature Permissions</div>
-        <div class="grid-2">
-          <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
-            <input type="checkbox" name="can_view_servers" value="1" checked style="width:auto;margin:0">
-            <span>Servers page</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
-            <input type="checkbox" name="can_view_dvr" value="1" checked style="width:auto;margin:0">
-            <span>DVR Monitor</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
-            <input type="checkbox" name="can_view_dbmon" value="1" style="width:auto;margin:0">
-            <span>DB Monitor</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
-            <input type="checkbox" name="can_view_alerts" value="1" checked style="width:auto;margin:0">
-            <span>Alerts page</span>
-          </label>
+        <div class="section-lbl">Feature permissions</div>
+        <div class="perm-cards">
+          <label class="perm-card"><span class="top">Servers <input type="checkbox" name="can_view_servers" value="1" checked></span><small>Server list, details & reports</small></label>
+          <label class="perm-card"><span class="top">DB Monitor <input type="checkbox" name="can_view_dbmon" value="1"></span><small>External data-feed health</small></label>
+          <label class="perm-card"><span class="top">Alerts <input type="checkbox" name="can_view_alerts" value="1" checked></span><small>Alert log & configuration</small></label>
         </div>
-        <hr class="divider">
-        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Server Access</div>
-        <div style="max-height:160px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px">
+        <div class="section-lbl">Server access <span class="text-muted" style="font-weight:500;font-size:12px;font-family:var(--font);">— which servers this user can see</span></div>
+        <input type="search" placeholder="Filter servers…" oninput="filterChips(this, 'new-srv-box')" style="margin-bottom:8px;">
+        <div class="srv-box" id="new-srv-box">
           {% for srv in servers %}
-          <label style="display:flex;align-items:center;gap:8px;margin-bottom:7px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
-            <input type="checkbox" name="server_access" value="{{ srv.table_name }}" style="width:auto;margin:0">
-            <span class="mono" style="font-size:12px;color:var(--accent)">{{ srv.system_name }}</span>
-            <span class="text-muted">— {{ srv.location }}</span>
+          <label class="srv-chip" data-search="{{ (srv.system_name ~ ' ' ~ srv.location)|lower }}">
+            <input type="checkbox" name="server_access" value="{{ srv.table_name }}">
+            {{ srv.system_name }} <span>· {{ srv.location }}</span>
           </label>
           {% else %}
           <span class="text-muted" style="font-size:13px">No servers registered yet.</span>
-          {% endfor %}
-        </div>
-
-        <hr class="divider">
-        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">DVR Hospital Access <span style="text-transform:none;font-weight:400;">(only used when "DVR Monitor" is checked above; leave all unchecked to block DVR entirely)</span></div>
-        <div style="max-height:160px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px">
-          {% for hosp in hospitals %}
-          <label style="display:flex;align-items:center;gap:8px;margin-bottom:7px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
-            <input type="checkbox" name="hospital_access" value="{{ hosp.id }}" style="width:auto;margin:0">
-            <span>{{ hosp.name }}</span>
-          </label>
-          {% else %}
-          <span class="text-muted" style="font-size:13px">No hospitals registered yet.</span>
           {% endfor %}
         </div>
       </div>
 
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-create').classList.remove('open')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Create User</button>
+        <button type="submit" class="btn btn-primary">Create user</button>
       </div>
     </form>
   </div>
@@ -170,5 +238,37 @@ function togglePermsSection(role, prefix){
   var el = document.getElementById(prefix+'-perms-section');
   if(el) el.style.display = role==='admin' ? 'none' : '';
 }
+function filterChips(input, boxId){
+  var q = input.value.trim().toLowerCase();
+  document.querySelectorAll('#' + boxId + ' .srv-chip').forEach(function(c){
+    c.style.display = !q || c.dataset.search.indexOf(q) !== -1 ? '' : 'none';
+  });
+}
+
+// ── Search + role filter ──
+(function(){
+  var roleFilter = 'all';
+  var search = document.getElementById('user-search');
+  function apply(){
+    var q = search.value.trim().toLowerCase(), shown = 0;
+    document.querySelectorAll('#users-tbody tr[data-role]').forEach(function(tr){
+      var okRole = roleFilter === 'all' ||
+                   (roleFilter === 'disabled' ? tr.dataset.active === '0' : tr.dataset.role === roleFilter);
+      var ok = okRole && (!q || tr.dataset.search.indexOf(q) !== -1);
+      tr.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    document.getElementById('users-empty').style.display = shown ? 'none' : '';
+  }
+  search.addEventListener('input', apply);
+  document.querySelectorAll('#role-chips .fchip').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#role-chips .fchip').forEach(function(x){ x.classList.remove('active'); });
+      b.classList.add('active');
+      roleFilter = b.dataset.role;
+      apply();
+    });
+  });
+})();
 </script>
 {% endblock %}

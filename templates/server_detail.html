@@ -1,60 +1,75 @@
 {% extends "base.html" %}
-{% block title %}{{ machine.system_name }} — REFORMMED{% endblock %}
+{% block title %}{{ machine.system_name }} — Reformmed INFRA Monitor{% endblock %}
 {% block page_title %}{{ machine.system_name }}{% endblock %}
 
 {% block extra_css %}
 <style>
 /* ── Layout ── */
-.server-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px;}
-.server-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-.server-meta{font-size:12px;color:var(--text-muted);margin-top:3px;}
+.server-header{position:relative;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:16px;
+  padding:20px 22px;border-radius:18px;border:1px solid var(--border);box-shadow:var(--shadow-1);overflow:hidden;
+  background:radial-gradient(600px 200px at 0% 0%,var(--accent-soft),transparent 70%),var(--bg2);}
+.server-title{display:flex;align-items:center;gap:16px;flex-wrap:wrap;min-width:0;}
+.srv-hero-ico{width:52px;height:52px;border-radius:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--g-ocean);color:#fff;box-shadow:0 10px 24px -10px rgba(0,0,0,.55);}
+.srv-hero-ico.off{background:linear-gradient(135deg,#ff8a8a,#e5484d);}
+.srv-hero-ico svg{width:26px;height:26px;}
+.srv-hero-name{font-family:var(--font-head);font-size:26px;font-weight:800;letter-spacing:-.5px;line-height:1.15;overflow-wrap:anywhere;}
+.server-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.meta-chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:8px;background:var(--bg3);font-size:12px;font-weight:600;color:var(--text-muted);white-space:nowrap;}
+.meta-chip svg{width:13px;height:13px;}
+.meta-chip b{color:var(--text);font-weight:600;}
+.st-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;}
+.st-pill::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;}
+.st-pill.online{background:color-mix(in srgb,var(--green) 14%,transparent);color:var(--green);}
+.st-pill.offline{background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red);}
+.hero-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.hero-chip{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:99px;background:var(--bg3);font-size:12px;font-weight:600;color:var(--text-muted);}
 
 /* ── Metric Row Card ── */
-.metric-row{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:0;margin-bottom:14px;overflow:hidden;display:grid;grid-template-columns:220px 1fr;min-height:150px;}
+.metric-row{background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:0;margin-bottom:14px;overflow:hidden;display:grid;grid-template-columns:220px 1fr;min-height:150px;}
 @media(max-width:700px){.metric-row{grid-template-columns:1fr;}}
 .metric-row-left{padding:16px 20px;display:flex;flex-direction:column;justify-content:center;border-right:1px solid var(--border);position:relative;overflow:hidden;}
 .metric-row-left::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;opacity:.6;}
-.mrl-cpu::after{background:#00d4ff;}
-.mrl-ram::after{background:#7c3aed;}
-.mrl-temp::after{background:#f59e0b;}
-.mrl-swap::after{background:#a855f7;}
-.mrl-net-up::after{background:#22c55e;}
-.mrl-net-down::after{background:#00d4ff;}
-.mrl-gpu::after{background:#e879f9;}
+.mrl-cpu::after{background:var(--g-ocean);}
+.mrl-ram::after{background:var(--g-violet);}
+.mrl-temp::after{background:var(--g-sunset);}
+.mrl-swap::after{background:var(--g-mint);}
+.mrl-net-up::after{background:var(--g-sunset);}
+.mrl-net-down::after{background:var(--g-ocean);}
+.mrl-gpu::after{background:var(--g-violet);}
 
-.metric-label{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;display:flex;align-items:center;gap:5px;}
-.metric-val{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;line-height:1;margin-bottom:5px;}
+.metric-label{font-size:12px;font-weight:500;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:5px;}
+.metric-val{font-size:26px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1;margin-bottom:5px;}
 .metric-sub{font-size:11px;color:var(--text-muted);}
 
-.progress-bar{height:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:6px;}
-.progress-fill{height:100%;border-radius:2px;transition:width .4s ease;}
-.progress-fill.green{background:#22c55e;}
-.progress-fill.blue{background:#7c3aed;}
-.progress-fill.yellow{background:#f59e0b;}
-.progress-fill.orange{background:#f97316;}
-.progress-fill.red{background:#ef4444;}
-.progress-fill.cyan{background:#00d4ff;}
-.progress-fill.pink{background:#e879f9;}
+.progress-bar{height:6px;border-radius:99px;background:var(--chart-track);overflow:hidden;margin-top:6px;}
+.progress-fill{height:100%;border-radius:99px;transition:width .4s ease;}
+.progress-fill.green{background:var(--green);}
+.progress-fill.blue{background:var(--g-violet);}
+.progress-fill.yellow{background:var(--yellow);}
+.progress-fill.orange{background:var(--orange);}
+.progress-fill.red{background:var(--red);}
+.progress-fill.cyan{background:var(--g-ocean);}
+.progress-fill.pink{background:var(--g-mint);}
 
 .metric-row-right{padding:10px 14px;display:flex;flex-direction:column;justify-content:center;}
 .chart-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
 
 /* ── Processes ── */
-.procs-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px;}
-.proc-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(37,42,58,.5);font-size:12px;}
+.procs-card{background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:18px 20px;margin-bottom:14px;}
+.proc-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;}
 .proc-row:last-child{border-bottom:none;}
 
 /* ── GPU unavailable ── */
-.gpu-unavail{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;display:flex;align-items:center;gap:12px;opacity:.6;}
+.gpu-unavail{background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:16px 20px;margin-bottom:14px;display:flex;align-items:center;gap:12px;opacity:.6;}
 .gpu-unavail-icon{font-size:20px;}
 .gpu-unavail-text{font-size:12px;color:var(--text-muted);}
 
 /* ── GPU Load Overview (redesigned) ── */
 .gpu-overview-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
-.gpu-overview-title{font-size:16px;font-weight:700;}
+.gpu-overview-title{font-family:var(--font-head);font-size:20px;font-weight:800;letter-spacing:-.3px;}
 .gpu-overview-sub{font-size:12px;color:var(--text-muted);margin-top:2px;}
 .gpu-range-select{padding:8px 12px;font-size:12px;width:auto;}
-.gpu-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px;display:grid;grid-template-columns:240px 1fr;gap:24px;}
+.gpu-card{background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:20px;margin-bottom:14px;display:grid;grid-template-columns:240px 1fr;gap:24px;}
 @media(max-width:900px){.gpu-card{grid-template-columns:1fr;}}
 .gpu-card-left{display:flex;flex-direction:column;align-items:center;text-align:center;}
 .gpu-card-badge-row{display:flex;align-items:center;gap:8px;align-self:flex-start;margin-bottom:6px;}
@@ -63,11 +78,12 @@
 .gpu-card-name{font-size:10px;color:var(--text-muted);align-self:flex-start;margin-bottom:14px;line-height:1.3;word-break:break-word;}
 .gpu-ring-wrap{position:relative;width:170px;height:170px;margin-bottom:14px;}
 .gpu-ring-val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
-.gpu-ring-val .num{font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:800;}
+.gpu-ring-val .num{font-size:32px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--text);}
 .gpu-ring-val .lbl{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.gpu-card-left > .gpu-side-metric-row{width:100%;gap:8px;}
 .gpu-side-metric{width:100%;text-align:left;margin-top:6px;font-size:12px;}
 .gpu-side-metric-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
-.gpu-side-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden;margin-bottom:10px;}
+.gpu-side-bar{height:6px;border-radius:99px;background:var(--chart-track);overflow:hidden;margin-bottom:10px;}
 .gpu-side-bar-fill{height:100%;border-radius:3px;transition:width .4s ease;}
 .gpu-intel-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;width:100%;text-align:left;margin-top:4px;font-size:11px;color:var(--text-muted);}
 .gpu-intel-grid b{color:var(--text);font-weight:600;}
@@ -75,71 +91,78 @@
 @media(max-width:900px){.gpu-stats-row{grid-template-columns:repeat(2,1fr);}}
 .gpu-stat-pill{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-width:0;}
 .gpu-stat-pill-lbl{font-size:10px;color:var(--text-muted);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.gpu-stat-pill-val{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;}
+.gpu-stat-pill-val{font-size:16px;font-weight:500;font-variant-numeric:tabular-nums;}
 .gpu-unavail-text strong{color:var(--text);font-size:13px;display:block;margin-bottom:2px;}
 
 /* ── Info + Alerts ── */
-.info-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px;}
-.card-section-title{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:14px;}
-.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px 18px;}
-.info-item{min-width:0;}
-.info-item .lbl{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;display:flex;align-items:center;gap:5px;}
-.info-item .val{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;overflow-wrap:anywhere;line-height:1.4;}
+.info-card{background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:18px 20px;margin-bottom:14px;}
+.card-section-title{font-family:var(--font-head);font-size:16px;font-weight:700;letter-spacing:-.2px;color:var(--text);margin-bottom:14px;}
+.info-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;}
+@media(max-width:1000px){.info-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:480px){.info-grid{grid-template-columns:1fr;}}
+.info-item{min-width:0;padding:10px 14px;border-radius:12px;background:var(--bg3);}
+.info-item .lbl{font-size:11px;color:var(--text-muted);margin-bottom:4px;display:flex;align-items:center;gap:5px;text-transform:uppercase;letter-spacing:.6px;font-weight:700;}
+.info-item .val{font-family:var(--mono);font-size:13px;font-weight:500;overflow-wrap:anywhere;line-height:1.4;}
 .bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 @media(max-width:700px){.bottom-grid{grid-template-columns:1fr;}}
 .pair-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
 @media(max-width:700px){.pair-row{grid-template-columns:1fr;}}
-.mini-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 20px;}
+.mini-card{background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:16px 20px;}
 
 /* ── Dashboard grid (new overview widgets) ── */
 .stat-cards-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px;}
-.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 18px;min-width:0;}
-.stat-card-top{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
-.stat-icon{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:7px;font-size:13px;flex-shrink:0;}
-.stat-label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.stat-card-val{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;display:flex;align-items:baseline;gap:8px;margin-bottom:8px;}
-.stat-trend{font-size:11px;font-weight:600;color:#22c55e;}
-.stat-trend.neg{color:#ef4444;}
-.stat-progress{height:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden;margin-bottom:8px;}
-.stat-progress-fill{height:100%;border-radius:2px;transition:width .4s ease;}
-.stat-progress-fill.cyan{background:#00d4ff;} .stat-progress-fill.purple{background:#a78bfa;}
-.stat-progress-fill.green{background:#22c55e;} .stat-progress-fill.pink{background:#e879f9;}
+/* stat cards follow the shared .kpi tile look */
+.stat-card{position:relative;background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:16px 18px;min-width:0;overflow:hidden;}
+.stat-card::after{content:'';position:absolute;right:-30px;top:-30px;width:110px;height:110px;border-radius:50%;background:var(--kpi-g,var(--g-ocean));opacity:.10;filter:blur(2px);pointer-events:none;}
+.stat-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;}
+.stat-icon{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:12px;font-size:15px;flex-shrink:0;background:var(--kpi-g,var(--g-ocean));color:#fff;box-shadow:0 6px 16px -6px rgba(0,0,0,.45);order:2;}
+.stat-icon svg{width:18px;height:18px;}
+.stat-label{font-size:13px;font-weight:600;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.stat-card-val{font-family:var(--font-head);font-size:30px;font-weight:800;letter-spacing:-.8px;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px;margin-bottom:8px;line-height:1.05;}
+.stat-trend{font-size:12px;font-weight:500;color:var(--text-muted);}
+.stat-trend.neg{color:var(--text-muted);}
+.stat-progress{height:8px;border-radius:99px;background:var(--chart-track);overflow:hidden;margin-bottom:10px;}
+.stat-progress-fill{height:100%;border-radius:99px;transition:width .4s ease;}
+.stat-progress-fill.cyan{background:var(--g-ocean);} .stat-progress-fill.purple{background:var(--g-violet);}
+.stat-progress-fill.green{background:var(--g-sunset);} .stat-progress-fill.pink{background:var(--g-mint);}
 .stat-sub{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .stat-card-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.stat-status-ok{font-size:11px;font-weight:600;color:#22c55e;}
+.stat-status-ok{font-size:12px;font-weight:500;color:var(--green);display:inline-flex;align-items:center;gap:6px;}
+.stat-status-ok::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;}
 
 .dash-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;}
 .dash-grid-3-eq{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px;}
 .dash-grid-3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;margin-bottom:14px;}
 @media(max-width:1100px){.dash-grid-4{grid-template-columns:repeat(2,1fr);} .dash-grid-3-eq{grid-template-columns:repeat(2,1fr);} .dash-grid-3{grid-template-columns:1fr;}}
 @media(max-width:600px){.dash-grid-4{grid-template-columns:1fr;} .dash-grid-3-eq{grid-template-columns:1fr;}}
-.dash-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 18px;min-width:0;}
+.dash-card{background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:18px 20px;min-width:0;}
 .dash-card-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
-.dash-card-title{font-size:12px;font-weight:700;color:var(--text);}
-.dash-card-sub-note{font-size:10px;color:var(--text-muted);}
-.dash-card-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;}
+.dash-card-title{font-family:var(--font-head);font-size:15px;font-weight:700;letter-spacing:-.2px;color:var(--text);}
+.dash-card-sub-note{font-size:12px;color:var(--text-muted);}
+.dash-card-val{font-size:18px;font-weight:500;font-variant-numeric:tabular-nums;}
 .chart-expand-btn{
-  background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-muted);
-  font-size:13px;line-height:1;padding:4px 6px;cursor:pointer;transition:.15s;
+  background:none;border:none;border-radius:50%;color:var(--text-muted);width:32px;height:32px;
+  font-size:16px;line-height:1;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center;
 }
-.chart-expand-btn:hover{border-color:var(--accent);color:var(--accent);}
+.chart-expand-btn:hover{background:var(--bg-hover);color:var(--text);}
 
 .donut-row{display:flex;align-items:center;gap:16px;}
-.donut-legend{display:flex;flex-direction:column;gap:7px;font-size:12px;flex:1;min-width:0;}
+.donut-legend{display:flex;flex-direction:column;gap:8px;font-size:13px;flex:1;min-width:0;}
 .donut-legend-item{display:flex;align-items:center;gap:6px;color:var(--text-muted);}
-.donut-legend-item b{color:var(--text);font-weight:600;margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;}
+.donut-legend-item b{color:var(--text);font-weight:600;margin-left:auto;font-variant-numeric:tabular-nums;font-size:13px;}
 .donut-legend-item.total{border-top:1px solid var(--border);padding-top:6px;margin-top:2px;color:var(--text);font-weight:600;}
 .donut-legend .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-.donut-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;pointer-events:none;}
+.donut-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:500;font-variant-numeric:tabular-nums;pointer-events:none;}
 
 .gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;}
-.gauge-val{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;margin-top:-24px;}
-.gauge-status{font-size:11px;font-weight:600;color:#22c55e;}
+.gauge-val{font-size:24px;font-weight:500;font-variant-numeric:tabular-nums;margin-top:6px;}
+.gauge-status{font-size:12px;font-weight:500;color:var(--green);display:inline-flex;align-items:center;gap:6px;}
+.gauge-status::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;}
 
 .rings-row{display:flex;gap:14px;flex-wrap:wrap;justify-content:space-around;}
 .ring-item{display:flex;flex-direction:column;align-items:center;gap:6px;}
-.ring-val{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;}
-.ring-lbl{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;}
+.ring-val{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;font-variant-numeric:tabular-nums;}
+.ring-lbl{font-size:12px;color:var(--text-muted);display:inline-flex;align-items:center;gap:6px;}
 
 .alerts-list{display:flex;flex-direction:column;gap:8px;max-height:180px;overflow-y:auto;}
 .alert-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;}
@@ -148,38 +171,46 @@
 .alert-time{color:var(--text-muted);font-size:11px;white-space:nowrap;flex-shrink:0;}
 
 /* ── History range filter bar ── */
-.history-bar{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:0;margin-bottom:14px;overflow:hidden;}
+.history-bar{background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:0;margin-bottom:14px;overflow:hidden;}
 .history-bar-header{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--border);}
 .history-bar-header svg{color:var(--accent);flex-shrink:0;}
-.history-bar-title{font-size:13px;font-weight:600;}
+.history-bar-title{font-family:var(--font-head);font-size:15px;font-weight:700;}
 .history-bar-title-sub{font-size:11px;color:var(--text-muted);margin-left:6px;font-weight:400;}
 .history-bar-body{padding:16px 18px;display:flex;flex-direction:column;gap:14px;}
 .history-presets{display:flex;gap:8px;flex-wrap:wrap;}
 .hist-preset-btn{
-  background:var(--bg3);border:1px solid var(--border);border-radius:99px;
-  color:var(--text-muted);font-size:12px;padding:6px 14px;cursor:pointer;
+  background:transparent;border:1px solid var(--border-strong);border-radius:8px;height:32px;
+  color:var(--text);font-size:13px;font-weight:500;padding:0 14px;cursor:pointer;
   transition:.15s;font-family:inherit;
 }
-.hist-preset-btn:hover{border-color:var(--accent);color:var(--text);}
-.hist-preset-btn.active{background:rgba(56,189,248,.12);border-color:var(--accent);color:var(--accent);font-weight:600;}
+.hist-preset-btn:hover{background:var(--bg-hover);}
+.hist-preset-btn.active{background:var(--accent-soft);border-color:transparent;color:var(--text);}
 .history-bar-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
 .history-custom-range{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;}
 .history-field{display:flex;flex-direction:column;gap:5px;}
-.history-field label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;}
+.history-field label{font-size:12px;color:var(--text-muted);margin:0;}
 .history-field input{padding:8px 12px;font-size:12.5px;min-width:200px;}
 .history-divider{width:1px;align-self:stretch;background:var(--border);margin:0 2px;}
 .history-status{font-size:12px;color:var(--text-muted);}
-.history-status.warn{color:#f59e0b;}
-.history-status.err{color:#ef4444;}
-.history-status.ok{color:#22c55e;}
+.history-status.warn{color:var(--yellow);}
+.history-status.err{color:var(--red);}
+.history-status.ok{color:var(--green);}
+
+/* Legend key: a colour dot beside text that stays in text colour */
+.key{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.key-line{display:inline-block;width:14px;height:3px;border-radius:2px;flex-shrink:0;}
+.net-legend{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--text-muted);text-align:right;}
+.net-legend span{display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;}
+.net-legend b{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums;}
+.dash-card,.stat-card,.info-card,.history-bar,.gpu-card{box-shadow:var(--shadow-1);}
 </style>
 {% endblock %}
 
 {% block content %}
 
 {% if machine.status == 'offline' %}
-<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-size:13px;color:#ef4444;">
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+<div style="background:color-mix(in srgb,var(--red) 12%,transparent);border:1px solid color-mix(in srgb,var(--red) 35%,transparent);border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text);">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--red)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
   <span>This machine is <strong>offline</strong> — charts and metrics below show the <strong>last recorded data only</strong> and are not live.</span>
 </div>
 <style>
@@ -191,37 +222,35 @@
 <!-- ── Header ── -->
 <div class="server-header">
   <div class="server-title">
-    <a href="{{ url_for('servers.index') }}" class="btn btn-ghost btn-sm">← Back</a>
-    <div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span class="mono" style="font-size:18px;font-weight:700;">{{ machine.system_name }}</span>
-        <span id="live-status">
-          <span class="status-dot {{ machine.status }}"></span>
-          <span class="badge badge-{{ 'online' if machine.status=='online' else 'offline' }}">{{ machine.status }}</span>
-        </span>
+    <a href="{{ url_for('servers.index') }}" class="btn btn-ghost btn-sm" aria-label="Back to servers">← Servers</a>
+    <span class="srv-hero-ico {{ 'off' if machine.status != 'online' else '' }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span>
+    <div style="min-width:0;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span class="srv-hero-name">{{ machine.system_name }}</span>
+        <span id="live-status"><span class="st-pill {{ 'online' if machine.status=='online' else 'offline' }}">{{ machine.status }}</span></span>
       </div>
       <div class="server-meta">
-        {{ machine.location }} &bull; {{ machine.os_type or 'Unknown OS' }} &bull;
-        Last seen: <span class="mono" id="last-seen">{{ machine.last_seen or '—' }}</span>
+        <span class="meta-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg><b>{{ machine.location }}</b></span>
+        <span class="meta-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><b>{{ machine.os_type or 'Unknown OS' }}</b></span>
+        {% if machine.hostname %}<span class="meta-chip mono">{{ machine.hostname }}</span>{% endif %}
+        <span class="meta-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Last seen <b class="mono" id="last-seen">{{ machine.last_seen or '—' }}</b></span>
       </div>
     </div>
   </div>
-  <div style="display:flex;align-items:center;gap:16px;">
+  <div class="hero-actions">
     {% if current_user.role == 'admin' %}
-    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);cursor:pointer;user-select:none;">
+    <label class="hero-chip" style="cursor:pointer;user-select:none;margin:0;">
       <span id="alerts-toggle-label">{{ 'Alerts on' if machine.alerts_enabled else 'Alerts muted' }}</span>
-      <span id="alerts-toggle-switch" onclick="toggleAlerts()"
+      <span id="alerts-toggle-switch" onclick="toggleAlerts()" role="switch" aria-checked="{{ 'true' if machine.alerts_enabled else 'false' }}"
             style="position:relative;width:36px;height:20px;border-radius:10px;transition:background .2s;
-                   background:{{ '#22c55e' if machine.alerts_enabled else 'rgba(255,255,255,.15)' }};display:inline-block;">
+                   background:{{ 'var(--accent)' if machine.alerts_enabled else 'var(--chart-track)' }};display:inline-block;cursor:pointer;">
         <span id="alerts-toggle-knob"
               style="position:absolute;top:2px;left:{{ '18px' if machine.alerts_enabled else '2px' }};
-                     width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;"></span>
+                     width:16px;height:16px;border-radius:50%;background:{{ 'var(--on-accent)' if machine.alerts_enabled else 'var(--text-muted)' }};transition:left .2s;"></span>
       </span>
     </label>
     {% endif %}
-    <div style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:5px;">
-      <span class="pulse"></span> Live · 2s refresh
-    </div>
+    <span class="hero-chip"><span class="pulse"></span> Live · updates every 2s</span>
   </div>
 </div>
 
@@ -233,7 +262,8 @@ function toggleAlerts() {
       if (data.error) return;
       const on = data.alerts_enabled;
       document.getElementById("alerts-toggle-label").textContent = on ? "Alerts on" : "Alerts muted";
-      document.getElementById("alerts-toggle-switch").style.background = on ? "#22c55e" : "rgba(255,255,255,.15)";
+      document.getElementById("alerts-toggle-switch").style.background = on ? "var(--accent)" : "var(--chart-track)";
+      document.getElementById("alerts-toggle-knob").style.background = on ? "var(--on-accent)" : "var(--text-muted)";
       document.getElementById("alerts-toggle-knob").style.left = on ? "18px" : "2px";
     })
     .catch(() => {});
@@ -244,14 +274,14 @@ function toggleAlerts() {
 <div class="info-card" style="margin-bottom:14px;">
   <div class="card-section-title">Machine Info</div>
   <div class="info-grid">
-    <div class="info-item"><div class="lbl">🖥️ System Name</div><div class="val">{{ machine.system_name }}</div></div>
-    <div class="info-item"><div class="lbl">📍 Location</div><div class="val">{{ machine.location }}</div></div>
-    <div class="info-item"><div class="lbl">🏷️ Hostname</div><div class="val">{{ machine.hostname or '—' }}</div></div>
-    <div class="info-item"><div class="lbl">🌐 Public IP</div><div class="val">{{ machine.public_ip or '—' }}</div></div>
-    <div class="info-item"><div class="lbl">💿 OS Type</div><div class="val">{{ machine.os_type or '—' }}</div></div>
-    <div class="info-item"><div class="lbl">🧬 OS Version</div><div class="val">{{ latest.os_version if latest and latest.os_version else '—' }}</div></div>
-    <div class="info-item"><div class="lbl">🗄️ Table</div><div class="val" style="color:var(--text-muted);font-size:11px;">{{ machine.table_name }}</div></div>
-    <div class="info-item"><div class="lbl">📅 Registered</div><div class="val">{{ machine.registered_at.strftime('%Y-%m-%d') if machine.registered_at else '—' }}</div></div>
+    <div class="info-item"><div class="lbl">System Name</div><div class="val">{{ machine.system_name }}</div></div>
+    <div class="info-item"><div class="lbl">Location</div><div class="val">{{ machine.location }}</div></div>
+    <div class="info-item"><div class="lbl">Hostname</div><div class="val">{{ machine.hostname or '—' }}</div></div>
+    <div class="info-item"><div class="lbl">Public IP</div><div class="val">{{ machine.public_ip or '—' }}</div></div>
+    <div class="info-item"><div class="lbl">OS Type</div><div class="val">{{ machine.os_type or '—' }}</div></div>
+    <div class="info-item"><div class="lbl">OS Version</div><div class="val">{{ latest.os_version if latest and latest.os_version else '—' }}</div></div>
+    <div class="info-item"><div class="lbl">Table</div><div class="val" style="color:var(--text-muted);font-size:11px;">{{ machine.table_name }}</div></div>
+    <div class="info-item"><div class="lbl">Registered</div><div class="val">{{ machine.registered_at.strftime('%Y-%m-%d') if machine.registered_at else '—' }}</div></div>
   </div>
 </div>
 
@@ -292,30 +322,30 @@ function toggleAlerts() {
      ═══════════════════════════════════════════════════════════ -->
 <div class="stat-cards-row">
 
-  <div class="stat-card">
+  <div class="stat-card" style="--kpi-g:var(--g-ocean);">
     <div class="stat-card-top">
-      <span class="stat-icon" style="background:rgba(0,212,255,.12);color:#00d4ff;">
+      <span class="stat-icon" style="background:var(--g-ocean);">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
       </span>
       <span class="stat-label">CPU Usage</span>
     </div>
     <div class="stat-card-val">
-      <span id="stat-cpu-val" style="color:#00d4ff">{{ '%.1f'%latest.cpu_percent if latest and latest.cpu_percent else '0.0' }}%</span>
+      <span id="stat-cpu-val">{{ '%.1f'%latest.cpu_percent if latest and latest.cpu_percent else '0.0' }}%</span>
       <span class="stat-trend" id="stat-cpu-trend">{{ '%+.1f%%'|format(trend_cpu) if trend_cpu }}</span>
     </div>
     <div class="stat-progress"><div class="stat-progress-fill cyan" id="stat-cpu-bar" style="width:{{ latest.cpu_percent or 0 }}%"></div></div>
     <div class="stat-sub" id="stat-cpu-freq">{{ '%.0f'%latest.cpu_freq_mhz if latest and latest.cpu_freq_mhz else '—' }} MHz</div>
   </div>
 
-  <div class="stat-card">
+  <div class="stat-card" style="--kpi-g:var(--g-violet);">
     <div class="stat-card-top">
-      <span class="stat-icon" style="background:rgba(167,139,250,.12);color:#a78bfa;">
+      <span class="stat-icon" style="background:var(--g-violet);">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="7" width="20" height="10" rx="1"/><line x1="6" y1="7" x2="6" y2="17"/><line x1="10" y1="7" x2="10" y2="17"/><line x1="14" y1="7" x2="14" y2="17"/><line x1="18" y1="7" x2="18" y2="17"/></svg>
       </span>
       <span class="stat-label">RAM Usage</span>
     </div>
     <div class="stat-card-val">
-      <span id="stat-ram-val" style="color:#a78bfa">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '0.0' }}%</span>
+      <span id="stat-ram-val">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '0.0' }}%</span>
       <span class="stat-trend" id="stat-ram-trend">{{ '%+.1f%%'|format(trend_ram) if trend_ram }}</span>
     </div>
     <div class="stat-progress"><div class="stat-progress-fill purple" id="stat-ram-bar" style="width:{{ latest.ram_percent or 0 }}%"></div></div>
@@ -323,26 +353,26 @@ function toggleAlerts() {
   </div>
 
   {% if latest and latest.swap_total_gb %}
-  <div class="stat-card">
+  <div class="stat-card" style="--kpi-g:var(--g-mint);">
     <div class="stat-card-top">
-      <span class="stat-icon" style="background:rgba(192,132,252,.12);color:#c084fc;">💾</span>
+      <span class="stat-icon" style="background:var(--g-mint);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></span>
       <span class="stat-label">Swap Usage</span>
     </div>
     <div class="stat-card-val">
-      <span id="stat-swap-val" style="color:#c084fc">{{ '%.1f'%latest.swap_percent if latest.swap_percent else '0.0' }}%</span>
+      <span id="stat-swap-val">{{ '%.1f'%latest.swap_percent if latest.swap_percent else '0.0' }}%</span>
     </div>
-    <div class="stat-progress"><div class="stat-progress-fill" id="stat-swap-bar" style="width:{{ latest.swap_percent or 0 }}%;background:#c084fc;"></div></div>
+    <div class="stat-progress"><div class="stat-progress-fill" id="stat-swap-bar" style="width:{{ latest.swap_percent or 0 }}%;background:var(--g-mint);"></div></div>
     <div class="stat-sub" id="stat-swap-detail">{{ '%.1f'%(latest.swap_used_gb or 0) }} / {{ '%.1f'%(latest.swap_total_gb or 0) }} GB</div>
   </div>
   {% endif %}
 
-  <div class="stat-card">
+  <div class="stat-card" style="--kpi-g:var(--g-sunset);">
     <div class="stat-card-top">
-      <span class="stat-icon" style="background:rgba(245,158,11,.12);color:#f59e0b;">🌡️</span>
+      <span class="stat-icon" style="background:var(--g-sunset);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z"/></svg></span>
       <span class="stat-label">CPU Temperature</span>
     </div>
     <div class="stat-card-val">
-      <span id="stat-temp-val" style="color:#f59e0b">{% if latest and latest.cpu_temp %}{{ '%.0f'%latest.cpu_temp }}°C{% else %}—{% endif %}</span>
+      <span id="stat-temp-val">{% if latest and latest.cpu_temp %}{{ '%.0f'%latest.cpu_temp }}°C{% else %}—{% endif %}</span>
     </div>
     <div class="stat-card-row">
       <span class="stat-status-ok" id="stat-temp-status">Normal</span>
@@ -350,9 +380,9 @@ function toggleAlerts() {
     </div>
   </div>
 
-  <div class="stat-card">
+  <div class="stat-card" style="--kpi-g:var(--g-mint);">
     <div class="stat-card-top">
-      <span class="stat-icon" style="background:rgba(56,189,248,.12);color:var(--accent);">⏱</span>
+      <span class="stat-icon" style="background:var(--g-mint);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
       <span class="stat-label">Uptime</span>
     </div>
     <div class="stat-card-val">
@@ -376,8 +406,8 @@ function toggleAlerts() {
     <div class="dash-card-header">
       <span class="dash-card-title">CPU Usage %</span>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span class="dash-card-val" id="cpuarea-val" style="color:#00d4ff">{{ '%.1f'%latest.cpu_percent if latest and latest.cpu_percent else '0.0' }}%</span>
-        <button type="button" class="chart-expand-btn" onclick="openChartModal('cpu')" title="Expand">⤢</button>
+        <span class="dash-card-val" id="cpuarea-val">{{ '%.1f'%latest.cpu_percent if latest and latest.cpu_percent else '0.0' }}%</span>
+        <button type="button" class="chart-expand-btn" aria-label="Expand chart" onclick="openChartModal('cpu')" title="Expand">⤢</button>
       </div>
     </div>
     <div style="height:150px;position:relative;"><canvas id="chart-cpu-area"></canvas></div>
@@ -387,15 +417,15 @@ function toggleAlerts() {
     <div class="dash-card-header">
       <span class="dash-card-title">RAM Usage</span>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span class="dash-card-val" style="color:#a78bfa">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '0.0' }}%</span>
-        <button type="button" class="chart-expand-btn" onclick="openChartModal('ram')" title="Expand">⤢</button>
+        <span class="dash-card-val">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '0.0' }}%</span>
+        <button type="button" class="chart-expand-btn" aria-label="Expand chart" onclick="openChartModal('ram')" title="Expand">⤢</button>
       </div>
     </div>
     <div class="donut-row">
       <div style="height:130px;width:130px;position:relative;flex-shrink:0;"><canvas id="chart-ram-donut"></canvas><div class="donut-center" id="ram-donut-center">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '0.0' }}%</div></div>
       <div class="donut-legend">
-        <div class="donut-legend-item"><span class="dot" style="background:#a78bfa;"></span>Used <b id="ram-legend-used">{{ '%.1f'%latest.ram_used_gb if latest and latest.ram_used_gb else '0' }} GB</b></div>
-        <div class="donut-legend-item"><span class="dot" style="background:#3a3f52;"></span>Free <b id="ram-legend-free">{{ '%.1f'%((latest.ram_total_gb or 0) - (latest.ram_used_gb or 0)) if latest else '0' }} GB</b></div>
+        <div class="donut-legend-item"><span class="dot" style="background:var(--g-violet);"></span>Used <b id="ram-legend-used">{{ '%.1f'%latest.ram_used_gb if latest and latest.ram_used_gb else '0' }} GB</b></div>
+        <div class="donut-legend-item"><span class="dot" style="background:var(--chart-track);"></span>Free <b id="ram-legend-free">{{ '%.1f'%((latest.ram_total_gb or 0) - (latest.ram_used_gb or 0)) if latest else '0' }} GB</b></div>
         <div class="donut-legend-item total">Total <b>{{ '%.1f'%latest.ram_total_gb if latest and latest.ram_total_gb else '0' }} GB</b></div>
       </div>
     </div>
@@ -405,15 +435,15 @@ function toggleAlerts() {
     <div class="dash-card-header">
       <span class="dash-card-title">Swap Usage</span>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span class="dash-card-val" style="color:#c084fc;font-size:16px;">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</span>
-        <button type="button" class="chart-expand-btn" onclick="openChartModal('swap')" title="Expand">⤢</button>
+        <span class="dash-card-val" style="font-size:16px;">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</span>
+        <button type="button" class="chart-expand-btn" aria-label="Expand chart" onclick="openChartModal('swap')" title="Expand">⤢</button>
       </div>
     </div>
     <div class="donut-row">
       <div style="height:130px;width:130px;position:relative;flex-shrink:0;"><canvas id="chart-swap-donut"></canvas><div class="donut-center" id="swap-donut-center">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</div></div>
       <div class="donut-legend">
-        <div class="donut-legend-item"><span class="dot" style="background:#c084fc;"></span>Used <b id="swap-legend-used">{{ '%.1f'%latest.swap_used_gb if latest and latest.swap_used_gb else '0' }} GB</b></div>
-        <div class="donut-legend-item"><span class="dot" style="background:#3a3f52;"></span>Free <b id="swap-legend-free">{{ '%.1f'%((latest.swap_total_gb or 0) - (latest.swap_used_gb or 0)) if latest else '0' }} GB</b></div>
+        <div class="donut-legend-item"><span class="dot" style="background:var(--g-mint);"></span>Used <b id="swap-legend-used">{{ '%.1f'%latest.swap_used_gb if latest and latest.swap_used_gb else '0' }} GB</b></div>
+        <div class="donut-legend-item"><span class="dot" style="background:var(--chart-track);"></span>Free <b id="swap-legend-free">{{ '%.1f'%((latest.swap_total_gb or 0) - (latest.swap_used_gb or 0)) if latest else '0' }} GB</b></div>
         <div class="donut-legend-item total">Total <b>{{ '%.1f'%latest.swap_total_gb if latest and latest.swap_total_gb else '0' }} GB</b></div>
       </div>
     </div>
@@ -423,8 +453,8 @@ function toggleAlerts() {
     <div class="dash-card-header">
       <span class="dash-card-title">Disk Usage</span>
       <div style="display:flex;align-items:center;gap:8px;">
-        {% if disk_primary %}<span class="dash-card-val" style="color:#f59e0b;font-size:16px;">{{ '%.1f'%(disk_primary.percent|float) }}%</span>{% endif %}
-        <button type="button" class="chart-expand-btn" onclick="openChartModal('disk')" title="Expand">⤢</button>
+        {% if disk_primary %}<span class="dash-card-val" style="font-size:16px;">{{ '%.1f'%(disk_primary.percent|float) }}%</span>{% endif %}
+        <button type="button" class="chart-expand-btn" aria-label="Expand chart" onclick="openChartModal('disk')" title="Expand">⤢</button>
       </div>
     </div>
     {% if disk_primary %}
@@ -432,10 +462,10 @@ function toggleAlerts() {
     {% set d_total = disk_primary.total_gb if disk_primary.total_gb is defined else 0 %}
     {% set d_free = disk_primary.free_gb if disk_primary.free_gb is defined else (d_total - d_used) %}
     <div class="donut-row">
-      <div style="height:130px;width:130px;position:relative;flex-shrink:0;"><canvas id="chart-disk-donut"></canvas><div class="donut-center">{{ '%.1f'%(disk_primary.percent|float) }}%</div></div>
+      <div style="height:130px;width:130px;position:relative;flex-shrink:0;"><canvas id="chart-disk-donut"></canvas><div class="donut-center" id="disk-donut-center">{{ '%.1f'%(disk_primary.percent|float) }}%</div></div>
       <div class="donut-legend">
-        <div class="donut-legend-item"><span class="dot" style="background:#f59e0b;"></span>Used <b>{{ '%.1f'%d_used }} GB</b></div>
-        <div class="donut-legend-item"><span class="dot" style="background:#3a3f52;"></span>Free <b>{{ '%.1f'%d_free }} GB</b></div>
+        <div class="donut-legend-item"><span class="dot" style="background:var(--g-sunset);"></span>Used <b>{{ '%.1f'%d_used }} GB</b></div>
+        <div class="donut-legend-item"><span class="dot" style="background:var(--chart-track);"></span>Free <b>{{ '%.1f'%d_free }} GB</b></div>
         <div class="donut-legend-item total">Total <b>{{ '%.1f'%d_total }} GB</b></div>
       </div>
     </div>
@@ -455,11 +485,11 @@ function toggleAlerts() {
     <div class="dash-card-header">
       <span class="dash-card-title">Net Traffic (KB/s)</span>
       <div style="display:flex;align-items:center;gap:10px;">
-        <div style="text-align:right;font-size:11px;">
-          <div style="color:#22c55e;">↑ <span id="net-up-val">{{ last_net_sent }}</span> KB/s</div>
-          <div style="color:#00d4ff;">↓ <span id="net-down-val">{{ last_net_recv }}</span> KB/s</div>
+        <div class="net-legend">
+          <span><i class="key-line" style="background:var(--g-sunset)"></i>Upload <b><span id="net-up-val">{{ last_net_sent }}</span> KB/s</b></span>
+          <span><i class="key-line" style="background:var(--g-ocean)"></i>Download <b><span id="net-down-val">{{ last_net_recv }}</span> KB/s</b></span>
         </div>
-        <button type="button" class="chart-expand-btn" onclick="openChartModal('net')" title="Expand">⤢</button>
+        <button type="button" class="chart-expand-btn" aria-label="Expand chart" onclick="openChartModal('net')" title="Expand">⤢</button>
       </div>
     </div>
     <div style="height:150px;position:relative;"><canvas id="chart-net-bar"></canvas></div>
@@ -467,8 +497,8 @@ function toggleAlerts() {
 
   <div class="dash-card">
     <div class="dash-card-header">
-      <span class="dash-card-title">CPU Per-Core Usage</span>
-      <button type="button" class="chart-expand-btn" onclick="openChartModal('cores')" title="Expand">⤢</button>
+      <span class="dash-card-title">CPU per core (now)</span>
+      <button type="button" class="chart-expand-btn" aria-label="Expand chart" onclick="openChartModal('cores')" title="Expand">⤢</button>
     </div>
     {% if chart_cores and chart_cores != '[]' %}
     <div style="height:150px;position:relative;"><canvas id="chart-cores"></canvas></div>
@@ -480,11 +510,11 @@ function toggleAlerts() {
   <div class="dash-card">
     <div class="dash-card-header">
       <span class="dash-card-title">Temperature (°C)</span>
-      <button type="button" class="chart-expand-btn" onclick="openChartModal('temp')" title="Expand">⤢</button>
+      <button type="button" class="chart-expand-btn" aria-label="Expand chart" onclick="openChartModal('temp')" title="Expand">⤢</button>
     </div>
     <div class="gauge-wrap">
       <div style="height:110px;width:100%;position:relative;"><canvas id="chart-temp-gauge"></canvas></div>
-      <div class="gauge-val" id="gauge-temp-val" style="color:#f59e0b;">{% if latest and latest.cpu_temp %}{{ '%.0f'%latest.cpu_temp }}°C{% else %}—{% endif %}</div>
+      <div class="gauge-val" id="gauge-temp-val">{% if latest and latest.cpu_temp %}{{ '%.0f'%latest.cpu_temp }}°C{% else %}—{% endif %}</div>
       <div class="gauge-status" id="gauge-temp-status">Normal</div>
     </div>
   </div>
@@ -499,11 +529,11 @@ function toggleAlerts() {
   <div class="dash-card">
     <div class="dash-card-header"><span class="dash-card-title">System Overview</span></div>
     <div class="rings-row">
-      <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-cpu"></canvas><div class="ring-val" id="ring-cpu-val">0%</div></div><div class="ring-lbl">CPU</div></div>
-      <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-ram"></canvas><div class="ring-val" id="ring-ram-val">0%</div></div><div class="ring-lbl">RAM</div></div>
-      <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-swap"></canvas><div class="ring-val" id="ring-swap-val">0%</div></div><div class="ring-lbl">Swap</div></div>
+      <div class="ring-item"><div style="height:84px;width:84px;position:relative;"><canvas id="ring-cpu"></canvas><div class="ring-val" id="ring-cpu-val">0%</div></div><div class="ring-lbl"><i class="key" style="background:var(--g-ocean)"></i>CPU</div></div>
+      <div class="ring-item"><div style="height:84px;width:84px;position:relative;"><canvas id="ring-ram"></canvas><div class="ring-val" id="ring-ram-val">0%</div></div><div class="ring-lbl"><i class="key" style="background:var(--g-violet)"></i>RAM</div></div>
+      <div class="ring-item"><div style="height:84px;width:84px;position:relative;"><canvas id="ring-swap"></canvas><div class="ring-val" id="ring-swap-val">0%</div></div><div class="ring-lbl"><i class="key" style="background:var(--g-mint)"></i>Swap</div></div>
       {% if disk_primary %}
-      <div class="ring-item"><div style="height:76px;width:76px;position:relative;"><canvas id="ring-disk"></canvas><div class="ring-val" id="ring-disk-val">0%</div></div><div class="ring-lbl">Disk</div></div>
+      <div class="ring-item"><div style="height:84px;width:84px;position:relative;"><canvas id="ring-disk"></canvas><div class="ring-val" id="ring-disk-val">0%</div></div><div class="ring-lbl"><i class="key" style="background:var(--g-sunset)"></i>Disk</div></div>
       {% endif %}
     </div>
   </div>
@@ -535,7 +565,7 @@ function toggleAlerts() {
       <div class="donut-legend">
         {% for status, count in proc_status_counts.items() %}
         <div class="donut-legend-item">
-          <span class="dot" style="background:{{ '#22c55e' if status=='running' else ('#00d4ff' if status=='sleeping' else ('#ef4444' if status=='stopped' else '#64748b')) }};"></span>
+          <span class="dot" style="background:{{ {'running':'var(--g-ocean)','sleeping':'var(--g-sunset)','idle':'var(--g-violet)','disk-sleep':'var(--g-mint)','stopped':'var(--g-pink)'}.get(status, 'var(--text-muted)') }};"></span>
           {{ status|capitalize }} <b>{{ count }}</b>
         </div>
         {% else %}
@@ -567,7 +597,8 @@ function toggleAlerts() {
 {% set idx = loop.index %}
 {% set gtype = gpu.type | default('unknown') | lower %}
 {% set gh = gpu_history.gpus[gi] if gpu_history and gpu_history.gpus|length > gi else None %}
-{% set accent = '#3b82f6' if gtype == 'intel' else '#a855f7' %}
+{% set accent = 'var(--g-ocean-b)' if gtype == 'intel' else 'var(--g-violet-b)' %}
+{% set accent_grad = 'var(--g-ocean)' if gtype == 'intel' else 'var(--g-violet)' %}
 
 {% if gtype == 'intel' %}
   {% set g_load    = gpu.gpu_percent       | default(0) | float %}
@@ -596,7 +627,7 @@ function toggleAlerts() {
 <div class="gpu-card" id="gpu-card-{{ gi }}">
   <div class="gpu-card-left">
     <div class="gpu-card-badge-row">
-      <span class="gpu-vendor-badge" style="background:{{ accent }}22;color:{{ accent }};">{{ gtype[:1]|upper }}</span>
+      <span class="gpu-vendor-badge" style="background:color-mix(in srgb,{{ accent }} 16%,transparent);color:{{ accent }};">{{ gtype[:1]|upper }}</span>
       <span class="gpu-card-title-txt">{{ gtype|upper }} GPU {{ idx }}</span>
     </div>
     <div class="gpu-card-name">{{ g_name_short }}</div>
@@ -604,7 +635,7 @@ function toggleAlerts() {
     <div class="gpu-ring-wrap">
       <canvas id="gpu-ring-{{ gi }}"></canvas>
       <div class="gpu-ring-val">
-        <span class="num" id="gpu-ring-val-{{ gi }}" style="color:{{ accent }};">{{ '%.0f'%g_load }}%</span>
+        <span class="num" id="gpu-ring-val-{{ gi }}">{{ '%.0f'%g_load }}%</span>
         <span class="lbl">GPU Load</span>
       </div>
     </div>
@@ -615,9 +646,9 @@ function toggleAlerts() {
       <div>Render <b id="val-gpu-render-{{ idx }}">{{ '%.0f'%g_render }}%</b></div>
       <div>Video <b id="val-gpu-video-{{ idx }}">{{ '%.0f'%g_video }}%</b></div>
       <div>RC6 Idle <b id="val-gpu-rc6-{{ idx }}">{{ '%.0f'%g_rc6 }}%</b></div>
-      <div>GPU Pwr <b id="val-gpu-pwrgpu-{{ idx }}" style="color:#f59e0b;">{{ '%.1f'%g_pwrgpu }}W</b></div>
-      <div>Pkg Pwr <b id="val-gpu-pwrpkg-{{ idx }}" style="color:#f59e0b;">{{ '%.1f'%g_pwrpkg }}W</b></div>
-      <div style="grid-column:1/-1;">Freq <b id="val-gpu-freq-{{ idx }}" style="color:#00d4ff;">{{ '%.0f'%g_freq }} MHz</b></div>
+      <div>GPU Pwr <b id="val-gpu-pwrgpu-{{ idx }}">{{ '%.1f'%g_pwrgpu }}W</b></div>
+      <div>Pkg Pwr <b id="val-gpu-pwrpkg-{{ idx }}">{{ '%.1f'%g_pwrpkg }}W</b></div>
+      <div style="grid-column:1/-1;">Freq <b id="val-gpu-freq-{{ idx }}">{{ '%.0f'%g_freq }} MHz</b></div>
     </div>
     {% else %}
     {% if g_vmem_total > 0 %}
@@ -625,23 +656,23 @@ function toggleAlerts() {
     {% set vram_tot_s  = ('%.1f GB'%(g_vmem_total/1024)) if g_vmem_total >= 1024 else ('%.0f MB'%g_vmem_total) %}
     <div class="gpu-side-metric">
       <div class="gpu-side-metric-row"><span>VRAM Usage</span><b id="val-gpu-vrampct-{{ idx }}">{{ '%.0f'%vram_pct }}%</b></div>
-      <div class="gpu-side-bar"><div class="gpu-side-bar-fill" id="bar-gpu-vram-{{ idx }}" style="width:{{ [vram_pct,100]|min }}%;background:{{ accent }};"></div></div>
+      <div class="gpu-side-bar"><div class="gpu-side-bar-fill" id="bar-gpu-vram-{{ idx }}" style="width:{{ [vram_pct,100]|min }}%;background:{{ accent_grad }};"></div></div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:-4px;margin-bottom:8px;" id="val-gpu-vram-{{ idx }}">{{ vram_used_s }} / {{ vram_tot_s }}</div>
     </div>
     {% endif %}
-    <div class="gpu-side-metric-row"><span>Temperature</span><b id="val-gpu-temp-{{ idx }}" style="color:#f59e0b;">{{ '%.0f'%g_temp }}°C</b></div>
+    <div class="gpu-side-metric-row"><span>Temperature</span><b id="val-gpu-temp-{{ idx }}">{{ '%.0f'%g_temp }}°C</b></div>
     {% endif %}
   </div>
 
   <div style="min-width:0;">
     <div class="gpu-stats-row">
-      <div class="gpu-stat-pill"><div class="gpu-stat-pill-lbl">Average Load</div><div class="gpu-stat-pill-val" id="gpu-stat-avg-{{ gi }}" style="color:{{ accent }};">{{ gh.stats.avg if gh else 0 }}%</div></div>
-      <div class="gpu-stat-pill"><div class="gpu-stat-pill-lbl">Min Load</div><div class="gpu-stat-pill-val" id="gpu-stat-min-{{ gi }}" style="color:{{ accent }};">{{ gh.stats.min if gh else 0 }}%</div></div>
-      <div class="gpu-stat-pill"><div class="gpu-stat-pill-lbl">Max Load</div><div class="gpu-stat-pill-val" id="gpu-stat-max-{{ gi }}" style="color:{{ accent }};">{{ gh.stats.max if gh else 0 }}%</div></div>
-      <div class="gpu-stat-pill"><div class="gpu-stat-pill-lbl">Time &gt; 50%</div><div class="gpu-stat-pill-val" id="gpu-stat-t50-{{ gi }}" style="color:{{ accent }};">{{ gh.stats.time_above_50 if gh else '0m 0s' }}</div></div>
-      <div class="gpu-stat-pill"><div class="gpu-stat-pill-lbl">Time &gt; 80%</div><div class="gpu-stat-pill-val" id="gpu-stat-t80-{{ gi }}" style="color:{{ accent }};">{{ gh.stats.time_above_80 if gh else '0m 0s' }}</div></div>
+      <div class="gpu-stat-pill"><div class="gpu-stat-pill-lbl">Average Load</div><div class="gpu-stat-pill-val" id="gpu-stat-avg-{{ gi }}">{{ gh.stats.avg if gh else 0 }}%</div></div>
+      <div class="gpu-stat-pill"><div class="gpu-stat-pill-lbl">Min Load</div><div class="gpu-stat-pill-val" id="gpu-stat-min-{{ gi }}">{{ gh.stats.min if gh else 0 }}%</div></div>
+      <div class="gpu-stat-pill"><div class="gpu-stat-pill-lbl">Max Load</div><div class="gpu-stat-pill-val" id="gpu-stat-max-{{ gi }}">{{ gh.stats.max if gh else 0 }}%</div></div>
+      <div class="gpu-stat-pill"><div class="gpu-stat-pill-lbl">Time &gt; 50%</div><div class="gpu-stat-pill-val" id="gpu-stat-t50-{{ gi }}">{{ gh.stats.time_above_50 if gh else '0m 0s' }}</div></div>
+      <div class="gpu-stat-pill"><div class="gpu-stat-pill-lbl">Time &gt; 80%</div><div class="gpu-stat-pill-val" id="gpu-stat-t80-{{ gi }}">{{ gh.stats.time_above_80 if gh else '0m 0s' }}</div></div>
     </div>
-    <div class="dash-card-title" style="margin-bottom:8px;">GPU LOAD (%)</div>
+    <div class="dash-card-title" style="margin-bottom:8px;">GPU load (%)</div>
     <div style="height:220px;position:relative;"><canvas id="gpu-chart-{{ gi }}"></canvas></div>
   </div>
 </div>
@@ -685,10 +716,10 @@ function toggleAlerts() {
 
 <!-- ═══ Chart expand modal ═══ -->
 <div class="modal-backdrop" id="chart-modal-backdrop" onclick="if(event.target===this) closeChartModal()">
-  <div class="modal" style="width:820px;">
+  <div class="modal" style="width:900px;">
     <div class="modal-title" id="chart-modal-title" style="display:flex;align-items:center;justify-content:space-between;">
       <span id="chart-modal-title-text">Chart</span>
-      <button type="button" class="btn btn-ghost btn-sm" onclick="closeChartModal()">✕</button>
+      <button type="button" class="icon-btn" onclick="closeChartModal()" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div id="chart-modal-filter" class="history-bar-row" style="margin-bottom:14px;display:none;">
       <div class="history-presets" id="modal-hist-presets">
@@ -706,7 +737,8 @@ function toggleAlerts() {
       </div>
       <span class="history-status" id="modal-hist-status"></span>
     </div>
-    <div id="chart-modal-note" style="font-size:12px;color:var(--text-muted);margin-bottom:12px;display:none;"></div>
+    <div id="chart-modal-note" style="font-size:13px;color:var(--text-muted);margin-bottom:12px;display:none;"></div>
+    <div id="chart-modal-legend" class="net-legend" style="flex-direction:row;gap:16px;justify-content:flex-start;margin-bottom:10px;display:none;"></div>
     <div id="chart-modal-donut-wrap" class="donut-row" style="display:none;justify-content:center;">
       <div style="height:260px;width:260px;position:relative;flex-shrink:0;"><canvas id="chart-modal-donut"></canvas><div class="donut-center" id="chart-modal-donut-center" style="font-size:32px;"></div></div>
       <div class="donut-legend" id="chart-modal-donut-legend" style="font-size:14px;"></div>
@@ -729,7 +761,18 @@ function toggleAlerts() {
 // ─────────────────────────────────────────────
 //  REFORMMED · Server Detail · Live Charts
 // ─────────────────────────────────────────────
-const TABLE      = "{{ machine.table_name }}";
+const TABLE      = {{ machine.table_name|tojson }};
+
+// Fixed identity colour per metric (CSS tokens from base.html — they switch
+// with the light/dark theme). Same slot = same metric on every chart.
+var M = {
+  cpu: 'g:ocean', ram: 'g:violet', swap: 'g:mint', disk: 'g:sunset',
+  up: 'g:sunset', down: 'g:ocean', temp: 'g:sunset',
+  gpuIntel: 'g:ocean', gpuOther: 'g:violet', track: '--chart-track'
+};
+var PROC_COLORS = { running: 'g:ocean', sleeping: 'g:sunset', idle: 'g:violet', 'disk-sleep': 'g:mint', stopped: 'g:pink' };
+function procColor(st) { return PROC_COLORS[st] || '--text-muted'; }
+function pct(v) { return (Math.round(v * 10) / 10).toFixed(1) + '%'; }
 const MAX_POINTS = 60;
 
 // ── Base metric history (seeded from Flask context) ──
@@ -758,16 +801,16 @@ var gpuCharts = {};  // { [gpuIndex]: { ring, area, accent } }
 
 // ── New dashboard widget helpers: donut, ring, gauge-needle, bar, multi-line ──
 
-function makeDonut(canvasId, usedVal, totalVal, color) {
-  var el = document.getElementById(canvasId);
-  if (!el) return null;
+// Used/free meter as a ring. Hover shows GB; the centre label shows %.
+function makeDonut(canvasId, usedVal, totalVal, colorVar) {
   var free = Math.max(0, (totalVal || 0) - (usedVal || 0));
-  return new Chart(el, {
+  return RM.chart(canvasId, {
     type: 'doughnut',
-    data: { datasets: [{ data: [usedVal || 0, free], backgroundColor: [color, '#2a2f42'], borderWidth: 0 }] },
+    data: { labels: ['Used', 'Free'], datasets: [{ data: [usedVal || 0, free], rm: { bg: [colorVar, M.track] }, borderWidth: 0, borderRadius: 99, spacing: 3 }] },
     options: {
-      responsive: true, maintainAspectRatio: false, cutout: '72%', animation: false,
-      plugins: { legend: { display: false }, tooltip: { enabled: false } }
+      responsive: true, maintainAspectRatio: false, cutout: '76%', animation: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: function(c) { return ' ' + c.label + ': ' + (+c.raw).toFixed(1) + ' GB'; } } } }
     }
   });
 }
@@ -779,14 +822,12 @@ function updateDonut(chart, usedVal, totalVal) {
   chart.update('none');
 }
 
-function makeRing(canvasId, pct, color) {
-  var el = document.getElementById(canvasId);
-  if (!el) return null;
-  return new Chart(el, {
+function makeRing(canvasId, pct, colorVar) {
+  return RM.chart(canvasId, {
     type: 'doughnut',
-    data: { datasets: [{ data: [pct || 0, Math.max(0, 100 - (pct || 0))], backgroundColor: [color, '#2a2f42'], borderWidth: 0 }] },
+    data: { datasets: [{ data: [pct || 0, Math.max(0, 100 - (pct || 0))], rm: { bg: [colorVar, M.track] }, borderWidth: 0, borderRadius: 99, spacing: 2 }] },
     options: {
-      responsive: true, maintainAspectRatio: false, cutout: '68%', animation: false,
+      responsive: true, maintainAspectRatio: false, cutout: '78%', animation: false,
       plugins: { legend: { display: false }, tooltip: { enabled: false } }
     }
   });
@@ -800,16 +841,15 @@ function updateRing(chart, pct, labelId) {
   if (labelId) setText(labelId, (pct || 0).toFixed(0) + '%');
 }
 
-function makeNetBar(canvasId, sentArr, recvArr) {
-  var el = document.getElementById(canvasId);
-  if (!el) return null;
-  return new Chart(el, {
-    type: 'bar',
+// Upload vs download over time — two lines on one shared KB/s axis.
+function makeNetBar(canvasId, sentArr, recvArr, big) {
+  return RM.chart(canvasId, {
+    type: 'line',
     data: {
       labels: labels.slice(),
       datasets: [
-        { data: sentArr.slice(), backgroundColor: '#22c55e', borderRadius: 2, barPercentage: 0.7, categoryPercentage: 0.85 },
-        { data: recvArr.slice(), backgroundColor: '#00d4ff', borderRadius: 2, barPercentage: 0.7, categoryPercentage: 0.85 },
+        { label: 'Upload',   data: sentArr.slice(), rm: { line: M.up,   fill: 'gradient' }, fill: 'origin', cubicInterpolationMode: 'monotone', borderWidth: 2.5 },
+        { label: 'Download', data: recvArr.slice(), rm: { line: M.down, fill: 'gradient' }, fill: 'origin', cubicInterpolationMode: 'monotone', borderWidth: 2.5 },
       ]
     },
     options: {
@@ -817,57 +857,56 @@ function makeNetBar(canvasId, sentArr, recvArr) {
       interaction: { intersect: false, mode: 'index' },
       plugins: {
         legend: { display: false },
-        tooltip: { backgroundColor: 'rgba(15,18,28,.95)', padding: 8, cornerRadius: 6, displayColors: false },
+        tooltip: { callbacks: { label: function(c) { return ' ' + c.dataset.label + ': ' + (+c.raw || 0).toFixed(1) + ' KB/s'; } } },
       },
       scales: {
-        x: { display: false },
-        y: { grid: { color: 'rgba(37,42,58,.6)', borderDash: [3, 4] }, border: { display: false }, ticks: { font: { size: 8 }, maxTicksLimit: 4 } }
+        x: { display: !!big, grid: { display: false }, ticks: { maxTicksLimit: 8, autoSkip: true, maxRotation: 0 } },
+        y: { min: 0, grace: '10%', border: { display: false }, ticks: { maxTicksLimit: 4 } }
       }
     }
   });
 }
 
-var CORE_COLORS = ['#00d4ff', '#a78bfa', '#22c55e', '#f59e0b', '#e879f9', '#ef4444', '#38bdf8', '#c084fc', '#fb923c', '#4ade80'];
-
-function makeCoresChart(canvasId, coresArr) {
-  var el = document.getElementById(canvasId);
-  if (!el || !coresArr || !coresArr.length) return null;
-  var datasets = coresArr.map(function(coreData, i) {
-    return {
-      data: coreData.slice(),
-      borderColor: CORE_COLORS[i % CORE_COLORS.length],
-      backgroundColor: 'transparent',
-      borderWidth: 1.3,
-      tension: 0.35,
-      cubicInterpolationMode: 'monotone',
-      pointRadius: 0,
-      fill: false,
-    };
-  });
-  return new Chart(el, {
-    type: 'line',
-    data: { labels: labels.slice(), datasets: datasets },
+// Current usage of each core as one bar per core. One series → one colour;
+// readable for 4 cores or 64, unlike a line per core.
+function makeCoresChart(canvasId, coresNow) {
+  if (!coresNow || !coresNow.length) return null;
+  return RM.chart(canvasId, {
+    type: 'bar',
+    data: {
+      labels: coresNow.map(function(_, i) { return 'C' + i; }),
+      datasets: [
+        { label: 'Core usage', data: coresNow.slice(), rm: { bg: M.cpu }, borderRadius: 99, borderSkipped: false,
+          maxBarThickness: 22, categoryPercentage: 0.8, barPercentage: 0.9, grouped: false, order: 1 },
+        { label: 'track', data: coresNow.map(function() { return 100; }), rm: { bg: M.track }, borderRadius: 99, borderSkipped: false,
+          maxBarThickness: 22, categoryPercentage: 0.8, barPercentage: 0.9, grouped: false, order: 2 }
+      ]
+    },
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { intersect: false, mode: 'index' },
       plugins: {
         legend: { display: false },
-        tooltip: { backgroundColor: 'rgba(15,18,28,.95)', padding: 8, cornerRadius: 6, displayColors: false },
+        tooltip: { filter: function(item) { return item.datasetIndex === 0; },
+                   callbacks: { title: function(items) { return 'Core ' + items[0].dataIndex; },
+                                label: function(c) { return ' ' + pct(+c.raw || 0); } } },
       },
       scales: {
-        x: { display: false },
-        y: { min: 0, max: 100, grid: { color: 'rgba(37,42,58,.6)', borderDash: [3, 4] }, border: { display: false }, ticks: { font: { size: 8 }, maxTicksLimit: 4 } }
+        x: { grid: { display: false }, border: { display: false }, ticks: { autoSkip: true, maxRotation: 0 } },
+        y: { min: 0, max: 100, border: { display: false }, grid: { display: false }, ticks: { maxTicksLimit: 3, callback: function(v) { return v + '%'; } } }
       }
     }
   });
 }
 
-function makeSparkline(canvasId, dataArr, color) {
-  var el = document.getElementById(canvasId);
-  if (!el) return null;
-  return new Chart(el, {
+function lastValues(arrs) {
+  return (arrs || []).map(function(a) { return a && a.length ? (+a[a.length - 1] || 0) : 0; });
+}
+
+function makeSparkline(canvasId, dataArr, colorVar) {
+  return RM.chart(canvasId, {
     type: 'line',
-    data: { labels: labels.slice(), datasets: [{ data: dataArr.slice(), borderColor: color, backgroundColor: 'transparent', borderWidth: 1.5, tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 0, fill: false }] },
+    data: { labels: labels.slice(), datasets: [{ data: dataArr.slice(), rm: { line: colorVar }, borderWidth: 1.5, cubicInterpolationMode: 'monotone', fill: false }] },
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
       plugins: { legend: { display: false }, tooltip: { enabled: false } },
@@ -894,7 +933,7 @@ var gaugeNeedlePlugin = {
     var x2 = cx + Math.cos(angle) * r;
     var y2 = cy + Math.sin(angle) * r;
     ctx.save();
-    ctx.strokeStyle = '#e6e8ee';
+    ctx.strokeStyle = RM.css('--text');
     ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.beginPath();
@@ -903,16 +942,16 @@ var gaugeNeedlePlugin = {
     ctx.stroke();
     ctx.beginPath();
     ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-    ctx.fillStyle = '#e6e8ee';
+    ctx.fillStyle = RM.css('--text');
     ctx.fill();
     ctx.restore();
   }
 };
 
 function tempStatusLabel(t) {
-  if (t >= 80) return { text: 'Critical', color: '#ef4444' };
-  if (t >= 65) return { text: 'Warning',  color: '#f59e0b' };
-  return { text: 'Normal', color: '#22c55e' };
+  if (t >= 80) return { text: 'Critical', color: 'var(--red)' };
+  if (t >= 65) return { text: 'Warning',  color: 'var(--yellow)' };
+  return { text: 'Normal', color: 'var(--green)' };
 }
 
 function pickPrimaryDisk(disks) {
@@ -922,44 +961,18 @@ function pickPrimaryDisk(disks) {
 }
 
 
-Chart.defaults.color = '#64748b';
-Chart.defaults.font.family = "'JetBrains Mono',monospace";
-Chart.defaults.font.size   = 9;
-
-function hexFill(hex, alpha) {
-  var r = parseInt(hex.slice(1,3),16),
-      g = parseInt(hex.slice(3,5),16),
-      b = parseInt(hex.slice(5,7),16);
-  return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
-}
-
-// Vertical gradient (rich color at top fading to transparent) instead of a
-// flat fill — this is what gives the "financial dashboard" look: the fill
-// reads as a soft glow under the line rather than a flat block of color.
-function makeGradientFill(hex) {
-  return function(context) {
-    var chart = context.chart;
-    var ctx = chart.ctx, chartArea = chart.chartArea;
-    if (!chartArea) return hexFill(hex, 0.1);  // first render pass, area not known yet
-    var gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-    gradient.addColorStop(0,   hexFill(hex, 0.38));
-    gradient.addColorStop(0.6, hexFill(hex, 0.12));
-    gradient.addColorStop(1,   hexFill(hex, 0.0));
-    return gradient;
-  };
-}
-
-function makeChart(canvasId, dataArr, color, yMax) {
-  var el = document.getElementById(canvasId);
-  if (!el) return null;
-  return new Chart(el, {
+// Single-series area chart (CPU %, GPU %). Colours come from the theme via
+// `rm`, the fill is a soft gradient of the line colour (RM.gradient).
+function makeChart(canvasId, dataArr, colorVar, yMax, big, seriesLabel) {
+  return RM.chart(canvasId, {
     type: 'line',
     data: {
       labels: labels.slice(),   // copy so base labels array isn't shared
       datasets: [{
+        label: seriesLabel || 'CPU',
         data: dataArr.slice(),
-        borderColor: color,
-        backgroundColor: makeGradientFill(color),
+        rm: { line: colorVar, fill: 'gradient' },
+        borderWidth: 2.5,
         // 'monotone' gives a smooth flowing curve like the reference charts
         // without the overshoot/undershoot a plain tension curve can cause
         // on percentage data (e.g. dipping below 0 or above 100 near spikes).
@@ -976,11 +989,8 @@ function makeChart(canvasId, dataArr, color, yMax) {
           var arr = context.dataset.data;
           return context.dataIndex === arr.length - 1 ? 4 : 0;
         },
-        pointBackgroundColor: color,
-        pointBorderColor: '#0b0e14',
         pointBorderWidth: 2,
         pointHoverRadius: 5,
-        pointHoverBackgroundColor: color,
         pointHitRadius: 8,
       }]
     },
@@ -992,22 +1002,17 @@ function makeChart(canvasId, dataArr, color, yMax) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: 'rgba(15,18,28,.95)',
-          titleFont: { size: 10 },
-          bodyFont: { size: 11 },
-          padding: 8,
-          cornerRadius: 6,
           displayColors: false,
+          callbacks: { label: function(c) { return ' ' + c.dataset.label + ': ' + pct(+c.raw || 0); } },
         },
       },
       scales: {
-        x: { display: false },
+        x: { display: !!big, grid: { display: false }, ticks: { maxTicksLimit: 8, autoSkip: true, maxRotation: 0 } },
         y: {
           min: 0,
           max: yMax || undefined,
-          grid: { color: 'rgba(37,42,58,.6)', borderDash: [3, 4], drawTicks: false },
           border: { display: false },
-          ticks: { font: { size: 8 }, maxTicksLimit: 4 }
+          ticks: { maxTicksLimit: 4, callback: function(v) { return v + '%'; } }
         }
       }
     }
@@ -1018,35 +1023,36 @@ function makeChart(canvasId, dataArr, color, yMax) {
 var charts = {};
 
 // CPU area chart + tiny temperature sparkline in the stat card
-charts.cpuArea   = makeChart('chart-cpu-area', cpuData, '#00d4ff', 100);
-charts.tempSpark = makeSparkline('stat-temp-spark', tempData, '#22c55e');
+charts.cpuArea   = makeChart('chart-cpu-area', cpuData, M.cpu, 100);
+charts.tempSpark = makeSparkline('stat-temp-spark', tempData, M.temp);
 
 // RAM / Swap / Disk donuts (values in GB — only the ratio matters)
-charts.ramDonut  = makeDonut('chart-ram-donut',  {{ (latest.ram_used_gb or 0) if latest else 0 }},  {{ (latest.ram_total_gb or 0) if latest else 0 }},  '#a78bfa');
-charts.swapDonut = makeDonut('chart-swap-donut', {{ (latest.swap_used_gb or 0) if latest else 0 }}, {{ (latest.swap_total_gb or 0) if latest else 0 }}, '#c084fc');
+charts.ramDonut  = makeDonut('chart-ram-donut',  {{ (latest.ram_used_gb or 0) if latest else 0 }},  {{ (latest.ram_total_gb or 0) if latest else 0 }},  M.ram);
+charts.swapDonut = makeDonut('chart-swap-donut', {{ (latest.swap_used_gb or 0) if latest else 0 }}, {{ (latest.swap_total_gb or 0) if latest else 0 }}, M.swap);
 {% if disk_primary %}
 charts.diskDonut = makeDonut(
   'chart-disk-donut',
   {{ (disk_primary.used_gb if disk_primary.used_gb is defined else 0) }},
   {{ (disk_primary.total_gb if disk_primary.total_gb is defined else 0) }},
-  '#f59e0b'
+  M.disk
 );
 {% endif %}
 
-// Net traffic grouped bar chart (upload/download KB/s)
+// Net traffic: upload / download lines (KB/s)
 charts.netBar = makeNetBar('chart-net-bar', sentData, recvData);
 
 // Per-core CPU multi-line chart (real data from cpu_per_core — replaces the
 // "Load Average" widget from the reference image, since this agent doesn't
 // collect Unix load averages)
 var coresData = {{ chart_cores | safe }};
-coresData = coresData.map(function(arr) { return padArr(arr.slice()); });
-charts.cores = makeCoresChart('chart-cores', coresData);
+charts.cores = makeCoresChart('chart-cores', lastValues(coresData));
 
 // Temperature gauge (semicircle zones + needle)
-charts.tempGauge = new Chart(document.getElementById('chart-temp-gauge'), {
+// Heat scale 0–100 °C: green → yellow → red; the needle marks the reading.
+function gaugeDataset() { return { data: [100], rm: { bg: 'g:heat', mode: 'h' }, borderWidth: 0, borderRadius: 99 }; }
+charts.tempGauge = RM.chart('chart-temp-gauge', {
   type: 'doughnut',
-  data: { datasets: [{ data: [60, 20, 20], backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'], borderWidth: 0 }] },
+  data: { datasets: [gaugeDataset()] },
   options: {
     responsive: true, maintainAspectRatio: false, animation: false,
     rotation: -90, circumference: 180, cutout: '75%',
@@ -1058,10 +1064,10 @@ charts.tempGauge.$gaugeValue = {{ (latest.cpu_temp or 0) if latest else 0 }};
 charts.tempGauge.update();
 
 // System Overview rings
-charts.ringCpu  = makeRing('ring-cpu',  {{ (latest.cpu_percent or 0) if latest else 0 }},  '#00d4ff');
-charts.ringRam  = makeRing('ring-ram',  {{ (latest.ram_percent or 0) if latest else 0 }},  '#a78bfa');
-charts.ringSwap = makeRing('ring-swap', {{ (latest.swap_percent or 0) if latest else 0 }}, '#c084fc');
-{% if disk_primary %}charts.ringDisk = makeRing('ring-disk', {{ '%.1f'%(disk_primary.percent|float) }}, '#f59e0b');{% endif %}
+charts.ringCpu  = makeRing('ring-cpu',  {{ (latest.cpu_percent or 0) if latest else 0 }},  M.cpu);
+charts.ringRam  = makeRing('ring-ram',  {{ (latest.ram_percent or 0) if latest else 0 }},  M.ram);
+charts.ringSwap = makeRing('ring-swap', {{ (latest.swap_percent or 0) if latest else 0 }}, M.swap);
+{% if disk_primary %}charts.ringDisk = makeRing('ring-disk', {{ '%.1f'%(disk_primary.percent|float) }}, M.disk);{% endif %}
 setText('ring-cpu-val', '{{ '%.0f'%(latest.cpu_percent or 0) if latest else 0 }}%');
 setText('ring-ram-val', '{{ '%.0f'%(latest.ram_percent or 0) if latest else 0 }}%');
 setText('ring-swap-val', '{{ '%.0f'%(latest.swap_percent or 0) if latest else 0 }}%');
@@ -1070,15 +1076,13 @@ setText('ring-swap-val', '{{ '%.0f'%(latest.swap_percent or 0) if latest else 0 
 // Process status donut — counts within the sampled top_processes list only
 {% if proc_status_counts %}
 (function() {
-  var statusColors = { running: '#22c55e', sleeping: '#00d4ff', stopped: '#ef4444' };
   var procLabels = {{ proc_status_counts.keys() | list | tojson }};
   var procValues = {{ proc_status_counts.values() | list | tojson }};
-  var procColors = procLabels.map(function(s) { return statusColors[s] || '#64748b'; });
-  charts.procDonut = new Chart(document.getElementById('chart-proc-donut'), {
+  charts.procDonut = RM.chart('chart-proc-donut', {
     type: 'doughnut',
-    data: { datasets: [{ data: procValues, backgroundColor: procColors, borderWidth: 0 }] },
-    options: { responsive: true, maintainAspectRatio: false, cutout: '68%', animation: false,
-      plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+    data: { labels: procLabels, datasets: [{ data: procValues, rm: { bg: procLabels.map(procColor) }, borderWidth: 0, spacing: 2, borderRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '72%', animation: false,
+      plugins: { legend: { display: false } } }
   });
 })();
 {% endif %}
@@ -1095,14 +1099,12 @@ function buildGpuTimeLabels(rawLabels) {
   });
 }
 
-function makeGpuAreaChart(canvasId, dataArr, lbls, color) {
-  var el = document.getElementById(canvasId);
-  if (!el) return null;
-  return new Chart(el, {
+function makeGpuAreaChart(canvasId, dataArr, lbls, colorVar) {
+  return RM.chart(canvasId, {
     type: 'line',
     data: { labels: lbls, datasets: [{
-      data: dataArr, borderColor: color, backgroundColor: makeGradientFill(color),
-      cubicInterpolationMode: 'monotone', tension: 0.4, fill: true,
+      label: 'GPU load', data: dataArr, rm: { line: colorVar, fill: 'gradient' },
+      cubicInterpolationMode: 'monotone', fill: true,
       borderWidth: 2, borderCapStyle: 'round', borderJoinStyle: 'round', pointRadius: 0,
     }] },
     options: {
@@ -1110,12 +1112,12 @@ function makeGpuAreaChart(canvasId, dataArr, lbls, color) {
       interaction: { intersect: false, mode: 'index' },
       plugins: {
         legend: { display: false },
-        tooltip: { backgroundColor: 'rgba(15,18,28,.95)', padding: 8, cornerRadius: 6, displayColors: false },
+        tooltip: { displayColors: false, callbacks: { label: function(c) { return ' Load: ' + pct(+c.raw || 0); } } },
       },
       scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 9 }, maxTicksLimit: 7, autoSkip: true } },
-        y: { min: 0, max: 100, grid: { color: 'rgba(37,42,58,.6)', borderDash: [3, 4] }, border: { display: false },
-             ticks: { font: { size: 9 }, callback: function(v) { return v + '%'; } } }
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 7, autoSkip: true, maxRotation: 0 } },
+        y: { min: 0, max: 100, border: { display: false },
+             ticks: { maxTicksLimit: 5, callback: function(v) { return v + '%'; } } }
       }
     }
   });
@@ -1124,7 +1126,7 @@ function makeGpuAreaChart(canvasId, dataArr, lbls, color) {
 function initGpuCharts() {
   var lbls = buildGpuTimeLabels(GPU_HISTORY_INITIAL.labels || []);
   (GPU_HISTORY_INITIAL.gpus || []).forEach(function(g) {
-    var accent = g.type === 'intel' ? '#3b82f6' : '#a855f7';
+    var accent = g.type === 'intel' ? M.gpuIntel : M.gpuOther;
     var lastLoad = g.load.length ? (g.load[g.load.length - 1] || 0) : 0;
     var ring = makeRing('gpu-ring-' + g.index, lastLoad, accent);
     var area = makeGpuAreaChart('gpu-chart-' + g.index, g.load, lbls, accent);
@@ -1170,7 +1172,7 @@ function pushPoint(chart, val, label) {
 }
 
 function colorByPct(pct) {
-  return pct > 85 ? 'var(--red)' : pct > 60 ? '#f59e0b' : '#22c55e';
+  return pct > 85 ? 'var(--red)' : pct > 60 ? 'var(--yellow)' : 'var(--green)';
 }
 
 function setBar(id, pct) {
@@ -1228,9 +1230,8 @@ async function pollLive() {
     setText('last-seen', d.last_seen || '—');
     var liveStatusEl = document.getElementById('live-status');
     if (liveStatusEl) {
-      liveStatusEl.innerHTML =
-        '<span class="status-dot ' + d.status + '"></span>' +
-        '<span class="badge badge-' + (d.status === 'online' ? 'online' : 'offline') + '">' + d.status + '</span>';
+      var st = d.status === 'online' ? 'online' : 'offline';
+      liveStatusEl.innerHTML = '<span class="st-pill ' + st + '">' + escapeHtml(d.status) + '</span>';
     }
 
     if (d.uptime_seconds) {
@@ -1257,9 +1258,7 @@ async function pollLive() {
       setText('stat-swap-detail', d.swap_used_gb.toFixed(1) + ' / ' + d.swap_total_gb.toFixed(1) + ' GB');
 
     setText('stat-temp-val', temp ? temp.toFixed(0) + '°C' : '—');
-    var tempEl = document.getElementById('stat-temp-val');
     var ts = tempStatusLabel(temp);
-    if (tempEl) tempEl.style.color = ts.color;
     var tsEl = document.getElementById('stat-temp-status');
     if (tsEl) { tsEl.textContent = ts.text; tsEl.style.color = ts.color; }
 
@@ -1278,7 +1277,7 @@ async function pollLive() {
       if (modalIsLiveFor('ram')) {
         updateDonut(modalChart, d.ram_used_gb, d.ram_total_gb);
         setText('chart-modal-donut-center', ram.toFixed(1) + '%');
-        renderModalDonutLegend('#a78bfa', d.ram_used_gb, d.ram_total_gb);
+        renderModalDonutLegend(M.ram, d.ram_used_gb, d.ram_total_gb);
       }
     }
 
@@ -1291,7 +1290,7 @@ async function pollLive() {
       if (modalIsLiveFor('swap')) {
         updateDonut(modalChart, d.swap_used_gb, d.swap_total_gb);
         setText('chart-modal-donut-center', swap.toFixed(1) + '%');
-        renderModalDonutLegend('#c084fc', d.swap_used_gb, d.swap_total_gb);
+        renderModalDonutLegend(M.swap, d.swap_used_gb, d.swap_total_gb);
       }
     }
 
@@ -1315,39 +1314,31 @@ async function pollLive() {
     if (d.disk_partitions) {
       var primary = pickPrimaryDisk(d.disk_partitions);
       if (primary && charts.diskDonut) {
-        var pct   = parseFloat(primary.percent || 0);
+        var dpct  = parseFloat(primary.percent || 0);
         var used  = primary.used_gb  !== undefined ? parseFloat(primary.used_gb)  : 0;
         var total = primary.total_gb !== undefined ? parseFloat(primary.total_gb) : 0;
         updateDonut(charts.diskDonut, used, total);
-        setText('ring-disk-val', pct.toFixed(0) + '%');
-        updateRing(charts.ringDisk, pct);
+        setText('disk-donut-center', dpct.toFixed(1) + '%');
+        setText('ring-disk-val', dpct.toFixed(0) + '%');
+        updateRing(charts.ringDisk, dpct);
         if (modalIsLiveFor('disk')) {
           updateDonut(modalChart, used, total);
-          setText('chart-modal-donut-center', pct.toFixed(1) + '%');
-          renderModalDonutLegend('#f59e0b', used, total);
+          setText('chart-modal-donut-center', dpct.toFixed(1) + '%');
+          renderModalDonutLegend(M.disk, used, total);
         }
       }
     }
 
     // ── Per-core CPU chart ──
     if (d.cpu_per_core && Array.isArray(d.cpu_per_core) && charts.cores) {
-      charts.cores.data.labels.push(now); charts.cores.data.labels.shift();
-      d.cpu_per_core.forEach(function(coreVal, i) {
-        var ds = charts.cores.data.datasets[i];
-        if (!ds) return;
-        ds.data.push(coreVal); ds.data.shift();
+      var coresNow = d.cpu_per_core.map(function(v) { return +v || 0; });
+      [charts.cores, modalIsLiveFor('cores') ? modalChart : null].forEach(function(c) {
+        if (!c) return;
+        c.data.labels = coresNow.map(function(_, i) { return 'C' + i; });
+        c.data.datasets[0].data = coresNow.slice();
+        if (c.data.datasets[1]) c.data.datasets[1].data = coresNow.map(function() { return 100; });
+        c.update('none');
       });
-      charts.cores.update('none');
-
-      if (modalIsLiveFor('cores')) {
-        modalChart.data.labels.push(now); modalChart.data.labels.shift();
-        d.cpu_per_core.forEach(function(coreVal, i) {
-          var mds = modalChart.data.datasets[i];
-          if (!mds) return;
-          mds.data.push(coreVal); mds.data.shift();
-        });
-        modalChart.update('none');
-      }
     }
 
     // ── Temperature gauge ──
@@ -1356,14 +1347,12 @@ async function pollLive() {
       charts.tempGauge.update('none');
     }
     setText('gauge-temp-val', temp ? temp.toFixed(0) + '°C' : '—');
-    var gEl = document.getElementById('gauge-temp-val');
-    if (gEl) gEl.style.color = ts.color;
     if (modalIsLiveFor('temp')) {
       modalChart.$gaugeValue = temp;
       modalChart.update('none');
       var mgv = document.getElementById('chart-modal-gauge-val');
       var mgs = document.getElementById('chart-modal-gauge-status');
-      if (mgv) { mgv.textContent = temp ? temp.toFixed(0) + '°C' : '—'; mgv.style.color = ts.color; }
+      if (mgv) { mgv.textContent = temp ? temp.toFixed(0) + '°C' : '—'; }
       if (mgs) { mgs.textContent = ts.text; mgs.style.color = ts.color; }
     }
     var gsEl = document.getElementById('gauge-temp-status');
@@ -1383,8 +1372,9 @@ async function pollLive() {
       });
       var labelsInOrder = Object.keys(counts);
       charts.procDonut.data.datasets[0].data = labelsInOrder.map(function(k) { return counts[k]; });
-      var statusColors = { running: '#22c55e', sleeping: '#00d4ff', stopped: '#ef4444' };
-      charts.procDonut.data.datasets[0].backgroundColor = labelsInOrder.map(function(k) { return statusColors[k] || '#64748b'; });
+      charts.procDonut.data.labels = labelsInOrder;
+      charts.procDonut.data.datasets[0].rm = { bg: labelsInOrder.map(procColor) };
+      RM.recolor(charts.procDonut);
       charts.procDonut.update('none');
       setText('proc-donut-center', String(d.top_processes.length));
     }
@@ -1603,13 +1593,13 @@ function modalIsLiveFor(kind) {
   return !!modalChart && modalKind === kind && !modalHistBase;
 }
 
-function renderModalDonutLegend(color, used, total) {
+function renderModalDonutLegend(colorVar, used, total) {
   var legendEl = document.getElementById('chart-modal-donut-legend');
   if (!legendEl) return;
   var free = Math.max(0, (total || 0) - (used || 0));
   legendEl.innerHTML =
-    '<div class="donut-legend-item"><span class="dot" style="background:' + color + ';"></span>Used <b>' + (used || 0).toFixed(1) + ' GB</b></div>' +
-    '<div class="donut-legend-item"><span class="dot" style="background:#3a3f52;"></span>Free <b>' + free.toFixed(1) + ' GB</b></div>' +
+    '<div class="donut-legend-item"><span class="dot" style="background:' + RM.cssBg(colorVar) + ';"></span>Used <b>' + (used || 0).toFixed(1) + ' GB</b></div>' +
+    '<div class="donut-legend-item"><span class="dot" style="background:var(--chart-track);"></span>Free <b>' + free.toFixed(1) + ' GB</b></div>' +
     '<div class="donut-legend-item total">Total <b>' + (total || 0).toFixed(1) + ' GB</b></div>';
 }
 
@@ -1631,8 +1621,10 @@ function openChartModal(kind) {
   var gaugeWrap  = document.getElementById('chart-modal-gauge-wrap');
   var canvasWrap = document.getElementById('chart-modal-canvas-wrap');
 
+  var legendEl = document.getElementById('chart-modal-legend');
   filterEl.style.display   = 'none';
   noteEl.style.display     = 'none';
+  legendEl.style.display   = 'none';
   donutWrap.style.display  = 'none';
   gaugeWrap.style.display  = 'none';
   canvasWrap.style.display = 'none';
@@ -1646,7 +1638,7 @@ function openChartModal(kind) {
     titleEl.textContent = 'CPU Usage %';
     filterEl.style.display = 'flex';
     canvasWrap.style.display = 'block';
-    modalChart = makeChart('chart-modal-canvas', charts.cpuArea ? charts.cpuArea.data.datasets[0].data : [], '#00d4ff', 100);
+    modalChart = makeChart('chart-modal-canvas', charts.cpuArea ? charts.cpuArea.data.datasets[0].data : [], M.cpu, 100, true);
     if (charts.cpuArea) { modalChart.data.labels = charts.cpuArea.data.labels.slice(); modalChart.update(); }
 
   } else if (kind === 'net') {
@@ -1654,28 +1646,28 @@ function openChartModal(kind) {
     filterEl.style.display = 'flex';
     canvasWrap.style.display = 'block';
     if (charts.netBar) {
-      modalChart = makeNetBar('chart-modal-canvas', charts.netBar.data.datasets[0].data, charts.netBar.data.datasets[1].data);
+      modalChart = makeNetBar('chart-modal-canvas', charts.netBar.data.datasets[0].data, charts.netBar.data.datasets[1].data, true);
+      legendEl.innerHTML = '<span><i class="key-line" style="background:var(--g-sunset)"></i>Upload</span>' +
+                           '<span><i class="key-line" style="background:var(--g-ocean)"></i>Download</span>';
+      legendEl.style.display = 'flex';
       modalChart.data.labels = charts.netBar.data.labels.slice();
       modalChart.update();
     }
 
   } else if (kind === 'cores') {
-    titleEl.textContent = 'CPU Per-Core Usage';
-    noteEl.textContent = 'Historical range filtering isn\'t available for per-core data yet — showing the current live window.';
+    titleEl.textContent = 'CPU per core (now)';
+    noteEl.textContent = 'Current usage of each core, updating live. Historical range filtering isn\'t available for per-core data.';
     noteEl.style.display = 'block';
     canvasWrap.style.display = 'block';
     if (charts.cores) {
-      var coreArrs = charts.cores.data.datasets.map(function(ds) { return ds.data.slice(); });
-      modalChart = makeCoresChart('chart-modal-canvas', coreArrs);
-      modalChart.data.labels = charts.cores.data.labels.slice();
-      modalChart.update();
+      modalChart = makeCoresChart('chart-modal-canvas', charts.cores.data.datasets[0].data);
     }
 
   } else if (kind === 'ram' || kind === 'swap' || kind === 'disk') {
     var cfg = {
-      ram:  { title: 'RAM Usage',  chart: charts.ramDonut,  color: '#a78bfa' },
-      swap: { title: 'Swap Usage', chart: charts.swapDonut, color: '#c084fc' },
-      disk: { title: 'Disk Usage', chart: charts.diskDonut, color: '#f59e0b' },
+      ram:  { title: 'RAM Usage',  chart: charts.ramDonut,  color: M.ram },
+      swap: { title: 'Swap Usage', chart: charts.swapDonut, color: M.swap },
+      disk: { title: 'Disk Usage', chart: charts.diskDonut, color: M.disk },
     }[kind];
     titleEl.textContent = cfg.title;
     noteEl.textContent = 'This is a point-in-time snapshot — historical range filtering doesn\'t apply to a current usage breakdown.';
@@ -1683,19 +1675,11 @@ function openChartModal(kind) {
     donutWrap.style.display = 'flex';
     if (cfg.chart) {
       var data = cfg.chart.data.datasets[0].data;
-      modalChart = new Chart(document.getElementById('chart-modal-donut'), {
-        type: 'doughnut',
-        data: { datasets: [{ data: data.slice(), backgroundColor: [cfg.color, '#2a2f42'], borderWidth: 0 }] },
-        options: { responsive: true, maintainAspectRatio: false, cutout: '72%', animation: false,
-          plugins: { legend: { display: false }, tooltip: { enabled: false } } }
-      });
       var total = (data[0] || 0) + (data[1] || 0);
-      var pct = total > 0 ? (data[0] / total * 100) : 0;
-      document.getElementById('chart-modal-donut-center').textContent = pct.toFixed(1) + '%';
-      document.getElementById('chart-modal-donut-legend').innerHTML =
-        '<div class="donut-legend-item"><span class="dot" style="background:' + cfg.color + ';"></span>Used <b>' + (data[0] || 0).toFixed(1) + ' GB</b></div>' +
-        '<div class="donut-legend-item"><span class="dot" style="background:#3a3f52;"></span>Free <b>' + (data[1] || 0).toFixed(1) + ' GB</b></div>' +
-        '<div class="donut-legend-item total">Total <b>' + total.toFixed(1) + ' GB</b></div>';
+      modalChart = makeDonut('chart-modal-donut', data[0] || 0, total, cfg.color);
+      var upct = total > 0 ? (data[0] / total * 100) : 0;
+      document.getElementById('chart-modal-donut-center').textContent = upct.toFixed(1) + '%';
+      renderModalDonutLegend(cfg.color, data[0] || 0, total);
     }
 
   } else if (kind === 'temp') {
@@ -1704,9 +1688,9 @@ function openChartModal(kind) {
     noteEl.style.display = 'block';
     gaugeWrap.style.display = 'flex';
     var val = charts.tempGauge ? charts.tempGauge.$gaugeValue : 0;
-    modalChart = new Chart(document.getElementById('chart-modal-gauge'), {
+    modalChart = RM.chart('chart-modal-gauge', {
       type: 'doughnut',
-      data: { datasets: [{ data: [60, 20, 20], backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'], borderWidth: 0 }] },
+      data: { datasets: [gaugeDataset()] },
       options: {
         responsive: true, maintainAspectRatio: false, animation: false,
         rotation: -90, circumference: 180, cutout: '75%',
@@ -1719,7 +1703,7 @@ function openChartModal(kind) {
     var ts = tempStatusLabel(val);
     var gv = document.getElementById('chart-modal-gauge-val');
     var gs = document.getElementById('chart-modal-gauge-status');
-    gv.textContent = val.toFixed(0) + '°C'; gv.style.color = ts.color;
+    gv.textContent = val.toFixed(0) + '°C';
     gs.textContent = ts.text; gs.style.color = ts.color;
   }
 

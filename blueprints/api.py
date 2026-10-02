@@ -1,7 +1,7 @@
 """
 Internal JSON API — consumed by frontend JS (session-auth only).
 """
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request, url_for
 from flask_login import login_required, current_user
 from db import get_db
 
@@ -132,11 +132,28 @@ def home_data():
         alerts = [dict(r, sent_at=str(r['sent_at'])) for r in cur.fetchall()]
 
         # ── Alerts today count ──
-        cur.execute("""
-            SELECT COUNT(*) AS cnt FROM alert_log
-            WHERE sent_at >= CURRENT_DATE
-        """)
-        alerts_today = int(cur.fetchone()["cnt"] or 0)
+        if allowed is None:
+            cur.execute("""
+                SELECT COUNT(*) AS cnt FROM alert_log
+                WHERE sent_at >= CURRENT_DATE
+            """)
+            alerts_today = int(cur.fetchone()["cnt"] or 0)
+        else:
+            # Non-admins: only their own servers' alerts (+ DVR / DB Monitor
+            # alerts when they have those permissions).
+            keys = _allowed_machine_keys(cur)
+
+            def _visible(a):
+                src = a["source"]
+                return ((src == "system" and a["machine_key"] in keys)
+                        or (src == "dvr" and current_user.can_view_dvr)
+                        or (src == "dbmonitor" and current_user.can_view_dbmon))
+            alerts = [a for a in alerts if _visible(a)]
+            cur.execute("""
+                SELECT COALESCE(source,'system') AS source, machine_key FROM alert_log
+                WHERE sent_at >= CURRENT_DATE LIMIT 20000
+            """)
+            alerts_today = sum(1 for a in cur.fetchall() if _visible(a))
 
     return jsonify({
         "total": total, "online": online, "offline": offline,
@@ -150,6 +167,8 @@ def home_data():
 @login_required
 def alerts_all():
     """Unified alert log: system + DVR + dbmonitor, last 200."""
+    if not (current_user.is_admin or current_user.can_view_alerts):
+        return jsonify({"error": "forbidden"}), 403
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute("""
@@ -157,7 +176,21 @@ def alerts_all():
             FROM alert_log ORDER BY sent_at DESC LIMIT 200
         """)
         rows = cur.fetchall()
+        keys = _allowed_machine_keys(cur)
+    if keys is not None:
+        rows = [r for r in rows if r["machine_key"] in keys]
     return jsonify([dict(r, sent_at=str(r["sent_at"])) for r in rows])
+
+
+def _allowed_machine_keys(cur):
+    """'system@location' keys (alert_log.machine_key) of the machines this user
+    may see. None = everything (admin)."""
+    allowed = current_user.allowed_servers()
+    if allowed is None:
+        return None
+    cur.execute("SELECT system_name, location, table_name FROM machine_registry")
+    return {f"{r['system_name']}@{r['location']}" for r in cur.fetchall()
+            if r["table_name"] in allowed}
 
 
 # ── Settings read ────────────────────────────────────────────────────────────
@@ -176,48 +209,48 @@ def settings_all():
 
 # ── AI Agent chat endpoint ─────────────────────────────────────────────────────
 
-@api_bp.route("/agent/context")
-@login_required
-def agent_context():
-    """Returns a JSON snapshot of DB data for the agent system prompt."""
+def _build_agent_context():
+    """DB snapshot for the agent system prompt, limited to what the current
+    user is allowed to see (their servers, and DVR / DB monitor only with
+    those permissions)."""
     import json
+    from psycopg2 import sql
     ctx = {}
+    allowed = current_user.allowed_servers()
+    can_dvr = False  # DVR monitoring was removed from the app
+    can_dbmon = current_user.is_admin or current_user.can_view_dbmon
+    can_alerts = current_user.is_admin or current_user.can_view_alerts
     with get_db() as conn:
         cur = conn.cursor()
-        # Machines
+        machines = []
         try:
             cur.execute("""
-                SELECT system_name, location, status, hostname, public_ip, last_seen
+                SELECT system_name, location, status, hostname, public_ip, last_seen, table_name
                 FROM machine_registry ORDER BY system_name
             """)
-            machines = cur.fetchall()
-            ctx["machines"] = [dict(m, last_seen=str(m["last_seen"])) for m in machines]
+            machines = [m for m in cur.fetchall() if allowed is None or m["table_name"] in allowed]
+            ctx["machines"] = [{k: (str(v) if k == "last_seen" else v) for k, v in m.items() if k != "table_name"}
+                               for m in machines]
             ctx["total"]   = len(machines)
-            ctx["online"]  = sum(1 for m in machines if m["status"]=="online")
-            ctx["offline"] = sum(1 for m in machines if m["status"]=="offline")
-        except Exception as e:
-            ctx["machines_error"] = str(e)
+            ctx["online"]  = sum(1 for m in machines if m["status"] == "online")
+            ctx["offline"] = sum(1 for m in machines if m["status"] == "offline")
+        except Exception:
+            ctx["machines"] = []
 
         # Latest metrics per machine
         metrics = []
-        # Re-fetch with table_name
-        try:
-            cur.execute("SELECT system_name, table_name FROM machine_registry")
-            tbl_map = {r["system_name"]: r["table_name"] for r in cur.fetchall()}
-        except Exception:
-            tbl_map = {}
-        for m in ctx.get("machines", []):
+        for m in machines:
             try:
-                tbl = tbl_map.get(m["system_name"], "")
-                if not tbl: continue
-                cur.execute(f"SELECT cpu_percent,ram_percent,cpu_temp,disk_partitions FROM {tbl} ORDER BY ts DESC LIMIT 1")
+                cur.execute(sql.SQL(
+                    "SELECT cpu_percent,ram_percent,cpu_temp,disk_partitions FROM {} ORDER BY ts DESC LIMIT 1"
+                ).format(sql.Identifier(m["table_name"])))
                 row = cur.fetchone()
                 if row:
                     disks = []
                     try:
                         raw = row["disk_partitions"]
-                        disks = json.loads(raw) if isinstance(raw,str) else (raw or [])
-                        disks = [{"mount":d.get("mountpoint"),"pct":d.get("percent")} for d in disks]
+                        disks = json.loads(raw) if isinstance(raw, str) else (raw or [])
+                        disks = [{"mount": d.get("mountpoint"), "pct": d.get("percent")} for d in disks]
                     except Exception:
                         pass
                     metrics.append({
@@ -228,44 +261,65 @@ def agent_context():
                         "disks": disks,
                     })
             except Exception:
-                pass
+                conn.rollback()
         ctx["metrics"] = metrics
 
         # Recent alerts (24h)
-        try:
-            cur.execute("""
-                SELECT alert_type, COALESCE(source,'system') AS source,
-                       machine_key, subject, sent_at
-                FROM alert_log WHERE sent_at >= NOW() - INTERVAL '24 hours'
-                ORDER BY sent_at DESC LIMIT 20
-            """)
-            ctx["alerts_24h"] = [dict(r, sent_at=str(r["sent_at"])) for r in cur.fetchall()]
-        except Exception:
-            ctx["alerts_24h"] = []
+        ctx["alerts_24h"] = []
+        if can_alerts:
+            try:
+                cur.execute("""
+                    SELECT alert_type, COALESCE(source,'system') AS source,
+                           machine_key, subject, sent_at
+                    FROM alert_log WHERE sent_at >= NOW() - INTERVAL '24 hours'
+                    ORDER BY sent_at DESC LIMIT 50
+                """)
+                rows = cur.fetchall()
+                keys = _allowed_machine_keys(cur)
+                if keys is not None:
+                    rows = [r for r in rows if r["machine_key"] in keys]
+                ctx["alerts_24h"] = [dict(r, sent_at=str(r["sent_at"])) for r in rows[:20]]
+            except Exception:
+                conn.rollback()
 
         # DVR status
-        try:
-            cur.execute("""
-                SELECT d.name, d.ip, d.status, l.name AS loc, h.name AS hospital
-                FROM dvr_devices d
-                JOIN dvr_locations l ON l.id=d.location_id
-                JOIN dvr_hospitals h ON h.id=l.hospital_id
-            """)
-            ctx["dvrs"] = [dict(r) for r in cur.fetchall()]
-        except Exception:
-            ctx["dvrs"] = []
+        ctx["dvrs"] = []
+        if can_dvr:
+            try:
+                hospitals = current_user.allowed_hospitals()
+                cur.execute("""
+                    SELECT d.name, d.ip, d.status, l.name AS loc, h.name AS hospital, h.id AS hospital_id
+                    FROM dvr_devices d
+                    JOIN dvr_locations l ON l.id=d.location_id
+                    JOIN dvr_hospitals h ON h.id=l.hospital_id
+                """)
+                ctx["dvrs"] = [{k: v for k, v in r.items() if k != "hospital_id"} for r in cur.fetchall()
+                               if hospitals is None or r["hospital_id"] in hospitals]
+            except Exception:
+                conn.rollback()
 
         # DB watches
-        try:
-            cur.execute("""
-                SELECT w.display_name, w.last_status, c.name AS conn_name
-                FROM dbmon_watches w JOIN dbmon_connections c ON c.id=w.conn_id
-            """)
-            ctx["db_watches"] = [dict(r) for r in cur.fetchall()]
-        except Exception:
-            ctx["db_watches"] = []
+        ctx["db_watches"] = []
+        if can_dbmon:
+            try:
+                cur.execute("""
+                    SELECT w.display_name, c.name AS conn_name,
+                           CASE WHEN NOT w.monitoring THEN 'paused'
+                                WHEN w.was_dead THEN 'dead' ELSE 'live' END AS last_status
+                    FROM dbmon_watches w JOIN dbmon_connections c ON c.id=w.conn_id
+                """)
+                ctx["db_watches"] = [dict(r) for r in cur.fetchall()]
+            except Exception:
+                conn.rollback()
 
-    return jsonify(ctx)
+    return ctx
+
+
+@api_bp.route("/agent/context")
+@login_required
+def agent_context():
+    """Returns a JSON snapshot of DB data for the agent system prompt."""
+    return jsonify(_build_agent_context())
 
 
 @api_bp.route("/agent/chat", methods=["POST"])
@@ -279,8 +333,14 @@ def agent_chat():
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
     body = request.get_json(silent=True) or {}
-    messages  = body.get("messages", [])   # full conversation history (Anthropic-style: [{role, content}])
-    context   = body.get("context",  {})   # DB snapshot passed from frontend
+    messages = body.get("messages", [])   # conversation history: [{role, content}]
+    if not isinstance(messages, list):
+        messages = []
+    # Bound what one request can send to the model.
+    messages = [m for m in messages[-12:] if isinstance(m, dict)]
+    # Context is always rebuilt server-side for this user — never trusted
+    # from the browser, which could otherwise inject arbitrary "live data".
+    context = _build_agent_context()
 
     # Build system prompt with live context
     machines_txt = ""
@@ -300,7 +360,7 @@ def agent_chat():
     for w in context.get("db_watches", []):
         dbw_txt += f"  - {w['conn_name']}.{w['display_name']}: {w.get('last_status','unknown')}\n"
 
-    system = f"""You are ARIA (Automated REFORMMED Infrastructure Agent), an AI assistant embedded in the REFORMMED Monitor dashboard — a healthcare infrastructure monitoring platform.
+    system = f"""You are ARIA (Automated REFORMMED Infrastructure Agent), an AI assistant embedded in the Reformmed INFRA Monitor dashboard — a healthcare infrastructure monitoring platform.
 
 You have real-time access to the following live data pulled from the PostgreSQL database:
 
@@ -310,20 +370,16 @@ MACHINES ({context.get('total',0)} total, {context.get('online',0)} online, {con
 ALERTS (last 24h, {len(context.get('alerts_24h',[]))} total):
 {alerts_txt or '  None'}
 
-DVR DEVICES:
-{dvr_txt or '  None'}
-
 DB MONITOR WATCHES:
 {dbw_txt or '  None'}
 
 Current user: {current_user.username} (role: {current_user.role})
-Current page: {body.get('page', 'unknown')}
+Current page: {str(body.get('page', 'unknown'))[:200]}
 
 You can answer questions about:
 - Machine health, CPU/RAM/disk/temperature status
 - Which machines are online or offline
 - Recent alerts and patterns
-- DVR connectivity
 - DB monitor watch status
 - General recommendations
 
@@ -335,7 +391,7 @@ Be concise, direct, and use bullet points for lists. For normal conversation, re
     contents = []
     for m in messages:
         role = "model" if m.get("role") == "assistant" else "user"
-        contents.append({"role": role, "parts": [{"text": m.get("content", "")}]})
+        contents.append({"role": role, "parts": [{"text": str(m.get("content", ""))[:4000]}]})
 
     payload = json.dumps({
         "contents": contents,
@@ -365,10 +421,126 @@ Be concise, direct, and use bullet points for lists. For normal conversation, re
         except Exception:
             body = ""
         print(f"[api/aria] Gemini API error {e.code}: {body}")
-        return jsonify({"error": f"Gemini API error {e.code}: {body}"}), 500
+        return jsonify({"error": f"AI service returned an error ({e.code}). Check the server log."}), 502
     except Exception as e:
         # Catch-all so we can never lose visibility into what actually
         # failed — includes network errors (DNS/timeout/connection refused),
         # JSON parse errors on a malformed response, etc.
         print(f"[api/aria] Non-HTTP error ({type(e).__name__}): {e}")
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+# ── Universal search (top bar) ────────────────────────────────────────────────
+
+def _search_pages():
+    """Pages and shortcuts the current user can open: (title, hint, url, keywords)."""
+    u = current_user
+    pages = [("Home", "Infrastructure overview", url_for("home.index"), "dashboard overview home")]
+    if u.is_admin or u.can_view_servers:
+        pages += [
+            ("Servers", "All registered servers", url_for("servers.index"), "servers machines fleet"),
+            ("Servers offline", "Servers not reporting right now", url_for("servers.index", filter="offline"), "offline down"),
+            ("Servers over threshold", "CPU / RAM / disk above alert limits", url_for("servers.index", filter="hot"), "hot high cpu ram disk threshold attention"),
+            ("Reports", "Build a printable infrastructure report", url_for("reports.index"), "report pdf export csv document"),
+        ]
+    if u.is_admin or u.can_view_dbmon:
+        pages += [
+            ("DB Monitor", "External data-feed health", url_for("dbmonitor.index"), "db database feeds tables monitor"),
+            ("Stopped data feeds", "Tables with no new rows", url_for("dbmonitor.index", filter="dead"), "dead stopped feeds"),
+        ]
+    if u.is_admin or u.can_view_alerts:
+        pages += [
+            ("Alerts", "Alert rules and history", url_for("alerts.index"), "alerts rules notifications"),
+            ("Alert log", "Every alert that was sent", url_for("alerts.index") + "#log", "log history sent failed"),
+            ("Machine alert routing", "Per-server recipients", url_for("alerts.index") + "#machine", "routing recipients machine"),
+        ]
+    if u.is_admin:
+        pages += [
+            ("Users", "Accounts, roles and access", url_for("users.index"), "users accounts people roles"),
+            ("Settings", "App-wide configuration", url_for("settings.index"), "settings config"),
+            ("Data retention", "How long data is kept", url_for("settings.index") + "#data", "retention purge cleanup"),
+            ("Email / SMTP", "Alert email delivery", url_for("settings.index") + "#smtp", "smtp email gmail"),
+            ("Alert recipients", "Address book for alerts", url_for("settings.index") + "#recipients", "recipients emails"),
+        ]
+    pages.append(("My profile", "Photo, password and 2FA", url_for("auth.profile"), "profile account password photo avatar 2fa"))
+    return pages
+
+
+@api_bp.route("/search")
+@login_required
+def search():
+    q = (request.args.get("q") or "").strip()[:80]
+    if not q:
+        return jsonify({"q": q, "groups": []})
+    ql = q.lower()
+    like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+    groups = []
+
+    pages = [{"title": t, "hint": h, "url": url, "kind": "page"}
+             for t, h, url, kw in _search_pages()
+             if ql in t.lower() or ql in h.lower() or any(w.startswith(ql) for w in kw.split())]
+    if pages:
+        groups.append({"label": "Pages", "items": pages[:6]})
+
+    with get_db() as conn:
+        cur = conn.cursor()
+        if current_user.is_admin or current_user.can_view_servers:
+            allowed = current_user.allowed_servers()
+            cur.execute("""
+                SELECT system_name, location, table_name, status, hostname, public_ip, os_type
+                FROM machine_registry
+                WHERE system_name ILIKE %(l)s OR location ILIKE %(l)s OR hostname ILIKE %(l)s
+                   OR public_ip ILIKE %(l)s OR os_type ILIKE %(l)s OR table_name ILIKE %(l)s
+                ORDER BY (status = 'online') DESC, system_name LIMIT 30
+            """, {"l": like})
+            rows = [r for r in cur.fetchall() if allowed is None or r["table_name"] in allowed][:8]
+            if rows:
+                groups.append({"label": "Servers", "items": [{
+                    "title": r["system_name"],
+                    "hint": " · ".join(x for x in (r["location"], r["hostname"], r["public_ip"]) if x),
+                    "url": url_for("servers.detail", table_name=r["table_name"]),
+                    "kind": "server", "status": r["status"] or "offline",
+                } for r in rows]})
+
+        if current_user.is_admin or current_user.can_view_dbmon:
+            try:
+                cur.execute("""
+                    SELECT w.id, w.display_name, w.schema_name, w.table_name, w.group_name,
+                           w.monitoring, w.was_dead, c.name AS conn_name
+                    FROM dbmon_watches w JOIN dbmon_connections c ON c.id = w.conn_id
+                    WHERE w.display_name ILIKE %(l)s OR w.table_name ILIKE %(l)s
+                       OR w.schema_name ILIKE %(l)s OR w.group_name ILIKE %(l)s OR c.name ILIKE %(l)s
+                    ORDER BY w.display_name LIMIT 6
+                """, {"l": like})
+                feeds = cur.fetchall()
+            except Exception:
+                conn.rollback()
+                feeds = []
+            if feeds:
+                groups.append({"label": "DB feeds", "items": [{
+                    "title": f["display_name"] or f"{f['schema_name']}.{f['table_name']}",
+                    "hint": " · ".join(x for x in (f["group_name"], f"{f['schema_name']}.{f['table_name']}", f["conn_name"]) if x),
+                    "url": url_for("dbmonitor.index", q=f["display_name"] or f["table_name"]),
+                    "kind": "feed",
+                    "status": "paused" if not f["monitoring"] else ("dead" if f["was_dead"] else "live"),
+                } for f in feeds]})
+
+        if current_user.is_admin:
+            cur.execute("""
+                SELECT id, username, email, role, avatar_ver FROM webapp_users
+                WHERE username ILIKE %(l)s OR email ILIKE %(l)s
+                ORDER BY username LIMIT 5
+            """, {"l": like})
+            people = cur.fetchall()
+            if people:
+                groups.append({"label": "Users", "items": [{
+                    "title": p["username"], "hint": f"{p['email']} · {p['role']}",
+                    "url": url_for("users.edit", user_id=p["id"]), "kind": "user",
+                    "avatar": url_for("auth.avatar", user_id=p["id"], v=p["avatar_ver"]) if p["avatar_ver"] else None,
+                } for p in people]})
+
+    if current_user.is_admin or current_user.can_view_alerts:
+        groups.append({"label": "Actions", "items": [{
+            "title": f"Search alert log for \u201c{q}\u201d", "hint": "Alerts → Alert log",
+            "url": url_for("alerts.index", q=q) + "#log", "kind": "action"}]})
+    return jsonify({"q": q, "groups": groups})

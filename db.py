@@ -89,11 +89,23 @@ def init_db():
             # Forgot-password OTP: hashed (not plaintext) 6-digit code + expiry.
             "ALTER TABLE webapp_users ADD COLUMN IF NOT EXISTS reset_otp_hash    TEXT",
             "ALTER TABLE webapp_users ADD COLUMN IF NOT EXISTS reset_otp_expires TIMESTAMPTZ",
+            "ALTER TABLE webapp_users ADD COLUMN IF NOT EXISTS reset_otp_attempts INTEGER NOT NULL DEFAULT 0",
+            # Profile photo: bumped on every upload/remove (0 = no photo); the
+            # image itself lives in user_avatars, never loaded on each request.
+            "ALTER TABLE webapp_users ADD COLUMN IF NOT EXISTS avatar_ver INTEGER NOT NULL DEFAULT 0",
         ]:
             try:
                 cur.execute(col_sql)
             except Exception:
                 pass
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS user_avatars (
+                user_id    INTEGER PRIMARY KEY REFERENCES webapp_users(id) ON DELETE CASCADE,
+                image      BYTEA NOT NULL,
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """)
 
         # ── User ↔ server permissions ─────────────────────────────────────────
         cur.execute("""
@@ -191,7 +203,7 @@ def init_db():
             ("smtp_host",           "smtp.gmail.com"),
             ("smtp_port",           "465"),
             ("alert_from_email",    ""),
-            ("app_name",            "REFORMMED Monitor"),
+            ("app_name",            "Reformmed INFRA Monitor"),
             ("sidebar_default",     "expanded"),
             # Master alert kill-switch — checked before every single alert
             # send, across System/Machine/DVR/DB Monitor alike. "0" mutes
@@ -220,14 +232,23 @@ def init_db():
                 ON CONFLICT (alert_type) DO NOTHING
             """, (atype, enabled, thresh, cooldown))
 
-        # Seed default admin user
-        from werkzeug.security import generate_password_hash
-        cur.execute("""
-            INSERT INTO webapp_users (username, email, password_hash, role,
-                                      can_view_dvr, can_view_dbmon, can_view_alerts, can_view_servers)
-            VALUES ('admin', 'admin@reformmed.local', %s, 'admin', TRUE, TRUE, TRUE, TRUE)
-            ON CONFLICT (username) DO NOTHING
-        """, (generate_password_hash("admin123"),))
+        # Seed the first admin ONLY when no admin exists. The old seed re-created
+        # admin/admin123 on every start (e.g. after the admin was renamed),
+        # which left a well-known login open in production.
+        cur.execute("SELECT COUNT(*) AS n FROM webapp_users WHERE role='admin'")
+        if cur.fetchone()["n"] == 0:
+            import secrets
+            from werkzeug.security import generate_password_hash
+            initial_pw = os.getenv("ADMIN_INITIAL_PASSWORD") or secrets.token_urlsafe(12)
+            cur.execute("""
+                INSERT INTO webapp_users (username, email, password_hash, role,
+                                          can_view_dvr, can_view_dbmon, can_view_alerts, can_view_servers)
+                VALUES ('admin', 'admin@reformmed.local', %s, 'admin', TRUE, TRUE, TRUE, TRUE)
+                ON CONFLICT DO NOTHING
+            """, (generate_password_hash(initial_pw),))
+            if not os.getenv("ADMIN_INITIAL_PASSWORD"):
+                log.warning("Created first admin user 'admin' with password: %s "
+                            "— change it after logging in.", initial_pw)
 
         log.info("✅ Webapp DB tables ready")
 
@@ -318,33 +339,91 @@ def list_alert_recipients():
         return cur.fetchall()
 
 
+RETENTION_MIN_DAYS = 1
+RETENTION_MAX_DAYS = 3650
+_PURGE_BATCH = 20000
+
+
+def retention_days():
+    """data_retention_days from Settings, clamped to a sane range."""
+    try:
+        days = int(get_setting("data_retention_days", "7"))
+    except (TypeError, ValueError):
+        days = 7
+    return max(RETENTION_MIN_DAYS, min(RETENTION_MAX_DAYS, days))
+
+
+def _batched_delete(conn, table, ts_col, days):
+    """Delete rows older than `days` in small batches, committing after each
+    one, so a big purge on a busy production table never holds a long lock
+    or a huge transaction. Returns the number of rows removed."""
+    from psycopg2 import sql
+    q = sql.SQL("""
+        DELETE FROM {t} WHERE ctid IN (
+            SELECT ctid FROM {t}
+            WHERE {c} < NOW() - make_interval(days => %s)
+            LIMIT %s
+        )
+    """).format(t=sql.Identifier(table), c=sql.Identifier(ts_col))
+    removed = 0
+    while True:
+        cur = conn.cursor()
+        cur.execute(q, (days, _PURGE_BATCH))
+        n = cur.rowcount or 0
+        conn.commit()
+        removed += n
+        if n < _PURGE_BATCH:
+            return removed
+
+
 def purge_old_data():
     """
-    Delete metric rows older than data_retention_days from all machine tables.
-    Call this from a scheduled job or on startup.
+    Delete metric rows and alert-log entries older than data_retention_days.
+    Runs automatically from the checker daemon (offline_checker.py) every
+    PURGE_INTERVAL_HOURS, and on demand from Settings → Data retention.
+    Records the outcome in app_settings (last_purge_*) for the Settings page.
+    Returns {"days", "metric_rows", "alert_rows", "tables", "errors"}.
     """
-    days = int(get_setting("data_retention_days", "7"))
+    import re
+    from datetime import datetime, timezone
+    days = retention_days()
     with get_db() as conn:
         cur = conn.cursor()
-        # Get all machine metric tables
         cur.execute("SELECT table_name FROM machine_registry")
-        tables = [r["table_name"] for r in cur.fetchall()]
-    deleted_total = 0
-    for tbl in tables:
+        tables = [r["table_name"] for r in cur.fetchall()
+                  if re.fullmatch(r"[a-z0-9_]{1,63}", r["table_name"] or "")]
+
+    result = {"days": days, "metric_rows": 0, "alert_rows": 0, "tables": 0, "errors": 0}
+    conn = psycopg2.connect(**DB_CONFIG, cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        for tbl in tables:
+            try:
+                result["metric_rows"] += _batched_delete(conn, tbl, "ts", days)
+                result["tables"] += 1
+            except Exception as e:
+                conn.rollback()
+                result["errors"] += 1
+                log.warning("purge_old_data: skipped table %s: %s", tbl, e)
         try:
-            with get_db() as conn:
-                cur = conn.cursor()
-                cur.execute(f"""
-                    DELETE FROM {tbl}
-                    WHERE ts < NOW() - INTERVAL '{days} days'
-                """)
-                deleted_total += cur.rowcount
+            result["alert_rows"] = _batched_delete(conn, "alert_log", "sent_at", days)
         except Exception as e:
-            log.warning("purge_old_data: skipped table %s: %s", tbl, e)
-    # Also prune alert_log
-    with get_db() as conn:
+            conn.rollback()
+            result["errors"] += 1
+            log.warning("purge_old_data: alert_log skipped: %s", e)
+
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         cur = conn.cursor()
-        cur.execute(f"""
-            DELETE FROM alert_log WHERE sent_at < NOW() - INTERVAL '{days} days'
-        """)
-    log.info("purge_old_data: deleted %d rows (retention=%d days)", deleted_total, days)
+        for k, v in (("last_purge_at", now),
+                     ("last_purge_rows", str(result["metric_rows"] + result["alert_rows"])),
+                     ("last_purge_errors", str(result["errors"]))):
+            cur.execute("""
+                INSERT INTO app_settings (key, value) VALUES (%s, %s)
+                ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value
+            """, (k, v))
+        conn.commit()
+    finally:
+        conn.close()
+    log.info("purge_old_data: removed %d metric rows from %d tables + %d alert rows "
+             "(retention=%d days, %d errors)", result["metric_rows"], result["tables"],
+             result["alert_rows"], days, result["errors"])
+    return result

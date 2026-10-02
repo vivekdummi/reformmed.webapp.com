@@ -1,82 +1,200 @@
 {% extends "base.html" %}
-{% block title %}Servers — REFORMMED Monitor{% endblock %}
+{% block title %}Servers — Reformmed INFRA Monitor{% endblock %}
 {% block page_title %}Servers{% endblock %}
 
-{% block content %}
+{% block extra_css %}
 <style>
-.server-name-link { transition: color .15s; }
-tr.machine-row:hover .server-name-link { color: var(--accent); text-decoration: underline; }
+.srv-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:6px 0 12px;}
+.srv-toolbar h2{font-family:var(--font-head);font-size:18px;font-weight:700;letter-spacing:-.2px;}
+.srv-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.srv-search{position:relative;}
+.srv-search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted);pointer-events:none;}
+.srv-search input{width:280px;max-width:70vw;height:36px;padding:0 14px 0 36px;border-radius:99px;margin:0;}
+.filter-chips{display:flex;gap:6px;flex-wrap:wrap;}
+.fchip{height:32px;padding:0 14px;border-radius:99px;border:1px solid var(--border);background:var(--bg2);color:var(--text-muted);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+.fchip:hover{color:var(--text);border-color:var(--border-strong);}
+.fchip.active{background:var(--accent-soft);color:var(--accent);border-color:transparent;}
+.fchip b{font-variant-numeric:tabular-nums;margin-left:4px;opacity:.8;}
+
+.srv-table td{padding:14px 12px;}
+.srv-name{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;min-width:0;}
+.srv-ico{width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--g-ocean);color:#fff;}
+.srv-ico.off{background:linear-gradient(135deg,#ff8a8a,#e5484d);}
+.srv-ico svg{width:18px;height:18px;}
+.srv-name-txt{font-family:var(--font-head);font-weight:700;font-size:14px;white-space:nowrap;}
+.srv-name-sub{font-size:12px;color:var(--text-muted);font-family:var(--mono);white-space:nowrap;}
+tr.machine-row:hover .srv-name-txt{color:var(--accent);}
+.st-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;font-size:11px;font-weight:800;letter-spacing:.5px;}
+.st-pill::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;}
+.st-pill.online{background:color-mix(in srgb,var(--green) 14%,transparent);color:var(--green);}
+.st-pill.offline{background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red);}
+.meter{min-width:120px;}
+.meter-top{display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);font-weight:600;margin-bottom:4px;}
+.meter-top b{color:var(--text);font-variant-numeric:tabular-nums;}
+.meter-top b.hot{color:var(--red);}
+.meter-bar{height:6px;border-radius:99px;background:var(--chart-track);overflow:hidden;}
+.meter-bar i{display:block;height:100%;border-radius:99px;}
+.os-chip{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:8px;background:var(--bg3);font-size:12px;font-weight:600;color:var(--text-muted);white-space:nowrap;}
+.hot-flag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--yellow);margin-left:6px;}
+.srv-empty{text-align:center;color:var(--text-muted);padding:48px;}
+.mute-switch{position:relative;width:36px;height:20px;border-radius:99px;cursor:pointer;display:inline-block;transition:background .15s;}
+.mute-switch .alerts-toggle-knob{position:absolute;top:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s;}
+.fleet-grid{display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:22px;}
+@media(max-width:1000px){.fleet-grid{grid-template-columns:1fr;}}
 </style>
+{% endblock %}
+
+{% block content %}
+{% set n_total = machines|length %}
+{% set n_online = machines|selectattr('status', 'equalto', 'online')|list|length %}
+{% set n_offline = n_total - n_online %}
+{% set with_metrics = machines|selectattr('cpu', 'ne', None)|list %}
+{% set avg_cpu = ((with_metrics|sum(attribute='cpu')) / (with_metrics|length)) if with_metrics else 0 %}
+{% set avg_ram = ((with_metrics|sum(attribute='ram')) / (with_metrics|length)) if with_metrics else 0 %}
+{% set n_hot = machines|selectattr('hot')|list|length %}
+{% set n_muted = machines|rejectattr('alerts_enabled')|list|length %}
+
 <div class="page-header">
   <div>
     <h1>Registered Servers</h1>
-    <p>{{ machines | length }} machine(s) visible to your account</p>
+    <p>{{ n_total }} machine{{ '' if n_total == 1 else 's' }} visible to your account — latest reading per server</p>
   </div>
 </div>
 
-<!-- Filter bar -->
-<div class="card" style="padding:16px;margin-bottom:20px">
-  <div style="display:flex;gap:12px;align-items:center">
-    <input type="text" id="search" placeholder="Search by name, hostname, IP…"
-           style="max-width:320px;margin:0">
-    <select id="filter-status" style="max-width:160px;margin:0">
-      <option value="">All statuses</option>
-      <option value="online">Online only</option>
-      <option value="offline">Offline only</option>
-    </select>
+<div class="kpi-grid">
+  <div class="kpi k-ocean">
+    <div class="kpi-top"><span class="kpi-label">Total servers</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span></div>
+    <div class="kpi-value">{{ n_total }}</div>
+    <div class="kpi-sub">{{ machines|map(attribute='location')|unique|list|length }} location{{ '' if (machines|map(attribute='location')|unique|list|length) == 1 else 's' }}</div>
+  </div>
+  <div class="kpi k-mint">
+    <div class="kpi-top"><span class="kpi-label">Online</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span></div>
+    <div class="kpi-value">{{ n_online }}</div>
+    <div class="kpi-bar"><i style="width:{{ (n_online / n_total * 100) if n_total else 0 }}%"></i></div>
+  </div>
+  <div class="kpi k-red">
+    <div class="kpi-top"><span class="kpi-label">Offline</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l22 22"/><path d="M16.72 11.06A10.94 10.94 0 0119 12.55"/><path d="M5 12.55a10.94 10.94 0 015.17-2.39"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg></span></div>
+    <div class="kpi-value">{{ n_offline }}</div>
+    <div class="kpi-sub">not reporting right now</div>
+  </div>
+  <div class="kpi k-ocean">
+    <div class="kpi-top"><span class="kpi-label">Avg CPU</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg></span></div>
+    <div class="kpi-value">{{ '%.1f'|format(avg_cpu) }}<small>%</small></div>
+    <div class="kpi-bar"><i style="width:{{ [avg_cpu,100]|min }}%"></i></div>
+  </div>
+  <div class="kpi k-violet">
+    <div class="kpi-top"><span class="kpi-label">Avg memory</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="10" rx="1"/><line x1="6" y1="7" x2="6" y2="17"/><line x1="10" y1="7" x2="10" y2="17"/><line x1="14" y1="7" x2="14" y2="17"/><line x1="18" y1="7" x2="18" y2="17"/></svg></span></div>
+    <div class="kpi-value">{{ '%.1f'|format(avg_ram) }}<small>%</small></div>
+    <div class="kpi-bar"><i style="width:{{ [avg_ram,100]|min }}%"></i></div>
+  </div>
+  <div class="kpi k-sunset">
+    <div class="kpi-top"><span class="kpi-label">Over thresholds</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span></div>
+    <div class="kpi-value">{{ n_hot }}</div>
+    <div class="kpi-sub">{{ n_muted }} with alerts muted</div>
   </div>
 </div>
 
-<div class="card">
+{% if with_metrics %}
+<div class="fleet-grid">
+  <div class="panel">
+    <div class="panel-head"><div><div class="panel-title">Fleet status</div><div class="panel-sub">Online vs offline right now</div></div></div>
+    <div style="display:flex;align-items:center;gap:18px;">
+      <div class="donut-box" style="width:150px;height:150px;"><canvas id="ch-status"></canvas>
+        <div class="donut-mid"><b>{{ '%.0f'|format((n_online / n_total * 100) if n_total else 0) }}%</b><span>online</span></div></div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:10px;font-size:13px;">
+        <div style="display:flex;align-items:center;gap:8px;"><i style="width:10px;height:10px;border-radius:4px;background:var(--g-mint)"></i><span style="flex:1;color:var(--text-muted);font-weight:500">Online</span><b>{{ n_online }}</b></div>
+        <div style="display:flex;align-items:center;gap:8px;"><i style="width:10px;height:10px;border-radius:4px;background:linear-gradient(90deg,#ff8a8a,#e5484d)"></i><span style="flex:1;color:var(--text-muted);font-weight:500">Offline</span><b>{{ n_offline }}</b></div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head">
+      <div><div class="panel-title">Busiest servers</div><div class="panel-sub">Highest of CPU / RAM / disk · top 6</div></div>
+      <div class="legend">
+        <span><i style="background:var(--g-ocean)"></i>CPU</span>
+        <span><i style="background:var(--g-violet)"></i>RAM</span>
+        <span><i style="background:var(--g-sunset)"></i>Fullest disk</span>
+      </div>
+    </div>
+    <div style="height:200px;position:relative;"><canvas id="ch-busiest"></canvas></div>
+  </div>
+</div>
+{% endif %}
+
+<div class="srv-toolbar">
+  <h2>All servers</h2>
+  <div class="srv-tools">
+    <div class="srv-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="search" placeholder="Search name, location, hostname, IP…" aria-label="Search servers">
+    </div>
+    <div class="filter-chips" id="filter-chips">
+      <button type="button" class="fchip active" data-filter="">All<b>{{ n_total }}</b></button>
+      <button type="button" class="fchip" data-filter="online">Online<b>{{ n_online }}</b></button>
+      <button type="button" class="fchip" data-filter="offline">Offline<b>{{ n_offline }}</b></button>
+      <button type="button" class="fchip" data-filter="hot">Over threshold<b>{{ n_hot }}</b></button>
+    </div>
+  </div>
+</div>
+
+<div class="panel" style="padding:6px 8px;">
   <div class="table-wrap">
-    <table id="machines-table">
+    <table id="machines-table" class="srv-table">
       <thead>
         <tr>
-          <th>System Name</th>
-          <th>Location</th>
+          <th>Server</th>
           <th>Status</th>
-          <th>OS</th>
-          <th>Hostname</th>
-          <th>Public IP</th>
-          <th>Last Seen</th>
-          <th>Registered</th>
+          <th class="hide-mobile">OS</th>
+          <th>CPU</th>
+          <th>RAM</th>
+          <th class="hide-mobile">Disk</th>
+          <th class="hide-mobile">Public IP</th>
+          <th class="hide-mobile">Last seen</th>
           <th>Alerts</th>
         </tr>
       </thead>
       <tbody>
+        {% macro meter(val, limit, grad) %}
+          {% if val is not none %}
+          <div class="meter">
+            <div class="meter-top"><span></span><b class="{{ 'hot' if val >= limit else '' }}">{{ '%.0f'|format(val) }}%</b></div>
+            <div class="meter-bar"><i style="width:{{ [val,100]|min }}%;background:var({{ grad }})"></i></div>
+          </div>
+          {% else %}<span class="text-muted">—</span>{% endif %}
+        {% endmacro %}
         {% for m in machines %}
-        <tr class="machine-row" data-name="{{ m.system_name }}" data-status="{{ m.status }}"
-            data-hostname="{{ m.hostname or '' }}" data-ip="{{ m.public_ip or '' }}">
+        <tr class="machine-row" data-status="{{ m.status }}" data-hot="{{ '1' if m.hot else '0' }}"
+            data-search="{{ (m.system_name ~ ' ' ~ (m.location or '') ~ ' ' ~ (m.hostname or '') ~ ' ' ~ (m.public_ip or '') ~ ' ' ~ (m.os_type or ''))|lower }}">
           <td>
-            <a href="{{ url_for('servers.detail', table_name=m.table_name) }}"
-               style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;">
-              <span class="status-dot {{ m.status }}"></span>
-              <span class="mono server-name-link" style="font-weight:600">{{ m.system_name }}</span>
+            <a class="srv-name" href="{{ url_for('servers.detail', table_name=m.table_name) }}">
+              <span class="srv-ico {{ 'off' if m.status != 'online' else '' }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span>
+              <span style="min-width:0;">
+                <span class="srv-name-txt">{{ m.system_name }}</span>{% if m.hot %}<span class="hot-flag" title="Over an alert threshold">▲ hot</span>{% endif %}<br>
+                <span class="srv-name-sub">{{ m.location }}{% if m.hostname %} · {{ m.hostname }}{% endif %}</span>
+              </span>
             </a>
           </td>
-          <td class="text-muted">{{ m.location }}</td>
-          <td>
-            <span class="badge badge-{{ 'online' if m.status == 'online' else 'offline' }}">
-              {{ m.status.upper() }}
-            </span>
-          </td>
-          <td class="text-muted" style="font-size:13px">{{ m.os_type or '—' }}</td>
-          <td class="mono text-muted" style="font-size:12px">{{ m.hostname or '—' }}</td>
-          <td class="mono text-muted" style="font-size:12px">{{ m.public_ip or '—' }}</td>
-          <td class="text-muted" style="font-size:12px">
-            {{ m.last_seen.strftime('%Y-%m-%d %H:%M:%S') if m.last_seen else '—' }}
-          </td>
-          <td class="text-muted" style="font-size:12px">
-            {{ m.registered_at.strftime('%Y-%m-%d') if m.registered_at else '—' }}
+          <td><span class="st-pill {{ 'online' if m.status == 'online' else 'offline' }}">{{ m.status|upper }}</span></td>
+          <td class="hide-mobile"><span class="os-chip">{{ m.os_type or '—' }}</span></td>
+          <td>{{ meter(m.cpu, thresholds.cpu or 90, '--g-ocean') }}</td>
+          <td>{{ meter(m.ram, thresholds.ram or 90, '--g-violet') }}</td>
+          <td class="hide-mobile">{{ meter(m.disk, thresholds.disk or 85, '--g-sunset') }}</td>
+          <td class="mono text-muted hide-mobile" style="font-size:12px">{{ m.public_ip or '—' }}</td>
+          <td class="text-muted hide-mobile" style="font-size:12px;white-space:nowrap;">
+            {{ m.last_seen.strftime('%Y-%m-%d %H:%M') if m.last_seen else '—' }}
           </td>
           <td>
             {% if current_user.role == 'admin' %}
-            <span class="alerts-toggle-switch" data-table="{{ m.table_name }}" onclick="toggleRowAlerts(this)"
-                  style="position:relative;width:32px;height:18px;border-radius:9px;cursor:pointer;display:inline-block;
-                         background:{{ '#22c55e' if m.alerts_enabled else 'rgba(255,255,255,.15)' }};">
-              <span class="alerts-toggle-knob"
-                    style="position:absolute;top:2px;left:{{ '16px' if m.alerts_enabled else '2px' }};
-                           width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s;"></span>
+            <span class="alerts-toggle-switch mute-switch" data-table="{{ m.table_name }}" onclick="toggleRowAlerts(this)"
+                  role="switch" aria-checked="{{ 'true' if m.alerts_enabled else 'false' }}" title="{{ 'Alerts on' if m.alerts_enabled else 'Alerts muted' }}"
+                  style="background:{{ 'var(--accent)' if m.alerts_enabled else 'var(--chart-track)' }};">
+              <span class="alerts-toggle-knob" style="left:{{ '19px' if m.alerts_enabled else '3px' }};"></span>
             </span>
             {% else %}
             <span class="text-muted" style="font-size:12px">{{ 'On' if m.alerts_enabled else 'Muted' }}</span>
@@ -84,12 +202,9 @@ tr.machine-row:hover .server-name-link { color: var(--accent); text-decoration: 
           </td>
         </tr>
         {% else %}
-        <tr>
-          <td colspan="9" style="text-align:center;color:var(--text-muted);padding:48px">
-            No machines registered yet.
-          </td>
-        </tr>
+        <tr><td colspan="9" class="srv-empty">No machines registered yet.</td></tr>
         {% endfor %}
+        <tr id="no-match" style="display:none;"><td colspan="9" class="srv-empty">No servers match your search.</td></tr>
       </tbody>
     </table>
   </div>
@@ -97,39 +212,90 @@ tr.machine-row:hover .server-name-link { color: var(--accent); text-decoration: 
 {% endblock %}
 
 {% block extra_js %}
+{% set chart_rows = [] %}
+{% for m in machines if m.cpu is not none %}
+  {% set _ = chart_rows.append({'name': m.system_name, 'table': m.table_name, 'cpu': m.cpu, 'ram': m.ram, 'disk': m.disk or 0}) %}
+{% endfor %}
+{% set n_on = machines|selectattr('status', 'equalto', 'online')|list|length %}
 <script>
   function toggleRowAlerts(el) {
     const tableName = el.dataset.table;
-    fetch(`/servers/${tableName}/toggle-alerts`, { method: "POST" })
+    fetch(`/servers/${encodeURIComponent(tableName)}/toggle-alerts`, { method: "POST" })
       .then(r => r.json())
       .then(data => {
         if (data.error) return;
         const on = data.alerts_enabled;
-        el.style.background = on ? "#22c55e" : "rgba(255,255,255,.15)";
-        el.querySelector(".alerts-toggle-knob").style.left = on ? "16px" : "2px";
+        el.style.background = on ? "var(--accent)" : "var(--chart-track)";
+        el.querySelector(".alerts-toggle-knob").style.left = on ? "19px" : "3px";
+        el.setAttribute('aria-checked', on ? 'true' : 'false');
+        el.title = on ? 'Alerts on' : 'Alerts muted';
       })
       .catch(() => {});
   }
 
-  const searchInput  = document.getElementById('search');
-  const statusFilter = document.getElementById('filter-status');
-
+  // ── Search + status chips ──
+  const searchInput = document.getElementById('search');
+  let statusFilter = '';
   function filterTable() {
-    const q  = searchInput.value.toLowerCase();
-    const st = statusFilter.value;
+    const q = searchInput.value.trim().toLowerCase();
+    let shown = 0;
     document.querySelectorAll('.machine-row').forEach(row => {
-      const name     = row.dataset.name.toLowerCase();
-      const hostname = row.dataset.hostname.toLowerCase();
-      const ip       = row.dataset.ip.toLowerCase();
-      const status   = row.dataset.status;
+      const matchQ = !q || row.dataset.search.includes(q);
+      const matchSt = !statusFilter
+        || (statusFilter === 'hot' ? row.dataset.hot === '1' : row.dataset.status === statusFilter);
+      const ok = matchQ && matchSt;
+      row.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    const none = document.getElementById('no-match');
+    if (none) none.style.display = (shown === 0 && document.querySelectorAll('.machine-row').length) ? '' : 'none';
+  }
+  searchInput.addEventListener('input', filterTable);
+  document.querySelectorAll('#filter-chips .fchip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#filter-chips .fchip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      statusFilter = btn.dataset.filter;
+      filterTable();
+    });
+  });
 
-      const matchQ  = !q || name.includes(q) || hostname.includes(q) || ip.includes(q);
-      const matchSt = !st || status === st;
-      row.style.display = (matchQ && matchSt) ? '' : 'none';
+  // ── Fleet charts ──
+  const FLEET_ROWS = {{ chart_rows|tojson }};
+  const N_ONLINE = {{ n_on }}, N_OFFLINE = {{ machines|length - n_on }};
+
+  RM.chart('ch-status', {
+    type: 'doughnut',
+    data: { labels: ['Online', 'Offline'], datasets: [{ data: [N_ONLINE, N_OFFLINE], rm: { bg: ['g:mint', '--red'] }, borderRadius: 8, spacing: 3 }] },
+    options: { cutout: '74%', animation: false, plugins: { legend: { display: false } } }
+  });
+
+  if (FLEET_ROWS.length) {
+    const busiest = FLEET_ROWS.slice().sort((a, b) =>
+      Math.max(b.cpu, b.ram, b.disk) - Math.max(a.cpu, a.ram, a.disk)).slice(0, 6);
+    RM.chart('ch-busiest', {
+      type: 'bar',
+      data: {
+        labels: busiest.map(m => m.name),
+        datasets: [
+          { label: 'CPU',          data: busiest.map(m => m.cpu),  rm: { bg: 'g:ocean' },  maxBarThickness: 16, categoryPercentage: .7, barPercentage: .85 },
+          { label: 'RAM',          data: busiest.map(m => m.ram),  rm: { bg: 'g:violet' }, maxBarThickness: 16, categoryPercentage: .7, barPercentage: .85 },
+          { label: 'Fullest disk', data: busiest.map(m => m.disk), rm: { bg: 'g:sunset' }, maxBarThickness: 16, categoryPercentage: .7, barPercentage: .85 }
+        ]
+      },
+      options: {
+        animation: false,
+        interaction: { intersect: false, mode: 'index' },
+        onClick: (e, els) => { if (els.length) location.href = '/servers/' + encodeURIComponent(busiest[els[0].index].table); },
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + (+c.raw).toFixed(1) + '%' } } },
+        scales: {
+          x: { grid: { display: false }, border: { display: false },
+               ticks: { callback: function(v) { const l = this.getLabelForValue(v); return l.length > 16 ? l.slice(0, 15) + '…' : l; } } },
+          y: { min: 0, max: 100, border: { display: false }, ticks: { maxTicksLimit: 5, callback: v => v + '%' } }
+        }
+      }
     });
   }
-
-  searchInput.addEventListener('input', filterTable);
-  statusFilter.addEventListener('change', filterTable);
 </script>
 {% endblock %}

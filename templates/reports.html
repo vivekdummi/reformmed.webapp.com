@@ -1,248 +1,588 @@
 {% extends "base.html" %}
-{% block title %}Reports — REFORMMED{% endblock %}
+{% block title %}Reports — Reformmed INFRA Monitor{% endblock %}
 {% block page_title %}Reports{% endblock %}
 
 {% block extra_css %}
 <style>
-.rep-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
-@media(max-width:900px){.rep-grid{grid-template-columns:1fr;}}
-.rep-card-title{font-weight:700;font-size:14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;}
-.rep-list{max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
-.rep-check-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;font-size:13px;cursor:pointer;user-select:none;}
-.rep-check-row:hover{background:var(--bg3,rgba(255,255,255,.03));}
-.rep-check-row input{width:auto;margin:0;flex-shrink:0;}
-.rep-sub{font-size:11px;color:var(--text-muted);margin-left:auto;font-family:'JetBrains Mono',monospace;}
-.rep-select-all{font-size:11px;color:var(--accent);cursor:pointer;background:none;border:none;font-family:inherit;padding:0;}
-.rep-actions{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
-.rep-status{font-size:13px;color:var(--text-muted);}
-.rep-status.err{color:var(--red,#ef4444);}
-.rep-table-wrap{overflow-x:auto;}
-.rep-table{width:100%;border-collapse:collapse;font-size:12.5px;}
-.rep-table th,.rep-table td{padding:9px 12px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border);}
-.rep-table th{color:var(--text-muted);font-weight:600;text-transform:uppercase;font-size:10.5px;letter-spacing:.5px;position:sticky;top:0;background:var(--bg2);}
-.rep-table tbody tr:hover{background:var(--bg3,rgba(255,255,255,.03));}
+/* ── Builder ── */
+.rb{margin-bottom:22px;}
+.rb-grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:22px;}
+@media(max-width:1100px){.rb-grid{grid-template-columns:1fr 1fr;}.rb-col.servers{grid-column:1/-1;}}
+@media(max-width:700px){.rb-grid{grid-template-columns:1fr;}}
+.rb-step{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.rb-num{width:26px;height:26px;border-radius:50%;background:var(--g-ocean);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.rb-title{font-family:var(--font-head);font-size:15px;font-weight:700;}
+.rb-title small{display:block;font-family:var(--font);font-size:12px;font-weight:500;color:var(--text-muted);}
+.rb-tools{display:flex;gap:8px;align-items:center;margin-bottom:10px;}
+.rb-tools input{height:36px;padding:0 12px;}
+.rb-link{background:none;border:none;color:var(--accent);font-weight:600;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;padding:4px;}
+.srv-list{display:flex;flex-wrap:wrap;gap:8px;max-height:220px;overflow-y:auto;padding:2px;}
+.srv-chip{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 12px 0 10px;border-radius:99px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;font-size:13px;font-weight:600;color:var(--text-muted);margin:0;user-select:none;transition:.15s;}
+.srv-chip input{display:none;}
+.srv-chip .dot{width:8px;height:8px;border-radius:50%;background:var(--text-muted);}
+.srv-chip .dot.online{background:var(--green);} .srv-chip .dot.offline{background:var(--red);}
+.srv-chip small{font-weight:500;color:var(--text-muted);}
+.srv-chip.on{background:var(--accent-soft);border-color:transparent;color:var(--text);}
+.srv-chip.on::after{content:'✓';color:var(--accent);font-weight:800;margin-left:2px;}
+.srv-count{font-size:12px;color:var(--text-muted);margin-top:8px;}
+.preset-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.preset{height:32px;padding:0 13px;border-radius:99px;border:1px solid var(--border);background:var(--bg2);color:var(--text-muted);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+.preset.active{background:var(--accent-soft);color:var(--accent);border-color:transparent;}
+.rb-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.rb-fields label{margin-bottom:4px;}
+.rb-fields input,.rb-fields select{height:38px;padding:0 10px;font-size:13px;}
+.sec-list{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;}
+.sec-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:10px;font-size:13px;font-weight:500;color:var(--text);margin:0;cursor:pointer;}
+.sec-item:hover{background:var(--bg-hover);}
+.sec-item input{width:16px;height:16px;margin:0;}
+.raw-cols{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--bg3);display:none;}
+.raw-cols.show{display:block;}
+.raw-cols .sec-item{padding:4px 6px;font-size:12px;}
+.rb-foot{display:flex;align-items:center;gap:12px;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap;}
+.rb-status{font-size:13px;color:var(--text-muted);}
+.rb-status.err{color:var(--red);font-weight:600;}
+.doc-actions{display:none;gap:8px;}
+.doc-actions.show{display:flex;}
+
+/* ── Report document ── */
+.doc{max-width:1040px;margin:0 auto 40px;background:var(--bg2);border:1px solid var(--border);border-radius:22px;box-shadow:var(--shadow);padding:44px 52px;display:none;}
+.doc.show{display:block;}
+@media(max-width:700px){.doc{padding:24px 18px;border-radius:16px;}}
+.doc-cover{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding-bottom:22px;border-bottom:3px solid transparent;border-image:linear-gradient(90deg,var(--accent),var(--brand-green)) 1;flex-wrap:wrap;}
+.doc-brand{display:flex;align-items:center;gap:14px;}
+.doc-brand img{width:58px;height:58px;object-fit:contain;}
+.doc-brand .bn{font-family:var(--font-head);font-weight:800;font-size:14px;letter-spacing:-.2px;color:var(--text-muted);}
+.doc-brand h2{font-family:var(--font-head);font-size:30px;font-weight:800;letter-spacing:-.8px;line-height:1.1;}
+.doc-period{font-size:14px;color:var(--text-muted);margin-top:4px;}
+.doc-meta{display:grid;grid-template-columns:auto auto;gap:4px 16px;font-size:12px;color:var(--text-muted);align-content:start;}
+.doc-meta b{color:var(--text);font-weight:600;}
+.doc-h{font-family:var(--font-head);font-size:20px;font-weight:800;letter-spacing:-.3px;margin:34px 0 14px;display:flex;align-items:center;gap:10px;}
+.doc-h::before{content:'';width:6px;height:22px;border-radius:3px;background:linear-gradient(180deg,var(--accent),var(--brand-green));}
+.doc-h3{font-family:var(--font-head);font-size:15px;font-weight:700;margin:22px 0 10px;}
+.doc-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
+@media(max-width:900px){.doc-kpis{grid-template-columns:repeat(3,1fr);}}
+.dk{border:1px solid var(--border);border-radius:14px;padding:12px 14px;background:var(--bg2);position:relative;overflow:hidden;}
+.dk::before{content:'';position:absolute;left:0;top:0;right:0;height:3px;background:var(--dk-g,var(--g-ocean));}
+.dk .l{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;}
+.dk .v{font-family:var(--font-head);font-size:22px;font-weight:800;letter-spacing:-.5px;margin-top:4px;font-variant-numeric:tabular-nums;}
+.dk .s{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.doc-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}
+.doc-table th{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:700;text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);white-space:nowrap;}
+.doc-table td{padding:8px 10px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums;vertical-align:top;}
+.doc-table td.n,.doc-table th.n{text-align:right;}
+.doc-table td:first-child{white-space:nowrap;}
+.doc-table tbody tr:hover td{background:transparent;}
+.doc-table .hot{color:var(--red);font-weight:700;}
+.doc-table .warm{color:var(--yellow);font-weight:700;}
+.doc-server{margin-top:40px;padding-top:6px;}
+.ds-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:16px 18px;border-radius:16px;background:linear-gradient(90deg,var(--accent-soft),transparent 80%);}
+.ds-head h3{font-family:var(--font-head);font-size:20px;font-weight:800;letter-spacing:-.3px;}
+.ds-head .sub{font-size:12px;color:var(--text-muted);margin-top:2px;font-family:var(--mono);}
+.ds-badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;}
+.ds-badge.online{background:color-mix(in srgb,var(--green) 16%,transparent);color:var(--green);}
+.ds-badge.offline{background:color-mix(in srgb,var(--red) 16%,transparent);color:var(--red);}
+.ds-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:12px;}
+@media(max-width:900px){.ds-kpis{grid-template-columns:repeat(3,1fr);}}
+.charts-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
+@media(max-width:800px){.charts-2{grid-template-columns:1fr;}}
+.doc-chart{border:1px solid var(--border);border-radius:14px;padding:12px 14px 8px;break-inside:avoid;}
+.doc-chart .ct{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:6px;}
+.doc-chart .lg{display:flex;gap:10px;font-size:11px;font-weight:500;color:var(--text-muted);}
+.doc-chart .lg i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:4px;vertical-align:middle;}
+.doc-chart .lg i.dash{-webkit-mask:repeating-linear-gradient(90deg,#000 0 4px,transparent 4px 7px);mask:repeating-linear-gradient(90deg,#000 0 4px,transparent 4px 7px);}
+.doc-chart .cv{height:190px;position:relative;}
+.doc-chart .cv img{width:100%;height:100%;object-fit:contain;}
+.disk-row{display:grid;grid-template-columns:160px 1fr 170px;gap:12px;align-items:center;font-size:13px;padding:6px 0;}
+.disk-row .m{font-family:var(--mono);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.disk-row .bar{height:12px;border-radius:99px;background:var(--chart-track);overflow:hidden;}
+.disk-row .bar i{display:block;height:100%;border-radius:99px;background:var(--g-sunset);}
+.disk-row .bar i.ok{background:var(--g-mint);}
+.disk-row .n{text-align:right;color:var(--text-muted);font-variant-numeric:tabular-nums;}
+.doc-note{font-size:12px;color:var(--text-muted);margin-top:8px;}
+.doc-empty{padding:16px;border-radius:12px;background:var(--bg3);font-size:13px;color:var(--text-muted);}
+.doc-foot{margin-top:40px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:12px;font-size:11px;color:var(--text-muted);flex-wrap:wrap;}
+.pill-ok{color:var(--green);font-weight:700;} .pill-bad{color:var(--red);font-weight:700;}
+
+/* ── Print / Save as PDF ── */
+@page{size:A4;margin:12mm;}
+@media print{
+  #appbar,#agent-fab,#agent-popup,.flash-messages,.page-header,.rb,.no-print{display:none!important;}
+  html,body{background:#fff!important;}
+  #content{padding:0!important;max-width:none!important;}
+  .doc{display:block!important;box-shadow:none!important;border:none!important;border-radius:0!important;padding:0!important;max-width:none!important;margin:0!important;background:#fff!important;}
+  .doc-server{break-before:page;margin-top:0;}
+  .doc-chart,.ds-head,.dk,.doc-table tr,.disk-row{break-inside:avoid;}
+  .doc-h,.doc-h3{break-after:avoid;}
+  .charts-2{grid-template-columns:1fr 1fr!important;}
+  .doc-kpis,.ds-kpis{grid-template-columns:repeat(6,1fr)!important;}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .doc canvas{display:none!important;}
+  .doc .print-img{display:block!important;}
+}
+.print-img{display:none;width:100%;height:auto;}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <div><h1>Reports</h1><p>Pick machines and metrics, preview the report, then download it</p></div>
+  <div><h1>Reports</h1><p>Build a detailed infrastructure report for any servers and period, then print it or save it as PDF</p></div>
+  <div class="doc-actions" id="doc-actions">
+    <button type="button" class="btn btn-ghost" onclick="downloadCsv()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      CSV data</button>
+    <button type="button" class="btn btn-primary" onclick="printReport()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      Print / Save PDF</button>
+  </div>
 </div>
 
 {% if not machines %}
-<div class="card" style="text-align:center;padding:48px;">
-  <div style="font-weight:600;font-size:16px;margin-bottom:6px;">No machines available</div>
-  <div class="text-muted" style="font-size:13px;">You don't have access to any machines yet.</div>
+<div class="panel" style="text-align:center;padding:48px;">
+  <div class="panel-title" style="margin-bottom:6px;">No servers available</div>
+  <div class="text-muted" style="font-size:13px;">You don't have access to any servers yet.</div>
 </div>
 {% else %}
 
-<div class="rep-grid">
-  <div class="card">
-    <div class="rep-card-title">
-      <span>1. Machines</span>
-      <button type="button" class="rep-select-all" onclick="toggleAllMachines()">Select / clear all</button>
+<div class="panel rb" id="builder">
+  <div class="rb-grid">
+    <!-- 1. Servers -->
+    <div class="rb-col servers">
+      <div class="rb-step"><span class="rb-num">1</span><div class="rb-title">Servers<small>Pick the servers to include</small></div></div>
+      <div class="rb-tools">
+        <input type="search" id="srv-search" placeholder="Search servers or locations…" oninput="filterServers(this.value)" aria-label="Search servers">
+        <button type="button" class="rb-link" onclick="setAllServers(true)">Select all</button>
+        <button type="button" class="rb-link" onclick="setAllServers(false)">Clear</button>
+      </div>
+      <div class="srv-list" id="srv-list">
+        {% for m in machines %}
+        <label class="srv-chip on" data-search="{{ (m.system_name ~ ' ' ~ m.location)|lower }}">
+          <input type="checkbox" class="srv-cb" value="{{ m.table_name }}" checked onchange="syncChip(this)">
+          <span class="dot {{ m.status }}"></span>{{ m.system_name }} <small>{{ m.location }}</small>
+        </label>
+        {% endfor %}
+      </div>
+      <div class="srv-count" id="srv-count"></div>
     </div>
-    <div class="rep-list" id="rep-machine-list">
-      {% for m in machines %}
-      <label class="rep-check-row">
-        <input type="checkbox" class="rep-machine-cb" value="{{ m.table_name }}">
-        <span>{{ m.system_name }}</span>
-        <span class="rep-sub">{{ m.location }} — {{ m.status }}</span>
-      </label>
-      {% endfor %}
+
+    <!-- 2. Period -->
+    <div class="rb-col">
+      <div class="rb-step"><span class="rb-num">2</span><div class="rb-title">Period<small>Up to {{ max_range_days }} days</small></div></div>
+      <div class="preset-row" id="presets">
+        <button type="button" class="preset" data-hours="1">Last 1h</button>
+        <button type="button" class="preset active" data-hours="24">Last 24h</button>
+        <button type="button" class="preset" data-hours="168">Last 7d</button>
+        <button type="button" class="preset" data-hours="720">Last 30d</button>
+        <button type="button" class="preset" data-hours="0">Custom</button>
+      </div>
+      <div class="rb-fields">
+        <div><label for="rb-from">From</label><input type="datetime-local" id="rb-from" onchange="markCustom()"></div>
+        <div><label for="rb-to">To</label><input type="datetime-local" id="rb-to" onchange="markCustom()"></div>
+        <div style="grid-column:1/-1;"><label for="rb-interval">Chart resolution</label>
+          <select id="rb-interval">
+            {% for iid, ilabel, _secs in intervals %}<option value="{{ iid }}">{{ ilabel }}</option>{% endfor %}
+          </select></div>
+      </div>
+    </div>
+
+    <!-- 3. Sections -->
+    <div class="rb-col">
+      <div class="rb-step"><span class="rb-num">3</span><div class="rb-title">Sections<small>What the report should show</small></div></div>
+      <div class="sec-list">
+        {% for sid, slabel in sections %}
+        <label class="sec-item"><input type="checkbox" class="sec-cb" value="{{ sid }}" {% if sid != 'raw' %}checked{% endif %}
+               {% if sid == 'raw' %}onchange="document.getElementById('raw-cols').classList.toggle('show', this.checked)"{% endif %}>{{ slabel }}</label>
+        {% endfor %}
+      </div>
+      <div class="raw-cols" id="raw-cols">
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Raw data columns</div>
+        <div class="sec-list">
+          {% for mid, label in metrics %}
+          <label class="sec-item"><input type="checkbox" class="rep-metric-cb" value="{{ mid }}" {% if mid in ('status','cpu','ram','disk') %}checked{% endif %}>{{ label }}</label>
+          {% endfor %}
+        </div>
+      </div>
     </div>
   </div>
-
-  <div class="card" id="rep-metrics-card">
-    <div class="rep-card-title">
-      <span>2. Metrics</span>
-      <button type="button" class="rep-select-all" onclick="toggleAllMetrics()">Select / clear all</button>
-    </div>
-    <div class="rep-list">
-      {% for mid, label in metrics %}
-      <label class="rep-check-row">
-        <input type="checkbox" class="rep-metric-cb" value="{{ mid }}" {% if mid in ('status','cpu','ram') %}checked{% endif %}>
-        <span>{{ label }}</span>
-      </label>
-      {% endfor %}
-    </div>
-  </div>
-</div>
-
-<div class="card" style="margin-bottom:16px;">
-  <div class="rep-card-title"><span>3. Time Range</span></div>
-  <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end;">
-    <label class="rep-check-row" style="padding:0;">
-      <input type="radio" name="rep-mode" value="latest" checked onchange="onModeChange()">
-      <span>Latest snapshot (current status)</span>
-    </label>
-    <label class="rep-check-row" style="padding:0;">
-      <input type="radio" name="rep-mode" value="range" onchange="onModeChange()">
-      <span>Date &amp; time range — raw readings (history)</span>
-    </label>
-    <label class="rep-check-row" style="padding:0;">
-      <input type="radio" name="rep-mode" value="events" onchange="onModeChange()">
-      <span>Date &amp; time range — events (offline/online, high CPU/RAM/disk)</span>
-    </label>
-  </div>
-  <div id="rep-range-wrap" style="display:none;margin-top:14px;gap:16px;flex-wrap:wrap;">
-    <div>
-      <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;">Start</label>
-      <input type="datetime-local" id="rep-range-start" style="padding:8px 12px;font-size:13px;">
-    </div>
-    <div>
-      <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;">End</label>
-      <input type="datetime-local" id="rep-range-end" style="padding:8px 12px;font-size:13px;">
-    </div>
-  </div>
-</div>
-
-<div class="rep-actions">
-  <button class="btn btn-primary" onclick="generateReport()">4. Generate Report</button>
-  <button class="btn btn-ghost" id="rep-download-btn" onclick="downloadReport()" style="display:none;">Download CSV</button>
-  <span class="rep-status" id="rep-status"></span>
-</div>
-
-<div class="card" id="rep-preview-card" style="display:none;">
-  <div class="rep-card-title"><span>Preview</span></div>
-  <div class="rep-table-wrap">
-    <table class="rep-table" id="rep-table">
-      <thead><tr id="rep-thead-row"></tr></thead>
-      <tbody id="rep-tbody"></tbody>
-    </table>
+  <div class="rb-foot">
+    <button type="button" class="btn btn-primary" id="gen-btn" onclick="generateReport()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Generate report</button>
+    <span class="rb-status" id="rb-status"></span>
   </div>
 </div>
 
+<article class="doc" id="report-doc" aria-live="polite"></article>
 {% endif %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
-function toggleAllMachines() {
-  const boxes = document.querySelectorAll('.rep-machine-cb');
-  const anyUnchecked = Array.from(boxes).some(b => !b.checked);
-  boxes.forEach(b => b.checked = anyUnchecked);
-}
-function toggleAllMetrics() {
-  const boxes = document.querySelectorAll('.rep-metric-cb');
-  const anyUnchecked = Array.from(boxes).some(b => !b.checked);
-  boxes.forEach(b => b.checked = anyUnchecked);
-}
-function selectedMode() {
-  return document.querySelector('input[name="rep-mode"]:checked').value;
-}
-function onModeChange() {
-  const mode = selectedMode();
-  document.getElementById('rep-range-wrap').style.display = (mode === 'latest') ? 'none' : 'flex';
-  document.getElementById('rep-metrics-card').style.display = (mode === 'events') ? 'none' : '';
-}
-function reportPayload() {
-  const payload = {table_names: selectedMachines(), mode: selectedMode()};
-  if (payload.mode !== 'events') payload.metrics = selectedMetrics();
-  if (payload.mode !== 'latest') {
-    payload.start = document.getElementById('rep-range-start').value;
-    payload.end   = document.getElementById('rep-range-end').value;
-  }
-  return payload;
-}
-// Default the range pickers to "last 24 hours" so switching to range mode
-// already has a sensible starting point instead of two empty fields.
-(function prefillRange() {
-  const end = new Date();
-  const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
-  const toLocal = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-  document.getElementById('rep-range-start').value = toLocal(start);
-  document.getElementById('rep-range-end').value = toLocal(end);
-})();
-function selectedMachines() {
-  return Array.from(document.querySelectorAll('.rep-machine-cb:checked')).map(b => b.value);
-}
-function selectedMetrics() {
-  return Array.from(document.querySelectorAll('.rep-metric-cb:checked')).map(b => b.value);
+var LOGO_URL = {{ url_for('static', filename='logo.png')|tojson }};
+var REPORT = null;        // last generated document (JSON)
+var DOC_CHARTS = [];
+
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function(c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
 }
 function setStatus(msg, isErr) {
-  const el = document.getElementById('rep-status');
+  var el = document.getElementById('rb-status');
+  if (!el) return;
   el.textContent = msg || '';
-  el.className = 'rep-status' + (isErr ? ' err' : '');
+  el.className = 'rb-status' + (isErr ? ' err' : '');
+}
+
+// ── Builder: servers ──
+function syncChip(cb) { cb.closest('.srv-chip').classList.toggle('on', cb.checked); updateCount(); }
+function setAllServers(on) {
+  document.querySelectorAll('.srv-chip').forEach(function(ch) {
+    if (ch.style.display === 'none') return;   // only the ones matching the search
+    var cb = ch.querySelector('input'); cb.checked = on; ch.classList.toggle('on', on);
+  });
+  updateCount();
+}
+function filterServers(q) {
+  q = (q || '').trim().toLowerCase();
+  document.querySelectorAll('.srv-chip').forEach(function(ch) {
+    ch.style.display = !q || ch.dataset.search.indexOf(q) !== -1 ? '' : 'none';
+  });
+}
+function selectedServers() { return Array.from(document.querySelectorAll('.srv-cb:checked')).map(function(b) { return b.value; }); }
+function updateCount() {
+  var n = selectedServers().length, total = document.querySelectorAll('.srv-cb').length;
+  var el = document.getElementById('srv-count');
+  if (el) el.textContent = n + ' of ' + total + ' server' + (total === 1 ? '' : 's') + ' selected';
+}
+
+// ── Builder: period ──
+function toLocalInput(d) {
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+function applyPreset(hours) {
+  if (!hours) return;
+  var end = new Date(), start = new Date(end.getTime() - hours * 3600000);
+  document.getElementById('rb-from').value = toLocalInput(start);
+  document.getElementById('rb-to').value = toLocalInput(end);
+}
+function markCustom() {
+  document.querySelectorAll('#presets .preset').forEach(function(b) { b.classList.toggle('active', b.dataset.hours === '0'); });
+}
+document.querySelectorAll('#presets .preset').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('#presets .preset').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    applyPreset(+btn.dataset.hours);
+    if (btn.dataset.hours === '0') document.getElementById('rb-from').focus();
+  });
+});
+if (document.getElementById('rb-from')) { applyPreset(24); updateCount(); }
+
+function payload() {
+  return {
+    table_names: selectedServers(),
+    start: document.getElementById('rb-from').value,
+    end: document.getElementById('rb-to').value,
+    interval: document.getElementById('rb-interval').value,
+    sections: Array.from(document.querySelectorAll('.sec-cb:checked')).map(function(b) { return b.value; }),
+  };
+}
+function rawMetrics() { return Array.from(document.querySelectorAll('.rep-metric-cb:checked')).map(function(b) { return b.value; }); }
+
+// ── Formatting ──
+function pct(v) { return v == null ? '—' : (+v).toFixed(1) + '%'; }
+function num(v, d) { return v == null ? '—' : (+v).toLocaleString(undefined, { maximumFractionDigits: d == null ? 1 : d }); }
+function dt(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso);
+  return isNaN(d) ? esc(iso) : d.toLocaleString([], { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function dday(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso);
+  return isNaN(d) ? '—' : d.toLocaleDateString([], { day: '2-digit', month: 'short' });
+}
+function dur(secs) {
+  if (secs == null) return '—';
+  secs = Math.round(secs);
+  var d = Math.floor(secs / 86400), h = Math.floor(secs % 86400 / 3600), m = Math.floor(secs % 3600 / 60);
+  return d ? d + 'd ' + h + 'h' : h ? h + 'h ' + m + 'm' : m + 'm';
+}
+function bucketLabel(s) { return s >= 86400 ? (s / 86400) + '-day' : s >= 3600 ? (s / 3600) + '-hour' : (s / 60) + '-minute'; }
+function heat(v, warn, hot) { return v == null ? '' : v >= hot ? 'hot' : v >= warn ? 'warm' : ''; }
+function axisLabels(times, spanHours) {
+  return times.map(function(t) {
+    var d = new Date(t);
+    if (spanHours > 48) return d.toLocaleDateString([], { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  });
+}
+function fullestDisk(s) {
+  return (s.disks || []).reduce(function(m, x) { return x.percent != null && (m == null || x.percent > m) ? x.percent : m; }, null);
+}
+
+// ── Document rendering ──
+function kpi(label, value, sub, grad) {
+  return '<div class="dk" style="--dk-g:var(--g-' + grad + ')"><div class="l">' + label + '</div><div class="v">' + value + '</div>' +
+         (sub ? '<div class="s">' + sub + '</div>' : '') + '</div>';
+}
+function chartBox(id, title, legend) {
+  return '<div class="doc-chart"><div class="ct"><span>' + title + '</span><span class="lg">' + legend + '</span></div><div class="cv"><canvas id="' + id + '"></canvas></div></div>';
+}
+function lg(grad, label, dashed) {
+  return '<span><i class="' + (dashed ? 'dash' : '') + '" style="background:var(--g-' + grad + ')"></i>' + label + '</span>';
+}
+function statsRow(label, st, unit) {
+  st = st || {};
+  var u = unit || '%';
+  function f(v) { return v == null ? '—' : (+v).toFixed(1) + u; }
+  return '<tr><td>' + label + '</td><td class="n">' + f(st.min) + '</td><td class="n">' + f(st.avg) + '</td><td class="n">' + f(st.p95) + '</td><td class="n">' + f(st.max) + '</td></tr>';
+}
+
+function renderDocument(d) {
+  var S = {}; d.sections.forEach(function(s) { S[s] = true; });
+  var spanHours = (new Date(d.period.end) - new Date(d.period.start)) / 3600000;
+  var T = d.totals, html = [];
+
+  html.push('<header class="doc-cover"><div class="doc-brand"><img src="' + esc(LOGO_URL) + '" alt="">' +
+    '<div><div class="bn">Reformmed INFRA Monitor</div><h2>' + esc(d.title) + '</h2>' +
+    '<div class="doc-period">' + dt(d.period.start) + ' &nbsp;→&nbsp; ' + dt(d.period.end) + '</div></div></div>' +
+    '<div class="doc-meta"><span>Generated</span><b>' + dt(d.generated_at) + '</b><span>Prepared by</span><b>' + esc(d.generated_by) + '</b>' +
+    '<span>Servers</span><b>' + T.servers + '</b><span>Resolution</span><b>' + bucketLabel(d.period.bucket_seconds) + ' averages</b></div></header>');
+
+  if (S.summary) {
+    html.push('<h2 class="doc-h">Executive summary</h2>');
+    html.push('<div class="doc-kpis">' +
+      kpi('Servers', T.servers, T.with_data + ' with data', 'ocean') +
+      kpi('Avg CPU', pct(T.cpu_avg), 'peak ' + pct(T.cpu_peak), 'ocean') +
+      kpi('Avg memory', pct(T.ram_avg), 'peak ' + pct(T.ram_peak), 'violet') +
+      kpi('Data coverage', pct(T.coverage_avg), 'avg across servers', 'mint') +
+      kpi('Readings', num(T.samples, 0), 'metric samples', 'pink') +
+      kpi('Alerts', T.alerts, T.alerts_failed ? T.alerts_failed + ' failed to send' : 'all delivered', 'sunset') + '</div>');
+    html.push('<table class="doc-table" style="margin-top:16px;"><thead><tr><th>Server</th><th>Location</th><th class="n">Coverage</th>' +
+      '<th class="n">Avg CPU</th><th class="n">Peak CPU</th><th class="n">Avg RAM</th><th class="n">Peak RAM</th><th class="n">Fullest disk</th><th class="n">Alerts</th></tr></thead><tbody>' +
+      d.servers.map(function(s) {
+        if (s.error || !s.samples) return '<tr><td><b>' + esc(s.name) + '</b></td><td>' + esc(s.location) + '</td><td colspan="7" class="text-muted">No data in this period</td></tr>';
+        var disk = fullestDisk(s);
+        return '<tr><td><b>' + esc(s.name) + '</b></td><td>' + esc(s.location) + '</td><td class="n">' + pct(s.coverage_pct) + '</td>' +
+          '<td class="n ' + heat(s.stats.cpu.avg, 70, 85) + '">' + pct(s.stats.cpu.avg) + '</td><td class="n ' + heat(s.stats.cpu.max, 85, 95) + '">' + pct(s.stats.cpu.max) + '</td>' +
+          '<td class="n ' + heat(s.stats.ram.avg, 75, 90) + '">' + pct(s.stats.ram.avg) + '</td><td class="n ' + heat(s.stats.ram.max, 85, 95) + '">' + pct(s.stats.ram.max) + '</td>' +
+          '<td class="n ' + heat(disk, 80, 90) + '">' + pct(disk) + '</td><td class="n">' + s.alert_count + '</td></tr>';
+      }).join('') + '</tbody></table>');
+  }
+
+  d.servers.forEach(function(s, i) {
+    html.push('<section class="doc-server"><div class="ds-head"><div><h3>' + esc(s.name) + '</h3><div class="sub">' +
+      esc(s.location) + (s.hostname ? ' · ' + esc(s.hostname) : '') + (s.public_ip ? ' · ' + esc(s.public_ip) : '') + (s.os ? ' · ' + esc(s.os) : '') + '</div></div>' +
+      (s.status ? '<span class="ds-badge ' + (s.status === 'online' ? 'online' : 'offline') + '">Now ' + esc(s.status) + '</span>' : '') + '</div>');
+    if (s.error || !s.samples) {
+      html.push('<p class="doc-empty" style="margin-top:12px;">' + esc(s.error || 'No readings were recorded for this server in the selected period.') + '</p></section>');
+      return;
+    }
+    var disk = fullestDisk(s), ngaps = (s.gaps || []).length, nd = (s.disks || []).length;
+    html.push('<div class="ds-kpis">' +
+      kpi('Readings', num(s.samples, 0), dday(s.first_ts) + ' – ' + dday(s.last_ts), 'pink') +
+      kpi('Coverage', pct(s.coverage_pct), ngaps + ' gap' + (ngaps === 1 ? '' : 's'), 'mint') +
+      kpi('Avg CPU', pct(s.stats.cpu.avg), 'p95 ' + pct(s.stats.cpu.p95), 'ocean') +
+      kpi('Avg RAM', pct(s.stats.ram.avg), s.ram_total_gb ? 'of ' + num(s.ram_total_gb) + ' GB' : 'p95 ' + pct(s.stats.ram.p95), 'violet') +
+      kpi('Fullest disk', pct(disk), nd + ' volume' + (nd === 1 ? '' : 's'), 'sunset') +
+      kpi('Alerts', s.alert_count, s.uptime_seconds ? 'uptime ' + dur(s.uptime_seconds) : 'in period', 'sunset') + '</div>');
+
+    var charts = [];
+    if (S.cpu) charts.push(chartBox('c-cpu-' + i, 'CPU usage', lg('ocean', 'Average') + lg('ocean', 'Peak', true)));
+    if (S.memory) charts.push(chartBox('c-ram-' + i, 'Memory', lg('violet', 'RAM') + lg('mint', 'Swap')));
+    if (S.network) charts.push(chartBox('c-net-' + i, 'Network (KB/s)', lg('sunset', 'Upload') + lg('ocean', 'Download')));
+    if (S.temperature && s.stats.temp.max != null) charts.push(chartBox('c-tmp-' + i, 'CPU temperature (°C)', lg('sunset', 'Average') + lg('sunset', 'Peak', true)));
+    if (charts.length) html.push('<div class="charts-2">' + charts.join('') + '</div>');
+
+    var rows = '';
+    if (S.cpu) rows += statsRow('CPU', s.stats.cpu);
+    if (S.memory) rows += statsRow('RAM', s.stats.ram) + statsRow('Swap', s.stats.swap);
+    if (S.temperature && s.stats.temp.max != null) rows += statsRow('CPU temperature', s.stats.temp, ' °C');
+    if (S.network) rows += '<tr><td>Upload</td><td class="n">—</td><td class="n">' + num(s.stats.net_up.avg) + ' KB/s</td><td class="n">—</td><td class="n">' + num(s.stats.net_up.max) + ' KB/s</td></tr>' +
+                           '<tr><td>Download</td><td class="n">—</td><td class="n">' + num(s.stats.net_down.avg) + ' KB/s</td><td class="n">—</td><td class="n">' + num(s.stats.net_down.max) + ' KB/s</td></tr>';
+    if (rows) html.push('<h4 class="doc-h3">Statistics</h4><table class="doc-table"><thead><tr><th>Metric</th><th class="n">Min</th><th class="n">Average</th><th class="n">95th pct</th><th class="n">Max</th></tr></thead><tbody>' + rows + '</tbody></table>');
+
+    if (S.disk) {
+      html.push('<h4 class="doc-h3">Disk usage <span class="text-muted" style="font-weight:500;font-size:12px;">(last reading in period)</span></h4>');
+      html.push(nd ? s.disks.map(function(x) {
+        var p = x.percent || 0;
+        return '<div class="disk-row"><span class="m" title="' + esc(x.mount) + '">' + esc(x.mount) + '</span><span class="bar"><i class="' + (p < 80 ? 'ok' : '') + '" style="width:' + Math.min(100, p) + '%"></i></span>' +
+               '<span class="n"><b style="color:var(--text)">' + pct(x.percent) + '</b> · ' + num(x.used_gb) + ' / ' + num(x.total_gb) + ' GB</span></div>';
+      }).join('') : '<p class="doc-empty">No disk data reported.</p>');
+    }
+    if (S.gpu && (s.gpus || []).length) {
+      html.push('<h4 class="doc-h3">GPU <span class="text-muted" style="font-weight:500;font-size:12px;">(last reading in period)</span></h4><table class="doc-table"><thead><tr><th>GPU</th><th class="n">Load</th><th class="n">Temperature</th><th class="n">VRAM</th></tr></thead><tbody>' +
+        s.gpus.map(function(g) {
+          return '<tr><td>' + esc(g.name) + '</td><td class="n">' + pct(g.load) + '</td><td class="n">' + (g.temp == null ? '—' : num(g.temp, 0) + ' °C') + '</td>' +
+                 '<td class="n">' + (g.vram_total_mb ? num(g.vram_used_mb, 0) + ' / ' + num(g.vram_total_mb, 0) + ' MB' : '—') + '</td></tr>';
+        }).join('') + '</tbody></table>');
+    }
+    if (S.availability) {
+      html.push('<h4 class="doc-h3">Availability &amp; data gaps</h4>');
+      html.push(ngaps
+        ? '<table class="doc-table"><thead><tr><th>No data from</th><th>Until</th><th class="n">Duration</th></tr></thead><tbody>' +
+          s.gaps.map(function(g) { return '<tr><td>' + dt(g.start) + '</td><td>' + dt(g.end) + '</td><td class="n">' + dur(g.seconds) + '</td></tr>'; }).join('') +
+          '</tbody></table><p class="doc-note">Periods of ' + dur(Math.max(180, d.period.bucket_seconds * 2)) + ' or more with no readings — the server or its agent was down or unreachable. Longest 10 shown.</p>'
+        : '<p class="doc-empty">Data was received continuously — no gaps detected (' + pct(s.coverage_pct) + ' coverage).</p>');
+    }
+    html.push('</section>');
+  });
+
+  if (S.alerts) {
+    html.push('<section class="doc-server"><h2 class="doc-h" style="margin-top:0;">Alerts in period</h2>');
+    html.push(d.alerts.length
+      ? '<table class="doc-table"><thead><tr><th>Time</th><th>Server</th><th>Event</th><th>Subject</th><th>Email</th></tr></thead><tbody>' +
+        d.alerts.map(function(a) {
+          return '<tr><td style="white-space:nowrap">' + dt(a.time) + '</td><td><b>' + esc(a.server) + '</b></td><td>' + esc(a.label) + '</td><td>' + esc(a.subject) + '</td>' +
+                 '<td>' + (a.success ? '<span class="pill-ok">Sent</span>' : '<span class="pill-bad">Failed</span>') + '</td></tr>';
+        }).join('') + '</tbody></table>' + (d.alerts_truncated ? '<p class="doc-note">Showing the latest 500 alerts.</p>' : '')
+      : '<p class="doc-empty">No alerts were raised for these servers in this period.</p>');
+    html.push('</section>');
+  }
+  if (S.raw) html.push('<section class="doc-server" id="raw-section"><h2 class="doc-h" style="margin-top:0;">Raw data</h2><p class="doc-empty">Loading readings…</p></section>');
+
+  html.push('<footer class="doc-foot"><span>Reformmed INFRA Monitor · ' + esc(d.title) + '</span><span>Generated ' + dt(d.generated_at) + ' by ' + esc(d.generated_by) + '</span></footer>');
+
+  var doc = document.getElementById('report-doc');
+  DOC_CHARTS.forEach(function(c) { if (c) c.destroy(); }); DOC_CHARTS = [];
+  doc.innerHTML = html.join('');
+  doc.classList.add('show');
+
+  d.servers.forEach(function(s, i) {
+    if (s.error || !s.samples) return;
+    var L = axisLabels(s.series.t, spanHours), Sx = s.series;
+    if (S.cpu) DOC_CHARTS.push(docLine('c-cpu-' + i, L, [
+      { label: 'Average', data: Sx.cpu_avg, rm: { line: 'g:ocean', fill: 'gradient' }, fill: 'origin' },
+      { label: 'Peak', data: Sx.cpu_max, rm: { line: 'g:ocean' }, borderDash: [4, 4], borderWidth: 1.5 }], '%', 100));
+    if (S.memory) DOC_CHARTS.push(docLine('c-ram-' + i, L, [
+      { label: 'RAM', data: Sx.ram_avg, rm: { line: 'g:violet', fill: 'gradient' }, fill: 'origin' },
+      { label: 'Swap', data: Sx.swap_avg, rm: { line: 'g:mint' }, borderWidth: 1.8 }], '%', 100));
+    if (S.network) DOC_CHARTS.push(docLine('c-net-' + i, L, [
+      { label: 'Upload', data: Sx.net_up, rm: { line: 'g:sunset' } },
+      { label: 'Download', data: Sx.net_down, rm: { line: 'g:ocean', fill: 'gradient' }, fill: 'origin' }], ' KB/s'));
+    if (S.temperature && s.stats.temp.max != null) DOC_CHARTS.push(docLine('c-tmp-' + i, L, [
+      { label: 'Average', data: Sx.temp_avg, rm: { line: 'g:sunset', fill: 'gradient' }, fill: 'origin' },
+      { label: 'Peak', data: Sx.temp_max, rm: { line: 'g:sunset' }, borderDash: [4, 4], borderWidth: 1.5 }], ' °C'));
+  });
+  if (S.raw) loadRaw();
+  // Build the print copies once the new charts have been laid out.
+  requestAnimationFrame(function() { requestAnimationFrame(buildPrintImages); });
+}
+
+function docLine(id, labels, datasets, unit, yMax) {
+  datasets.forEach(function(ds) { ds.cubicInterpolationMode = 'monotone'; ds.spanGaps = false; if (!ds.borderWidth) ds.borderWidth = 2.2; });
+  return RM.chart(id, {
+    type: 'line',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      animation: false, interaction: { intersect: false, mode: 'index' },
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: function(c) { return ' ' + c.dataset.label + ': ' + (c.raw == null ? '—' : (+c.raw).toFixed(1) + unit); } } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 6, maxRotation: 0, autoSkip: true } },
+        y: { min: 0, max: yMax, border: { display: false }, ticks: { maxTicksLimit: 5, callback: function(v) { return v + (unit === '%' ? '%' : ''); } } }
+      }
+    }
+  });
+}
+
+async function loadRaw() {
+  var sec = document.getElementById('raw-section');
+  var p = payload(), metrics = rawMetrics();
+  var head = '<h2 class="doc-h" style="margin-top:0;">Raw data</h2>';
+  if (!metrics.length) { sec.innerHTML = head + '<p class="doc-empty">Pick at least one raw data column.</p>'; return; }
+  try {
+    var r = await fetch('/reports/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ table_names: p.table_names, mode: 'range', metrics: metrics, start: p.start, end: p.end }) });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'failed');
+    var shown = d.rows.slice(0, 300);
+    sec.innerHTML = head + '<div class="table-wrap"><table class="doc-table"><thead><tr>' +
+      d.columns.map(function(c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      (shown.map(function(row) { return '<tr>' + row.map(function(c) { return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('') ||
+       '<tr><td colspan="' + d.columns.length + '" class="text-muted">No readings</td></tr>') +
+      '</tbody></table></div><p class="doc-note">' + (d.rows.length > shown.length ? 'Showing the first ' + shown.length + ' of ' + d.rows.length + ' readings — use "CSV data" for all of them.' : d.rows.length + ' readings.') +
+      (d.truncated ? ' Some servers hit the 1000-reading cap; narrow the period for full detail.' : '') + '</p>';
+  } catch (e) {
+    sec.innerHTML = head + '<p class="doc-empty">Couldn\'t load raw readings: ' + esc(e.message) + '</p>';
+  }
 }
 
 async function generateReport() {
-  const payload = reportPayload();
-  if (!payload.table_names.length) { setStatus('Select at least one machine.', true); return; }
-  if (payload.mode !== 'events' && !payload.metrics.length) { setStatus('Select at least one metric.', true); return; }
-  if (payload.mode !== 'latest' && (!payload.start || !payload.end)) {
-    setStatus('Pick both a start and end date/time.', true); return;
-  }
-
-  setStatus('Generating…', false);
-  document.getElementById('rep-download-btn').style.display = 'none';
+  var p = payload();
+  if (!p.table_names.length) return setStatus('Select at least one server.', true);
+  if (!p.start || !p.end) return setStatus('Pick both a From and To date/time.', true);
+  if (p.start >= p.end) return setStatus('"From" must be before "To".', true);
+  if (!p.sections.length) return setStatus('Pick at least one section.', true);
+  var btn = document.getElementById('gen-btn');
+  btn.disabled = true; setStatus('Building report…');
   try {
-    const res = await fetch('/reports/generate', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) { setStatus(data.error || 'Failed to generate report.', true); return; }
-
-    const theadRow = document.getElementById('rep-thead-row');
-    const tbody = document.getElementById('rep-tbody');
-    theadRow.innerHTML = data.columns.map(c => `<th>${escapeHtml(c)}</th>`).join('');
-    tbody.innerHTML = data.rows.map(row =>
-      '<tr>' + row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('') + '</tr>'
-    ).join('') || `<tr><td colspan="${data.columns.length}" style="text-align:center;color:var(--text-muted);">No data</td></tr>`;
-
-    document.getElementById('rep-preview-card').style.display = '';
-    document.getElementById('rep-download-btn').style.display = '';
-    let msg = `${data.rows.length} row(s) — ${data.columns.length - 1} column(s).`;
-    if (data.truncated) msg += ' Some machines had more readings than the 1000-row cap — narrow the range for full detail.';
-    setStatus(msg, false);
+    var r = await fetch('/reports/document', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Failed to build the report.');
+    REPORT = d;
+    renderDocument(d);
+    document.getElementById('doc-actions').classList.add('show');
+    setStatus('Report ready — ' + d.totals.servers + ' server' + (d.totals.servers === 1 ? '' : 's') + ', ' + num(d.totals.samples, 0) + ' readings.');
+    document.getElementById('report-doc').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (e) {
-    setStatus('Network error while generating report.', true);
+    setStatus(e.message || 'Network error while building the report.', true);
+  } finally {
+    btn.disabled = false;
   }
 }
 
-async function downloadReport() {
-  const payload = reportPayload();
-  if (!payload.table_names.length) { setStatus('Select at least one machine.', true); return; }
-  if (payload.mode !== 'events' && !payload.metrics.length) { setStatus('Select at least one metric.', true); return; }
-  if (payload.mode !== 'latest' && (!payload.start || !payload.end)) {
-    setStatus('Pick both a start and end date/time.', true); return;
-  }
-
-  setStatus('Preparing download…', false);
-  try {
-    const res = await fetch('/reports/download', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setStatus(data.error || 'Failed to download report.', true);
-      return;
+// ── Print / PDF ──
+// Browsers print <canvas> charts unreliably: the print preview re-lays the
+// page out at paper width, Chart.js resizes (and clears) every canvas
+// asynchronously, and the PDF captures blank boxes. Images created during
+// 'beforeprint' don't help either — a data-URL image decodes asynchronously,
+// so it isn't ready when the print snapshot is taken.
+// Instead, every chart gets a light-themed PNG copy as soon as the report is
+// built; the print stylesheet shows those images and hides the canvases, so
+// Ctrl+P and the Print button both work with no timing involved.
+function buildPrintImages() {
+  var root = document.documentElement, prev = root.getAttribute('data-theme');
+  // Switch to light, snapshot, switch back — all in one task, so the screen
+  // never repaints in between (no flicker).
+  if (prev !== 'light') { root.setAttribute('data-theme', 'light'); RM.retheme(); }
+  DOC_CHARTS.forEach(function(c) {
+    if (!c || !c.canvas || !c.canvas.width) return;
+    var img = c.$printImg;
+    if (!img) {
+      img = c.$printImg = new Image();
+      img.className = 'print-img';
+      img.alt = '';
+      c.canvas.parentNode.appendChild(img);
     }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const cd = res.headers.get('Content-Disposition') || '';
-    const match = cd.match(/filename="?([^"]+)"?/);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = match ? match[1] : 'report.csv';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    setStatus('Downloaded.', false);
-  } catch (e) {
-    setStatus('Network error while downloading report.', true);
-  }
+    img.src = c.toBase64Image('image/png', 1);
+  });
+  if (prev !== 'light') { root.setAttribute('data-theme', prev); RM.retheme(); }
+}
+async function printReport() {
+  buildPrintImages();
+  // Make sure every chart image is decoded before the print snapshot.
+  await Promise.all(DOC_CHARTS.map(function(c) {
+    return c && c.$printImg && c.$printImg.decode ? c.$printImg.decode().catch(function() {}) : null;
+  }));
+  window.print();
 }
 
-function escapeHtml(s) {
-  const d = document.createElement('div');
-  d.textContent = s == null ? '' : String(s);
-  return d.innerHTML;
+async function downloadCsv() {
+  var p = payload(), metrics = rawMetrics();
+  if (!metrics.length) metrics = ['status', 'cpu', 'ram', 'disk'];
+  setStatus('Preparing CSV…');
+  try {
+    var r = await fetch('/reports/download', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ table_names: p.table_names, mode: 'range', metrics: metrics, start: p.start, end: p.end }) });
+    if (!r.ok) { var e = await r.json().catch(function() { return {}; }); throw new Error(e.error || 'Download failed.'); }
+    var blob = await r.blob(), url = URL.createObjectURL(blob);
+    var m = (r.headers.get('Content-Disposition') || '').match(/filename="?([^"]+)"?/);
+    var a = document.createElement('a'); a.href = url; a.download = m ? m[1] : 'report.csv';
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    setStatus('CSV downloaded.');
+  } catch (e) { setStatus(e.message, true); }
 }
 </script>
 {% endblock %}

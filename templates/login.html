@@ -1,279 +1,34 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="dark">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login — REFORMMED Monitor</title>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root, [data-theme="dark"] {
-      --bg: #0d0f14; --bg2: #141720; --bg3: #1c2030;
-      --border: #252a3a; --accent: #00d4ff; --text: #e2e8f0;
-      --text-muted: #64748b; --red: #ef4444; --green: #22c55e;
-    }
-    [data-theme="light"] {
-      --bg: #f0f2f7; --bg2: #ffffff; --bg3: #e8eaf0;
-      --border: #d1d5e0; --accent: #0284c7; --text: #0f172a;
-      --text-muted: #64748b; --red: #dc2626; --green: #16a34a;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Space Grotesk', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background .2s, color .2s;
-    }
-    #themeBtn {
-      position: fixed; top: 18px; right: 18px;
-      width: 38px; height: 38px; border-radius: 50%;
-      background: var(--bg2); border: 1px solid var(--border);
-      color: var(--text); font-size: 16px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-    }
-    body::before {
-      content: '';
-      position: fixed;
-      inset: -20%;
-      background:
-        radial-gradient(ellipse 500px 400px at 20% 30%, rgba(0,212,255,0.10) 0%, transparent 70%),
-        radial-gradient(ellipse 450px 380px at 80% 70%, rgba(124,58,237,0.10) 0%, transparent 70%),
-        radial-gradient(ellipse 380px 320px at 50% 90%, rgba(0,212,255,0.06) 0%, transparent 70%);
-      pointer-events: none;
-      animation: driftBg 18s ease-in-out infinite alternate;
-    }
-    [data-theme="light"] body::before {
-      background:
-        radial-gradient(ellipse 500px 400px at 20% 30%, rgba(2,132,199,0.08) 0%, transparent 70%),
-        radial-gradient(ellipse 450px 380px at 80% 70%, rgba(124,58,237,0.08) 0%, transparent 70%),
-        radial-gradient(ellipse 380px 320px at 50% 90%, rgba(2,132,199,0.05) 0%, transparent 70%);
-    }
-    @keyframes driftBg {
-      0%   { transform: translate(0, 0) scale(1); }
-      50%  { transform: translate(-3%, 2%) scale(1.06); }
-      100% { transform: translate(3%, -2%) scale(1.02); }
-    }
-    .particle {
-      position: fixed;
-      bottom: -10px;
-      width: 3px; height: 3px;
-      border-radius: 50%;
-      background: var(--accent);
-      opacity: 0;
-      pointer-events: none;
-      animation: floatUp linear infinite;
-    }
-    @keyframes floatUp {
-      0%   { transform: translateY(0) translateX(0); opacity: 0; }
-      10%  { opacity: .5; }
-      90%  { opacity: .5; }
-      100% { transform: translateY(-110vh) translateX(var(--drift, 20px)); opacity: 0; }
-    }
-    .login-wrap {
-      width: 400px;
-      max-width: 95vw;
-    }
-    .brand-area {
-      text-align: center;
-      margin-bottom: 36px;
-    }
-    .brand-name {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--accent);
-      letter-spacing: 3px;
-      text-transform: uppercase;
-    }
-    .brand-sub {
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
-    .login-card {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 32px;
-    }
-    .login-card h2 {
-      font-size: 20px;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-    .login-card .subtitle {
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-bottom: 28px;
-    }
-    .form-group { margin-bottom: 16px; }
-    label {
-      display: block;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      margin-bottom: 6px;
-    }
-    input {
-      width: 100%;
-      padding: 11px 14px;
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      font-size: 14px;
-      font-family: inherit;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-    input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(0,212,255,0.08);
-    }
-    .btn-login {
-      width: 100%;
-      padding: 12px;
-      background: var(--accent);
-      color: #0d0f14;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      letter-spacing: 0.5px;
-      transition: background 0.15s;
-      margin-top: 8px;
-      font-family: inherit;
-    }
-    .btn-login:hover { background: #00b8d9; }
-    .btn-google {
-      width: 100%;
-      padding: 11px;
-      background: var(--bg3);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      text-decoration: none;
-      font-family: inherit;
-      transition: border-color 0.15s, background 0.15s;
-    }
-    .btn-google:hover { border-color: var(--accent); background: #21263a; }
-    .divider {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin: 20px 0;
-      color: var(--text-muted);
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-    }
-    .divider::before, .divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }
-    .alert-danger {
-      background: rgba(239,68,68,.12);
-      border: 1px solid rgba(239,68,68,.3);
-      color: var(--red);
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 13px;
-      margin-bottom: 16px;
-    }
-    .footer-note {
-      text-align: center;
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 20px;
-    }
-    .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 4px; box-shadow: 0 0 6px var(--green); }
-  </style>
-</head>
-<body>
-  <button id="themeBtn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
-  <div class="login-wrap">
-    <div class="brand-area">
-      <div class="brand-name">REFORMMED</div>
-      <div class="brand-sub">Server Monitor Dashboard</div>
+{% extends "_auth_base.html" %}
+{% block title %}Sign in — Reformmed INFRA Monitor{% endblock %}
+
+{% block head %}
+  <h1>Sign in</h1>
+  <p>to continue to Reformmed INFRA Monitor</p>
+{% endblock %}
+
+{% block body %}
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="field">
+      <input type="text" id="username" name="username" placeholder=" " autocomplete="username" required autofocus>
+      <label for="username">Username or email</label>
     </div>
-    <div class="login-card">
-      <h2>Sign in</h2>
-      <p class="subtitle">Enter your credentials to continue</p>
-
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for category, message in messages %}
-          <div class="alert-danger">{{ message }}</div>
-        {% endfor %}
-      {% endwith %}
-
-      <form method="POST">
-        <div class="form-group">
-          <label>Username</label>
-          <input type="text" name="username" placeholder="username or email" autocomplete="username" required>
-        </div>
-        <div class="form-group">
-          <label>Password</label>
-          <input type="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
-        </div>
-        <button type="submit" class="btn-login">Sign in →</button>
-      </form>
-      <div style="text-align:center;margin-top:14px;">
-        <a href="{{ url_for('auth.forgot_password') }}" style="font-size:12px;color:var(--text-muted);text-decoration:none;">Forgot password?</a>
-      </div>
-
-      {% if google_sso_enabled %}
-      <div class="divider">or</div>
-      <a href="{{ url_for('auth.google_login') }}" class="btn-google">
-        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.5 29.3 35.5 24 35.5c-6.4 0-11.5-5.1-11.5-11.5S17.6 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.9 6.5 29.2 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.4-.3-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.6 18.9 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.9 6.5 29.2 4.5 24 4.5c-7.7 0-14.4 4.4-17.7 10.2z"/><path fill="#4CAF50" d="M24 43.5c5.1 0 9.8-2 13.3-5.2l-6.1-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.3 0-9.7-3.5-11.3-8.3l-6.5 5c3.3 6.5 10 11.3 17.8 11.3z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.7l6.1 5.2c-.4.4 6.7-4.9 6.7-14.9 0-1.2-.1-2.4-.3-3.5z"/></svg>
-        Sign in with Google
-      </a>
-      {% endif %}
+    <div class="field">
+      <input type="password" id="password" name="password" placeholder=" " autocomplete="current-password" required>
+      <label for="password">Password</label>
     </div>
-    <div class="footer-note">
-      <span class="dot"></span> REFORMMED Monitor v2
+    <a href="{{ url_for('auth.forgot_password') }}" class="link">Forgot password?</a>
+    <div class="actions">
+      <span></span>
+      <button type="submit" class="btn btn-primary">Next</button>
     </div>
-  </div>
-  <script>
-    var _dark = (localStorage.getItem('rmTheme') || 'dark') === 'dark';
-    function applyTheme() {
-      document.documentElement.setAttribute('data-theme', _dark ? 'dark' : 'light');
-      document.getElementById('themeBtn').textContent = _dark ? '🌙' : '☀️';
-    }
-    function toggleTheme() {
-      _dark = !_dark;
-      localStorage.setItem('rmTheme', _dark ? 'dark' : 'light');
-      applyTheme();
-    }
-    applyTheme();
+  </form>
 
-    // Gentle rising particles behind the login card — purely decorative.
-    (function spawnParticles() {
-      var n = 16;
-      for (var i = 0; i < n; i++) {
-        var p = document.createElement('div');
-        p.className = 'particle';
-        p.style.left = (Math.random() * 100) + 'vw';
-        p.style.setProperty('--drift', (Math.random() * 60 - 30) + 'px');
-        p.style.animationDuration = (14 + Math.random() * 12) + 's';
-        p.style.animationDelay = (Math.random() * 18) + 's';
-        document.body.appendChild(p);
-      }
-    })();
-  </script>
-</body>
-</html>
+  {% if google_sso_enabled %}
+  <div class="divider">or</div>
+  <a href="{{ url_for('auth.google_login') }}" class="btn btn-outline">
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.5 29.3 35.5 24 35.5c-6.4 0-11.5-5.1-11.5-11.5S17.6 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.9 6.5 29.2 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.4-.3-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.6 18.9 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.9 6.5 29.2 4.5 24 4.5c-7.7 0-14.4 4.4-17.7 10.2z"/><path fill="#4CAF50" d="M24 43.5c5.1 0 9.8-2 13.3-5.2l-6.1-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.3 0-9.7-3.5-11.3-8.3l-6.5 5c3.3 6.5 10 11.3 17.8 11.3z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.7l6.1 5.2c-.4.4 6.7-4.9 6.7-14.9 0-1.2-.1-2.4-.3-3.5z"/></svg>
+    Sign in with Google
+  </a>
+  {% endif %}
+{% endblock %}

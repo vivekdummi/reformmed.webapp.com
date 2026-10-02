@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}AI Review — REFORMMED Monitor{% endblock %}
+{% block title %}AI Review — Reformmed INFRA Monitor{% endblock %}
 {% block page_title %}AI Review{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
     <h1>AI Infrastructure Review</h1>
-    <p>Claude analyzes live DB data and generates a complete health summary</p>
+    <p>AI reads live servers, alerts and data-feed status and writes a health summary with recommendations</p>
   </div>
   <button class="btn btn-primary" id="run-btn" onclick="runReview()">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -14,18 +14,41 @@
   </button>
 </div>
 
-<div id="status-bar" style="display:none;align-items:center;gap:10px;padding:10px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:16px;font-size:13px;">
+<div id="snapshot-grid" class="kpi-grid">
+  <div class="kpi k-ocean">
+    <div class="kpi-top"><span class="kpi-label">Machines</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span></div>
+    <div class="kpi-value" id="snap-total">—</div><div class="kpi-sub">registered</div>
+  </div>
+  <div class="kpi k-mint">
+    <div class="kpi-top"><span class="kpi-label">Online</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span></div>
+    <div class="kpi-value" id="snap-online">—</div><div class="kpi-sub">reporting now</div>
+  </div>
+  <div class="kpi k-red">
+    <div class="kpi-top"><span class="kpi-label">Offline</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span></div>
+    <div class="kpi-value" id="snap-offline">—</div><div class="kpi-sub">not reporting</div>
+  </div>
+  <div class="kpi k-sunset">
+    <div class="kpi-top"><span class="kpi-label">Alerts today</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></span></div>
+    <div class="kpi-value" id="snap-alerts">—</div><div class="kpi-sub">since midnight</div>
+  </div>
+</div>
+
+<div id="status-bar" style="display:none;align-items:center;gap:10px;padding:12px 16px;background:var(--accent-soft);border-radius:12px;margin-bottom:16px;font-size:13px;font-weight:600;">
   <span class="pulse" style="background:var(--accent);box-shadow:0 0 6px var(--accent)"></span>
   <span id="status-text">Collecting data from database...</span>
 </div>
 
-<div class="card" style="min-height:300px">
+<div class="panel" style="min-height:320px">
   <div id="idle-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:16px;color:var(--text-muted)">
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".4">
-      <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
-    </svg>
+    <span class="kpi-icon k-violet" style="width:64px;height:64px;border-radius:20px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:30px;height:30px"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>
+    </span>
     <div style="text-align:center">
-      <div style="font-size:15px;font-weight:600;margin-bottom:6px;color:var(--text)">Ready to analyze</div>
+      <div style="font-family:var(--font-head);font-size:18px;font-weight:700;margin-bottom:6px;color:var(--text)">Ready to analyze</div>
       <div style="font-size:13px">Click <strong>Run Review</strong> to pull live data from PostgreSQL<br>and generate an AI-powered health summary</div>
     </div>
   </div>
@@ -33,8 +56,7 @@
   <div id="output-area" style="display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
       <div style="display:flex;align-items:center;gap:8px">
-        <div style="width:8px;height:8px;border-radius:50%;background:var(--accent)"></div>
-        <span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">AI Review</span>
+        <span class="panel-title">AI health summary</span>
         <span id="gen-time" style="font-size:11px;color:var(--text-muted)"></span>
       </div>
       <div style="display:flex;gap:8px">
@@ -46,24 +68,13 @@
   </div>
 </div>
 
-<div id="snapshot-grid" style="display:none;margin-top:14px">
-  <div class="card-title" style="margin-bottom:10px">Live Snapshot (from DB)</div>
-  <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">
-    <div class="stat-card total"><div class="stat-value" id="snap-total" style="color:var(--accent);font-size:26px">—</div><div class="stat-label">Machines</div></div>
-    <div class="stat-card online"><div class="stat-value" id="snap-online" style="color:var(--green);font-size:26px">—</div><div class="stat-label">Online</div></div>
-    <div class="stat-card offline"><div class="stat-value" id="snap-offline" style="color:var(--red);font-size:26px">—</div><div class="stat-label">Offline</div></div>
-    <div class="stat-card warning"><div class="stat-value" id="snap-dvr" style="color:var(--yellow);font-size:26px">—</div><div class="stat-label">DVRs Online</div></div>
-    <div class="stat-card total"><div class="stat-value" id="snap-alerts" style="color:var(--accent2);font-size:26px">—</div><div class="stat-label">Alerts 24h</div></div>
-  </div>
-</div>
-
 <style>
-#md-output h1,#md-output h2{font-size:15px;font-weight:700;margin:18px 0 6px;color:var(--accent);}
-#md-output h3{font-size:14px;font-weight:600;margin:14px 0 5px;}
+#md-output h1,#md-output h2{font-family:var(--font-head);font-size:17px;font-weight:700;margin:20px 0 8px;color:var(--text);padding-left:10px;border-left:3px solid var(--accent);}
+#md-output h3{font-family:var(--font-head);font-size:15px;font-weight:700;margin:14px 0 6px;}
 #md-output strong{font-weight:700;color:var(--text);}
 #md-output ul,#md-output ol{padding-left:20px;margin:6px 0;}
 #md-output li{margin:4px 0;}
-#md-output code{font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:4px;}
+#md-output code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:4px;}
 #md-output hr{border:none;border-top:1px solid var(--border);margin:14px 0;}
 #md-output p{margin:6px 0;}
 </style>
@@ -73,7 +84,19 @@
 <script>
 var _startTime = null;
 
+fetch('/api/home/data').then(function(r){ return r.json(); }).then(function(d){
+  ['total','online','offline'].forEach(function(k){
+    var el = document.getElementById('snap-' + k); if (el && typeof d[k] === 'number') el.textContent = d[k];
+  });
+  var a = document.getElementById('snap-alerts'); if (a && typeof d.alerts_today === 'number') a.textContent = d.alerts_today;
+}).catch(function(){});
+
 function simpleMarkdown(text){
+  // Escape first: the model's output can echo agent-controlled strings
+  // (machine names etc.), so raw HTML in it must never reach innerHTML.
+  text = String(text == null ? '' : text).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
   return text
     .replace(/^### (.+)$/gm,  '<h3>$1</h3>')
     .replace(/^## (.+)$/gm,   '<h2>$1</h2>')
@@ -93,7 +116,6 @@ function runReview(){
   document.getElementById('idle-state').style.display = 'none';
   document.getElementById('output-area').style.display = 'block';
   document.getElementById('status-bar').style.display  = 'flex';
-  document.getElementById('snapshot-grid').style.display = 'block';
   document.getElementById('md-output').innerHTML = '';
   document.getElementById('gen-time').textContent = '';
   document.getElementById('run-btn').disabled = true;
@@ -105,19 +127,13 @@ function runReview(){
   fetch('/api/home/data', {credentials:'include'})
     .then(function(r){ return r.json(); })
     .then(function(d){
-      document.getElementById('snap-total').textContent   = d.total   || '—';
-      document.getElementById('snap-online').textContent  = d.online  || '—';
-      document.getElementById('snap-offline').textContent = d.offline || '—';
-      document.getElementById('snap-alerts').textContent  = d.alerts_today || '0';
+      function val(v){ return (typeof v === 'number') ? v : '—'; }
+      document.getElementById('snap-total').textContent   = val(d.total);
+      document.getElementById('snap-online').textContent  = val(d.online);
+      document.getElementById('snap-offline').textContent = val(d.offline);
+      document.getElementById('snap-alerts').textContent  = val(d.alerts_today);
     }).catch(function(){});
 
-  // DVR count
-  fetch('/dvr/ping/all', {method:'POST', credentials:'include'})
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      var online = Object.values(d).filter(function(v){ return v==='online'; }).length;
-      document.getElementById('snap-dvr').textContent = online || '—';
-    }).catch(function(){});
 
   setStatus('Sending to Claude AI…');
 
@@ -135,7 +151,7 @@ function runReview(){
     var elapsed = ((Date.now() - _startTime)/1000).toFixed(1);
     document.getElementById('gen-time').textContent = 'Generated in ' + elapsed + 's';
     if(d.error){
-      document.getElementById('md-output').innerHTML = '<span style="color:var(--red)">Error: '+d.error+'</span>';
+      document.getElementById('md-output').innerHTML = '<span style="color:var(--red)">Error: '+simpleMarkdown(d.error)+'</span>';
     } else {
       document.getElementById('md-output').innerHTML = simpleMarkdown(d.text || '');
     }
@@ -144,7 +160,7 @@ function runReview(){
     document.getElementById('status-bar').style.display = 'none';
     document.getElementById('run-btn').disabled = false;
     document.getElementById('run-btn').innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Review';
-    document.getElementById('md-output').innerHTML = '<span style="color:var(--red)">Network error: '+e.message+'</span>';
+    document.getElementById('md-output').innerHTML = '<span style="color:var(--red)">Network error: '+simpleMarkdown(e.message)+'</span>';
   });
 }
 

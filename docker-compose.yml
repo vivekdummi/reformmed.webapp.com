@@ -22,7 +22,9 @@ services:
     build:
       context: .
     container_name: reformmed_webapp
-    command: python app.py
+    # Production WSGI server instead of the Werkzeug dev server. One worker so
+    # the in-memory login rate limiter is shared; threads handle concurrency.
+    command: gunicorn -w 1 --threads 8 -b 0.0.0.0:5000 --timeout 90 "app:create_app()"
     network_mode: "host"
     environment:
       POSTGRES_HOST:     ${POSTGRES_HOST}
@@ -31,7 +33,11 @@ services:
       POSTGRES_DB:       ${POSTGRES_DB}
       POSTGRES_PORT:     ${POSTGRES_PORT:-5432}
       FLASK_SECRET:      ${FLASK_SECRET}
+      SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY}
+      ALERT_TO:          ${ALERT_TO}
       FLASK_DEBUG:       "0"
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-1}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-}
       GMAIL_USER:        ${GMAIL_USER}
       GMAIL_APP_PASS:    ${GMAIL_APP_PASS}
       SMTP_HOST:         smtp.gmail.com
@@ -60,6 +66,10 @@ services:
       POSTGRES_PORT:       ${POSTGRES_PORT:-5432}
       GMAIL_USER:          ${GMAIL_USER}
       GMAIL_APP_PASS:      ${GMAIL_APP_PASS}
+      # Needed to decrypt SMTP credentials saved in Settings, and as the
+      # fallback recipient list when a machine has no recipients of its own.
+      SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY}
+      ALERT_TO:            ${ALERT_TO}
       SMTP_HOST:           smtp.gmail.com
       SMTP_PORT:           "465"
       OFFLINE_AFTER_SECS:  "60"

@@ -36,6 +36,9 @@ DB_PASS = os.getenv("POSTGRES_PASSWORD", "")
 
 OFFLINE_THRESHOLD_SECS = int(os.getenv("OFFLINE_AFTER_SECS", "60"))
 CHECK_INTERVAL_SECS    = int(os.getenv("CHECK_INTERVAL_SECS", "15"))
+# Data retention: purge metric rows / alert log older than Settings →
+# Data retention. Runs shortly after start, then every PURGE_INTERVAL_HOURS.
+PURGE_INTERVAL_HOURS   = float(os.getenv("PURGE_INTERVAL_HOURS", "6"))
 
 SKIP_MOUNT_PREFIXES = ("/snap/", "/proc", "/sys", "/dev", "/run")
 
@@ -193,7 +196,7 @@ def _render_alert(alert_type: str, system_name: str, location: str,
     <table style="width:100%;border-collapse:collapse;">{html_rows}</table>
   </div>
   <div style="background:#f7f7f9;padding:10px 22px;border-top:1px solid #eee;">
-    <span style="font-size:11px;color:#a0a4ab;">REFORMMED Monitor · automated alert</span>
+    <span style="font-size:11px;color:#a0a4ab;">Reformmed INFRA Monitor · automated alert</span>
   </div>
 </div>
 """
@@ -271,8 +274,13 @@ def _effective_config(global_config: dict, machine_overrides: dict) -> dict:
     return merged
 
 
+def _base_type(alert_type: str) -> str:
+    """'disk:/var' -> 'disk'. Per-mount disk alerts share the 'disk' config row."""
+    return alert_type.split(":", 1)[0]
+
+
 def _recipients(config: dict, atype: str) -> list[str]:
-    cfg = config.get(atype, {})
+    cfg = config.get(_base_type(atype), {})
     emails = cfg.get("notify_emails", "") or os.getenv("ALERT_TO", "")
     return [e.strip() for e in emails.split(",") if e.strip()]
 
@@ -281,10 +289,14 @@ async def _alert(conn, config: dict, machine_key: str, alert_type: str,
                   system_name: str, location: str, rows: list[tuple[str, str]]):
     if not _master_enabled_cache:
         return  # kill-switch — defense-in-depth, main() already checks this too
-    cfg = config.get(alert_type, {})
+    # Config + recipients live under the base type ("disk"), while the cooldown
+    # stays keyed per mount ("disk:/var") so each full partition alerts on its own.
+    # Looking config up by "disk:/var" used to return {} -> no recipients -> the
+    # disk email was silently skipped every time.
+    cfg = config.get(_base_type(alert_type), {})
     if not cfg.get("enabled", True):
         return
-    cooldown = cfg.get("cooldown_minutes", 10)
+    cooldown = cfg.get("cooldown_minutes") or 10
     if _cooldown_ok(machine_key, alert_type, cooldown):
         subject, plain, html = _render_alert(alert_type, system_name, location, rows)
         to_list = _recipients(config, alert_type)
@@ -340,14 +352,29 @@ async def check_metrics(conn, machine, config, alerts_enabled=True):
         if isinstance(partitions, str):
             partitions = json.loads(partitions)
         disk_thresh = disk_cfg.get("threshold") or 85
-        for part in partitions:
-            mount = part.get("mountpoint", "?")
+        for part in partitions or []:
+            if not isinstance(part, dict):
+                continue
+            mount = str(part.get("mountpoint") or "?")
             if any(mount.startswith(p) for p in SKIP_MOUNT_PREFIXES):
                 continue
-            pct = float(part.get("percent", 0))
+            if (part.get("fstype") or "") == "squashfs":
+                continue  # read-only snap images always report 100%
+            try:
+                pct = float(part.get("percent") or 0)
+            except (TypeError, ValueError):
+                continue
             if pct >= disk_thresh:
                 await _alert(conn, config, key, f"disk:{mount}", system_name, location,
                              [("Mount", mount), ("Usage", f"{pct:.1f}%"), ("Threshold", f"{disk_thresh}%")])
+
+
+async def _run_purge():
+    try:
+        from db import purge_old_data
+        await asyncio.to_thread(purge_old_data)
+    except Exception as e:
+        log.error("Retention purge failed: %s", e)
 
 
 async def main():
@@ -359,6 +386,9 @@ async def main():
         server_settings={"timezone": "Asia/Kolkata"},
     )
     log.info("✅ Connected to database")
+    loop = asyncio.get_running_loop()
+    last_purge = float("-inf")  # first purge right after start
+    purge_task = None
 
     while True:
         try:
@@ -374,48 +404,65 @@ async def main():
                 now      = datetime.now(timezone.utc)
 
                 for machine in machines:
-                    system_name    = machine["system_name"]
-                    location       = machine["location"]
-                    table_name     = machine["table_name"]
-                    current_status = machine["status"]
-                    last_seen      = machine["last_seen"]
-                    alerts_enabled = machine["alerts_enabled"]
-                    key            = f"{system_name}@{location}"
+                    # One bad machine (NULL last_seen, malformed metrics…) must not
+                    # abort the cycle for every machine after it.
+                    try:
+                        system_name    = machine["system_name"]
+                        location       = machine["location"]
+                        table_name     = machine["table_name"]
+                        current_status = machine["status"]
+                        last_seen      = machine["last_seen"]
+                        alerts_enabled = machine["alerts_enabled"]
+                        key            = f"{system_name}@{location}"
 
-                    # This machine's own thresholds win over the fleet-wide
-                    # defaults, alert_type by alert_type.
-                    effective_cfg = _effective_config(config, overrides.get(table_name, {}))
-                    offline_cfg   = effective_cfg.get("offline", {})
-                    online_cfg    = effective_cfg.get("online",  {})
-                    thresh_secs   = OFFLINE_THRESHOLD_SECS
+                        # This machine's own thresholds win over the fleet-wide
+                        # defaults, alert_type by alert_type.
+                        effective_cfg = _effective_config(config, overrides.get(table_name, {}))
+                        offline_cfg   = effective_cfg.get("offline", {})
+                        online_cfg    = effective_cfg.get("online",  {})
+                        thresh_secs   = OFFLINE_THRESHOLD_SECS
 
-                    seconds_offline = (now - last_seen).total_seconds()
-                    new_status = "offline" if seconds_offline > thresh_secs else "online"
+                        if last_seen is None:
+                            continue  # registered but never reported
+                        if last_seen.tzinfo is None:
+                            last_seen = last_seen.replace(tzinfo=timezone.utc)
+                        seconds_offline = (now - last_seen).total_seconds()
+                        new_status = "offline" if seconds_offline > thresh_secs else "online"
 
-                    if current_status != new_status:
-                        await conn.execute(
-                            "UPDATE machine_registry SET status=$1 WHERE system_name=$2 AND location=$3",
-                            new_status, system_name, location,
-                        )
-                        # Status ALWAYS updates so the dashboard reflects reality,
-                        # even with the master switch off — only the EMAIL below
-                        # is gated by it.
-                        if not master_enabled:
-                            pass
-                        elif not alerts_enabled:
-                            log.info("🔕 %s (%s) → %s (alerts muted for this machine)",
-                                     system_name, location, new_status)
-                        elif new_status == "offline" and offline_cfg.get("enabled", True):
-                            log.warning("🔴 %s (%s) went OFFLINE", system_name, location)
-                            await _alert(conn, effective_cfg, key, "offline", system_name, location,
-                                         [("Last seen", _fmt_ist(last_seen))])
-                        elif new_status == "online" and online_cfg.get("enabled", True):
-                            log.info("🟢 %s (%s) came back ONLINE", system_name, location)
-                            await _alert(conn, effective_cfg, key, "online", system_name, location,
-                                         [("Back online since", _fmt_ist(now))])
+                        if current_status != new_status:
+                            await conn.execute(
+                                "UPDATE machine_registry SET status=$1 WHERE table_name=$2",
+                                new_status, table_name,
+                            )
+                            # Status ALWAYS updates so the dashboard reflects reality,
+                            # even with the master switch off — only the EMAIL below
+                            # is gated by it.
+                            if not master_enabled:
+                                pass
+                            elif not alerts_enabled:
+                                log.info("🔕 %s (%s) → %s (alerts muted for this machine)",
+                                         system_name, location, new_status)
+                            elif new_status == "offline" and offline_cfg.get("enabled", True):
+                                log.warning("🔴 %s (%s) went OFFLINE", system_name, location)
+                                await _alert(conn, effective_cfg, key, "offline", system_name, location,
+                                             [("Last seen", _fmt_ist(last_seen))])
+                            elif new_status == "online" and online_cfg.get("enabled", True):
+                                log.info("🟢 %s (%s) came back ONLINE", system_name, location)
+                                await _alert(conn, effective_cfg, key, "online", system_name, location,
+                                             [("Back online since", _fmt_ist(now))])
 
-                    if new_status == "online" and master_enabled:
-                        await check_metrics(conn, machine, effective_cfg, alerts_enabled)
+                        if new_status == "online" and master_enabled:
+                            await check_metrics(conn, machine, effective_cfg, alerts_enabled)
+                    except Exception as e:
+                        log.error("Check error for %s: %s", machine["table_name"], e)
+
+            # Data retention purge (sync psycopg2 code shared with the webapp,
+            # run in a worker thread so alert checks keep their cadence).
+            # It runs as a background task, never two at once.
+            if (PURGE_INTERVAL_HOURS > 0 and (purge_task is None or purge_task.done())
+                    and loop.time() - last_purge >= PURGE_INTERVAL_HOURS * 3600):
+                last_purge = loop.time()
+                purge_task = asyncio.create_task(_run_purge())
 
             await asyncio.sleep(CHECK_INTERVAL_SECS)
 

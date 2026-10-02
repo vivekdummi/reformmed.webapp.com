@@ -1,163 +1,23 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="dark">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Verify — REFORMMED Monitor</title>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root, [data-theme="dark"] {
-      --bg: #0d0f14; --bg2: #141720; --bg3: #1c2030;
-      --border: #252a3a; --accent: #00d4ff; --text: #e2e8f0;
-      --text-muted: #64748b; --red: #ef4444; --green: #22c55e;
-    }
-    [data-theme="light"] {
-      --bg: #f0f2f7; --bg2: #ffffff; --bg3: #e8eaf0;
-      --border: #d1d5e0; --accent: #0284c7; --text: #0f172a;
-      --text-muted: #64748b; --red: #dc2626; --green: #16a34a;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Space Grotesk', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background .2s, color .2s;
-    }
-    body::before {
-      content: '';
-      position: fixed;
-      inset: -20%;
-      background:
-        radial-gradient(ellipse 500px 400px at 20% 30%, rgba(0,212,255,0.10) 0%, transparent 70%),
-        radial-gradient(ellipse 450px 380px at 80% 70%, rgba(124,58,237,0.10) 0%, transparent 70%),
-        radial-gradient(ellipse 380px 320px at 50% 90%, rgba(0,212,255,0.06) 0%, transparent 70%);
-      pointer-events: none;
-      animation: driftBg 18s ease-in-out infinite alternate;
-    }
-    [data-theme="light"] body::before {
-      background:
-        radial-gradient(ellipse 500px 400px at 20% 30%, rgba(2,132,199,0.08) 0%, transparent 70%),
-        radial-gradient(ellipse 450px 380px at 80% 70%, rgba(124,58,237,0.08) 0%, transparent 70%),
-        radial-gradient(ellipse 380px 320px at 50% 90%, rgba(2,132,199,0.05) 0%, transparent 70%);
-    }
-    @keyframes driftBg {
-      0%   { transform: translate(0, 0) scale(1); }
-      50%  { transform: translate(-3%, 2%) scale(1.06); }
-      100% { transform: translate(3%, -2%) scale(1.02); }
-    }
-    .particle {
-      position: fixed;
-      bottom: -10px;
-      width: 3px; height: 3px;
-      border-radius: 50%;
-      background: var(--accent);
-      opacity: 0;
-      pointer-events: none;
-      animation: floatUp linear infinite;
-    }
-    @keyframes floatUp {
-      0%   { transform: translateY(0) translateX(0); opacity: 0; }
-      10%  { opacity: .5; }
-      90%  { opacity: .5; }
-      100% { transform: translateY(-110vh) translateX(var(--drift, 20px)); opacity: 0; }
-    }
-    #themeBtn {
-      position: fixed; top: 18px; right: 18px;
-      width: 38px; height: 38px; border-radius: 50%;
-      background: var(--bg2); border: 1px solid var(--border);
-      color: var(--text); font-size: 16px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .login-wrap { width: 400px; max-width: 95vw; }
-    .brand-area { text-align: center; margin-bottom: 36px; }
-    .brand-name {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 20px; font-weight: 700; color: var(--accent);
-      letter-spacing: 3px; text-transform: uppercase;
-    }
-    .brand-sub { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
-    .login-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 32px; }
-    .login-card h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
-    .login-card .subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; }
-    .form-group { margin-bottom: 16px; }
-    input {
-      width: 100%; padding: 14px; background: var(--bg3); border: 1px solid var(--border);
-      border-radius: 8px; color: var(--text); font-size: 24px; font-family: 'JetBrains Mono', monospace;
-      letter-spacing: 8px; text-align: center; outline: none; transition: border-color 0.15s;
-    }
-    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,212,255,0.08); }
-    .btn-login {
-      width: 100%; padding: 12px; background: var(--accent); color: #0d0f14; border: none;
-      border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer;
-      letter-spacing: 0.5px; transition: background 0.15s; margin-top: 8px; font-family: inherit;
-    }
-    .btn-login:hover { background: #00b8d9; }
-    .alert-danger {
-      background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.3); color: var(--red);
-      padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;
-    }
-    .footer-note { text-align: center; font-size: 12px; color: var(--text-muted); margin-top: 20px; }
-    .footer-note a { color: var(--accent); text-decoration: none; }
-  </style>
-</head>
-<body>
-  <button id="themeBtn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
-  <div class="login-wrap">
-    <div class="brand-area">
-      <div class="brand-name">REFORMMED</div>
-      <div class="brand-sub">Server Monitor Dashboard</div>
-    </div>
-    <div class="login-card">
-      <h2>Verify it's you</h2>
-      <p class="subtitle">Enter the 6-digit code for <strong>{{ username }}</strong> from your authenticator app</p>
+{% extends "_auth_base.html" %}
+{% block title %}2-Step Verification — Reformmed INFRA Monitor{% endblock %}
 
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for category, message in messages %}
-          <div class="alert-danger">{{ message }}</div>
-        {% endfor %}
-      {% endwith %}
+{% block head %}
+  <h1>2-Step Verification</h1>
+  <p>Signing in as <strong>{{ username }}</strong></p>
+  <p class="muted">Enter the 6-digit code from your authenticator app.</p>
+{% endblock %}
 
-      <form method="POST">
-        <div class="form-group">
-          <input type="text" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
-                 placeholder="000000" autocomplete="one-time-code" required autofocus>
-        </div>
-        <button type="submit" class="btn-login">Verify →</button>
-      </form>
+{% block body %}
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="field">
+      <input type="text" id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+             placeholder=" " autocomplete="one-time-code" required autofocus>
+      <label for="code">Enter code</label>
     </div>
-    <div class="footer-note">
-      <a href="{{ url_for('auth.login') }}">← Back to login</a>
+    <div class="actions">
+      <a href="{{ url_for('auth.login') }}" class="btn btn-text">Back</a>
+      <button type="submit" class="btn btn-primary">Next</button>
     </div>
-  </div>
-  <script>
-    var _dark = (localStorage.getItem('rmTheme') || 'dark') === 'dark';
-    function applyTheme() {
-      document.documentElement.setAttribute('data-theme', _dark ? 'dark' : 'light');
-      document.getElementById('themeBtn').textContent = _dark ? '🌙' : '☀️';
-    }
-    function toggleTheme() {
-      _dark = !_dark;
-      localStorage.setItem('rmTheme', _dark ? 'dark' : 'light');
-      applyTheme();
-    }
-    applyTheme();
-
-    (function spawnParticles() {
-      var n = 16;
-      for (var i = 0; i < n; i++) {
-        var p = document.createElement('div');
-        p.className = 'particle';
-        p.style.left = (Math.random() * 100) + 'vw';
-        p.style.setProperty('--drift', (Math.random() * 60 - 30) + 'px');
-        p.style.animationDuration = (14 + Math.random() * 12) + 's';
-        p.style.animationDelay = (Math.random() * 18) + 's';
-        document.body.appendChild(p);
-      }
-    })();
-  </script>
-</body>
-</html>
+  </form>
+{% endblock %}

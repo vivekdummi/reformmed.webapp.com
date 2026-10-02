@@ -3,9 +3,9 @@
 {% block page_title %}{{ hosp.name }}{% endblock %}
 {% block extra_css %}
 <style>
-.dvr-row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(37,42,58,.5);gap:12px;flex-wrap:wrap;}
+.dvr-row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap;}
 .dvr-row:last-child{border-bottom:none;}
-.dvr-row.is-offline{background:rgba(239,68,68,.03);}
+.dvr-row.is-offline{background:color-mix(in srgb,var(--red) 3%,transparent);}
 .loc-section{background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden;}
 .loc-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg3);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px;}
 </style>
@@ -175,7 +175,7 @@ async function pingDevice(id) {
       statusEl.innerHTML = '<span class="status-dot offline"></span><span class="badge badge-offline">OFFLINE</span>';
       timeEl.textContent  = d.went_offline ? 'Offline since: ' + new Date(d.went_offline).toLocaleString() : 'Offline';
       rowEl.classList.add('is-offline');
-      rowEl.style.background = 'rgba(239,68,68,.04)';
+      rowEl.style.background = 'color-mix(in srgb,var(--red) 4%,transparent)';
     }
   } catch(e) { console.error('Ping ' + id, e); }
 }

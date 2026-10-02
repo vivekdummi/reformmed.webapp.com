@@ -1,184 +1,300 @@
 {% extends "base.html" %}
 {% import "_macros.html" as macros %}
-{% block title %}Alerts — REFORMMED Monitor{% endblock %}
+{% block title %}Alerts — Reformmed INFRA Monitor{% endblock %}
 {% block page_title %}Alerts{% endblock %}
 
+{% block extra_css %}
+<style>
+.al-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:22px;}
+@media(max-width:1100px){.al-grid{grid-template-columns:1fr;}}
+.al-types{display:flex;flex-direction:column;gap:9px;flex:1;min-width:0;}
+.al-type-row{display:flex;align-items:center;gap:8px;font-size:13px;}
+.al-type-row i{width:10px;height:10px;border-radius:4px;flex-shrink:0;}
+.al-type-row span{flex:1;color:var(--text-muted);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.al-type-row b{font-variant-numeric:tabular-nums;}
+
+.section-note{font-size:13px;color:var(--text-muted);margin:-4px 0 16px;}
+.section-note a{color:var(--accent);font-weight:600;text-decoration:none;}
+
+/* rule cards */
+.rule-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
+.rule{position:relative;background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:16px 18px;box-shadow:var(--shadow-1);display:flex;flex-direction:column;gap:14px;transition:border-color .15s,opacity .15s;}
+.rule.off{opacity:.62;}
+.rule-top{display:flex;align-items:flex-start;gap:12px;}
+.rule-name{font-family:var(--font-head);font-size:16px;font-weight:700;letter-spacing:-.2px;}
+.rule-hint{font-size:12px;color:var(--text-muted);margin-top:2px;line-height:1.4;}
+.rule-top .toggle{margin-left:auto;margin-top:4px;}
+.rule-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.rule-field label{margin-bottom:4px;}
+.unit-input{position:relative;}
+.unit-input input{padding-right:46px;}
+.unit-input span{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--text-muted);font-weight:600;pointer-events:none;}
+.rule-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:12px;}
+.rule-na{font-size:13px;color:var(--text-muted);padding:10px 12px;border-radius:10px;background:var(--bg3);}
+.sticky-save{position:sticky;bottom:16px;z-index:5;display:flex;justify-content:flex-end;margin-top:16px;}
+.sticky-save .btn{box-shadow:var(--shadow);}
+
+/* machine routing */
+.ma-head{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;}
+.ma-head .form-group{margin:0;min-width:280px;flex:0 1 380px;}
+.ma-rows{display:flex;flex-direction:column;gap:10px;margin-top:16px;}
+.ma-row{display:grid;grid-template-columns:240px 70px 1fr;gap:14px;align-items:center;padding:12px 14px;border-radius:14px;background:var(--bg3);}
+@media(max-width:760px){.ma-row{grid-template-columns:1fr;}}
+.ma-type{display:flex;align-items:center;gap:10px;font-weight:700;}
+.ma-type .kpi-icon{width:32px;height:32px;border-radius:10px;}
+.ma-type .kpi-icon svg{width:16px;height:16px;}
+.mini-icon{width:28px;height:28px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;background:var(--kpi-g);color:#fff;flex-shrink:0;}
+.mini-icon svg{width:14px;height:14px;}
+.cell-type{display:flex;align-items:center;gap:10px;font-weight:600;white-space:nowrap;}
+
+/* log */
+.log-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.log-tools input[type=search]{max-width:280px;height:36px;padding:0 14px;border-radius:99px;}
+.fchip{height:32px;padding:0 14px;border-radius:99px;border:1px solid var(--border);background:var(--bg2);color:var(--text-muted);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+.fchip:hover{color:var(--text);border-color:var(--border-strong);}
+.fchip.active{background:var(--accent-soft);color:var(--accent);border-color:transparent;}
+.chip-group{display:flex;gap:6px;flex-wrap:wrap;}
+.chip-sep{width:1px;height:22px;background:var(--border);}
+.log-count{margin-left:auto;font-size:12px;color:var(--text-muted);font-weight:600;}
+.log-more{display:flex;justify-content:center;margin-top:14px;}
+.log-subject{font-size:13px;max-width:440px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.src-badge{font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent);white-space:nowrap;}
+.src-badge.dbmonitor{background:color-mix(in srgb,var(--violet) 16%,transparent);color:var(--violet);}
+.empty-row td{text-align:center;color:var(--text-muted);padding:36px!important;}
+.toggle-sm{transform:scale(.9);transform-origin:left center;}
+</style>
+{% endblock %}
+
 {% block content %}
+{% macro type_icon(t) -%}
+  {%- set t = (t or '').split(':')[0] -%}
+  {%- if t == 'offline' -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l22 22"/><path d="M16.72 11.06A10.94 10.94 0 0119 12.55"/><path d="M5 12.55a10.94 10.94 0 015.17-2.39"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+  {%- elif t == 'online' -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+  {%- elif t == 'cpu' -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
+  {%- elif t == 'ram' -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="10" rx="1"/><line x1="6" y1="7" x2="6" y2="17"/><line x1="10" y1="7" x2="10" y2="17"/><line x1="14" y1="7" x2="14" y2="17"/><line x1="18" y1="7" x2="18" y2="17"/></svg>
+  {%- elif t == 'disk' -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/></svg>
+  {%- elif t == 'temp' -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z"/></svg>
+  {%- elif t == 'db_dead' -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+  {%- else -%}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+  {%- endif -%}
+{%- endmacro %}
+{% macro type_grad(t) -%}
+  {{- {'offline':'k-red','online':'k-mint','cpu':'k-ocean','ram':'k-violet','disk':'k-sunset','temp':'k-pink','db_dead':'k-violet'}.get((t or '').split(':')[0], 'k-ocean') -}}
+{%- endmacro %}
+{% set TYPE_LABELS = {'offline':'Server offline','online':'Back online','cpu':'High CPU','ram':'High RAM','disk':'Disk full','temp':'High temperature','db_dead':'DB feed stopped'} %}
+{% set TYPE_HINTS = {'offline':'Server stops reporting for longer than the offline window','online':'Server starts reporting again after being offline','cpu':'CPU usage at or above the threshold','ram':'Memory usage at or above the threshold','disk':'Any real disk partition at or above the threshold','temp':'CPU temperature at or above the threshold'} %}
+{% set ndays = overview.labels|length %}
+
 <div class="page-header">
   <div>
     <h1>Alerts</h1>
-    <p>System alerts, DVR alerts, and DB Monitor alerts — all in one place</p>
+    <p>Alert rules, who gets notified, and every alert that was sent — servers and DB Monitor feeds in one place</p>
+  </div>
+  {% if current_user.is_admin %}
+  <a href="{{ url_for('settings.index') }}#recipients" class="btn btn-ghost btn-sm">Manage recipients</a>
+  {% endif %}
+</div>
+
+<!-- ═══ KPI tiles ═══ -->
+<div class="kpi-grid">
+  <div class="kpi k-sunset">
+    <div class="kpi-top"><span class="kpi-label">Alerts today</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></span></div>
+    <div class="kpi-value">{{ overview.today }}</div>
+    <div class="kpi-sub">since midnight (IST)</div>
+  </div>
+  <div class="kpi k-ocean">
+    <div class="kpi-top"><span class="kpi-label">Last 7 days</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span></div>
+    <div class="kpi-value">{{ overview.week }}</div>
+    <div class="kpi-sub">{{ overview.total }} in the last {{ ndays }} days</div>
+  </div>
+  <div class="kpi k-mint">
+    <div class="kpi-top"><span class="kpi-label">Delivered</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg></span></div>
+    <div class="kpi-value">{% if overview.delivered_pct is not none %}{{ overview.delivered_pct }}<small>%</small>{% else %}—{% endif %}</div>
+    <div class="kpi-bar"><i style="width:{{ overview.delivered_pct or 0 }}%"></i></div>
+    <div class="kpi-sub">{{ overview.sent }} emails sent (7 days)</div>
+  </div>
+  <div class="kpi k-red">
+    <div class="kpi-top"><span class="kpi-label">Failed</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></span></div>
+    <div class="kpi-value">{{ overview.failed }}</div>
+    <div class="kpi-sub">{{ 'check SMTP settings' if overview.failed else 'no delivery problems' }}</div>
+  </div>
+  <div class="kpi k-violet">
+    <div class="kpi-top"><span class="kpi-label">Rules enabled</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span></div>
+    <div class="kpi-value">{{ overview.rules_on }}<small>/ {{ overview.rules_total }}</small></div>
+    <div class="kpi-bar"><i style="width:{{ (overview.rules_on / overview.rules_total * 100) if overview.rules_total else 0 }}%"></i></div>
+    <div class="kpi-sub">fleet-wide system rules</div>
+  </div>
+  <div class="kpi k-pink">
+    <div class="kpi-top"><span class="kpi-label">Machine routing</span>
+      <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span></div>
+    <div class="kpi-value">{{ overview.overridden }}</div>
+    <div class="kpi-sub">with own rules · {{ overview.muted }} muted</div>
+  </div>
+</div>
+
+<!-- ═══ Charts ═══ -->
+<div class="al-grid">
+  <div class="panel">
+    <div class="panel-head">
+      <div><div class="panel-title">Alert activity</div><div class="panel-sub">Alerts per day, last {{ ndays }} days, by type</div></div>
+      <div class="legend" id="al-legend"></div>
+    </div>
+    <div style="height:250px;position:relative;">
+      {% if overview.total %}<canvas id="ch-al-days"></canvas>
+      {% else %}<div class="empty-chart"><b>No alerts in the last {{ ndays }} days</b>Everything has been quiet.</div>{% endif %}
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div><div class="panel-title">Alerts by type</div><div class="panel-sub">Last {{ ndays }} days</div></div></div>
+    {% if overview.total %}
+    <div class="donut-wrap" style="display:flex;align-items:center;gap:18px;">
+      <div class="donut-box" style="width:160px;height:160px;"><canvas id="ch-al-types"></canvas>
+        <div class="donut-mid"><b>{{ overview.total }}</b><span>alerts</span></div></div>
+      <div class="al-types" id="al-types"></div>
+    </div>
+    {% else %}<div class="empty-chart">No alert data yet.</div>{% endif %}
   </div>
 </div>
 
 <!-- Tab strip -->
 <div class="tabs">
-  <button class="tab-btn active" data-tabgroup="alerts" data-tabid="system" onclick="showTab('alerts','system')">
-    🔔 System Alerts
-  </button>
-  <button class="tab-btn" data-tabgroup="alerts" data-tabid="machine" onclick="showTab('alerts','machine')">
-    🖥️ Machine Alerts
-  </button>
-  <button class="tab-btn" data-tabgroup="alerts" data-tabid="dvr" onclick="showTab('alerts','dvr')">
-    📹 DVR Alerts
-  </button>
-  <button class="tab-btn" data-tabgroup="alerts" data-tabid="dbmon" onclick="showTab('alerts','dbmon')">
-    🗄️ DB Monitor Alerts
-  </button>
-  <button class="tab-btn" data-tabgroup="alerts" data-tabid="log" onclick="showTab('alerts','log')">
-    📋 Alert Log
-  </button>
+  <button class="tab-btn active" data-tabgroup="alerts" data-tabid="system" onclick="showTab('alerts','system')">System rules</button>
+  <button class="tab-btn" data-tabgroup="alerts" data-tabid="machine" onclick="showTab('alerts','machine')">Machine routing</button>
+  {% if current_user.is_admin or current_user.can_view_dbmon %}
+  <button class="tab-btn" data-tabgroup="alerts" data-tabid="dbmon" onclick="showTab('alerts','dbmon')">DB Monitor</button>
+  {% endif %}
+  <button class="tab-btn" data-tabgroup="alerts" data-tabid="log" onclick="showTab('alerts','log')">Alert log <span class="badge badge-info" style="margin-left:6px;">{{ logs|length }}</span></button>
 </div>
 
-<!-- ── SYSTEM ALERTS ─────────────────────────────────────────────── -->
+<!-- ── SYSTEM RULES ─────────────────────────────────────────────── -->
 <div class="tab-panel active" data-tabpanel="alerts" data-panelid="system">
-  <div class="card mb-2">
-    <div class="card-title">System Alert Rules</div>
-    {% if current_user.is_admin %}
-    <form method="POST" action="{{ url_for('alerts.update_config') }}">
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Enabled</th>
-              <th>Threshold</th>
-              <th class="hide-mobile">Cooldown</th>
-              <th class="hide-mobile">Updated</th>
-              <th>Test</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for c in configs %}
-            <tr>
-              <td>
-                <span style="font-size:18px">
-                  {% if c.alert_type=='offline' %}🔴
-                  {% elif c.alert_type=='online' %}🟢
-                  {% elif c.alert_type=='cpu' %}🔥
-                  {% elif c.alert_type=='ram' %}🧠
-                  {% elif c.alert_type=='disk' %}💿
-                  {% elif c.alert_type=='temp' %}🌡️
-                  {% else %}🔔{% endif %}
-                </span>
-                <span class="mono" style="font-size:12px">{{ c.alert_type }}</span>
-              </td>
-              <td>
-                <select name="enabled_{{ c.id }}" style="width:auto;padding:5px 8px">
-                  <option value="1" {% if c.enabled %}selected{% endif %}>On</option>
-                  <option value="0" {% if not c.enabled %}selected{% endif %}>Off</option>
-                </select>
-              </td>
-              <td>
-                {% if c.threshold is not none %}
-                <input type="number" name="threshold_{{ c.id }}" value="{{ c.threshold }}"
-                       step="0.5" min="0" max="100" style="width:80px">
-                <span class="text-muted" style="font-size:11px">{% if c.alert_type=='temp' %}°C{% else %}%{% endif %}</span>
-                {% else %}
-                <span class="text-muted">N/A</span>
-                <input type="hidden" name="threshold_{{ c.id }}" value="">
-                {% endif %}
-              </td>
-              <td class="hide-mobile">
-                <input type="number" name="cooldown_{{ c.id }}" value="{{ c.cooldown_minutes }}"
-                       min="1" max="1440" style="width:70px"> min
-              </td>
-              <td class="text-muted hide-mobile" style="font-size:12px">
-                {{ c.updated_at.strftime('%m-%d %H:%M') if c.updated_at else '—' }}
-              </td>
-              <td>
-                <button type="submit" form="test-form-{{ c.id }}" class="btn btn-ghost btn-sm">Test</button>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+  <p class="section-note">Fleet-wide rules: when each alert fires and how often it can repeat. Who gets the email is set per machine in
+    <a href="#machine" onclick="showTab('alerts','machine');return false;">Machine routing</a>.</p>
+  {% if current_user.is_admin %}
+  <form method="POST" action="{{ url_for('alerts.update_config') }}">
+    <div class="rule-grid">
+      {% for c in configs %}
+      {% set t = c.alert_type %}
+      <div class="rule {{ type_grad(t) }} {{ '' if c.enabled else 'off' }}" data-rule>
+        <div class="rule-top">
+          <span class="kpi-icon">{{ type_icon(t) }}</span>
+          <div style="min-width:0;">
+            <div class="rule-name">{{ TYPE_LABELS.get(t, t) }}</div>
+            <div class="rule-hint">{{ TYPE_HINTS.get(t, 'Alert type “' ~ t ~ '”') }}</div>
+          </div>
+          <label class="toggle" title="Enable or disable this rule" style="margin-bottom:0;">
+            <input type="checkbox" name="enabled_{{ c.id }}" value="1" {% if c.enabled %}checked{% endif %}
+                   aria-label="Enable {{ TYPE_LABELS.get(t, t) }}"
+                   onchange="this.closest('[data-rule]').classList.toggle('off', !this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="rule-fields">
+          <div class="rule-field">
+            <label>Threshold</label>
+            {% if c.threshold is not none %}
+            <div class="unit-input">
+              <input type="number" name="threshold_{{ c.id }}" value="{{ c.threshold }}" step="0.5" min="0" max="100">
+              <span>{% if t=='temp' %}°C{% else %}%{% endif %}</span>
+            </div>
+            {% else %}
+            <div class="rule-na">Not applicable</div>
+            <input type="hidden" name="threshold_{{ c.id }}" value="">
+            {% endif %}
+          </div>
+          <div class="rule-field">
+            <label>Cooldown</label>
+            <div class="unit-input">
+              <input type="number" name="cooldown_{{ c.id }}" value="{{ c.cooldown_minutes }}" min="1" max="1440">
+              <span>min</span>
+            </div>
+          </div>
+        </div>
+        <div class="rule-foot">
+          <span>Updated {{ c.updated_at.strftime('%d %b, %H:%M') if c.updated_at else '—' }}</span>
+          <button type="submit" form="test-form-{{ c.id }}" class="btn btn-ghost btn-sm">Send test</button>
+        </div>
       </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">
-        Who gets notified is set per-machine in the <a href="#machine" onclick="showTab('alerts','machine')" style="color:var(--accent);">Machine Alerts</a> tab, not here.
-      </div>
-      <div style="margin-top:14px">
-        <button type="submit" class="btn btn-primary">Save System Alerts</button>
-      </div>
-    </form>
-    {% for c in configs %}
-    <form id="test-form-{{ c.id }}" method="POST"
-          action="{{ url_for('alerts.test_alert', alert_type=c.alert_type) }}"
-          style="display:none"></form>
-    {% endfor %}
-    {% else %}
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Type</th><th>Enabled</th><th>Threshold</th><th>Cooldown</th></tr></thead>
-        <tbody>
-          {% for c in configs %}
-          <tr>
-            <td class="mono">{{ c.alert_type }}</td>
-            <td><span class="badge badge-{{ 'online' if c.enabled else 'offline' }}">{{ 'ON' if c.enabled else 'OFF' }}</span></td>
-            <td>{{ (c.threshold|string + ('°C' if c.alert_type=='temp' else '%')) if c.threshold else '—' }}</td>
-            <td>{{ c.cooldown_minutes }} min</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      {% endfor %}
     </div>
-    {% endif %}
+    <div class="sticky-save"><button type="submit" class="btn btn-primary">Save system rules</button></div>
+  </form>
+  {% for c in configs %}
+  <form id="test-form-{{ c.id }}" method="POST"
+        action="{{ url_for('alerts.test_alert', alert_type=c.alert_type) }}"
+        style="display:none"></form>
+  {% endfor %}
+  {% else %}
+  <div class="rule-grid">
+    {% for c in configs %}
+    {% set t = c.alert_type %}
+    <div class="rule {{ type_grad(t) }} {{ '' if c.enabled else 'off' }}">
+      <div class="rule-top">
+        <span class="kpi-icon">{{ type_icon(t) }}</span>
+        <div style="min-width:0;">
+          <div class="rule-name">{{ TYPE_LABELS.get(t, t) }}</div>
+          <div class="rule-hint">{{ TYPE_HINTS.get(t, '') }}</div>
+        </div>
+        <span class="badge badge-{{ 'online' if c.enabled else 'offline' }}" style="margin-left:auto;">{{ 'On' if c.enabled else 'Off' }}</span>
+      </div>
+      <div class="rule-foot">
+        <span>Threshold <b style="color:var(--text)">{{ (c.threshold|string + ('°C' if t=='temp' else '%')) if c.threshold is not none else '—' }}</b></span>
+        <span>Cooldown <b style="color:var(--text)">{{ c.cooldown_minutes }} min</b></span>
+      </div>
+    </div>
+    {% endfor %}
   </div>
+  {% endif %}
 </div>
 
-<!-- ── MACHINE ALERTS (per-machine threshold overrides) ─────────────────── -->
+<!-- ── MACHINE ROUTING ─────────────────────────────────────────────── -->
 <div class="tab-panel" data-tabpanel="alerts" data-panelid="machine">
-
   {% if current_user.is_admin %}
-  <div class="card mb-2">
-    <div class="card-title">Machine Alert Rules</div>
-    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">
-      Pick a machine to see all six alert types for it — each one you edit here overrides the
-      fleet-wide System Alert of the same type, for that machine only. Unselected here just falls
-      back to the global rule.
+  <div class="panel mb-2">
+    <div class="panel-head"><div>
+      <div class="panel-title">Routing for one machine</div>
+      <div class="panel-sub">Turn each alert type on or off for a single machine and choose who is emailed. Threshold and cooldown always come from the system rules.</div>
+    </div></div>
+    <div class="ma-head">
+      <div class="form-group">
+        <label for="ma-machine-select">Machine</label>
+        <select id="ma-machine-select" onchange="loadMachineAlertRules(this.value)">
+          <option value="">— Select a machine —</option>
+          {% for m in machines %}
+          <option value="{{ m.table_name }}">{{ m.system_name }} — {{ m.location }}{{ ' (alerts muted)' if not m.alerts_enabled else '' }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </div>
-    <div class="form-group" style="max-width:360px;">
-      <label>Machine</label>
-      <select id="ma-machine-select" onchange="loadMachineAlertRules(this.value)">
-        <option value="">— Select a machine —</option>
-        {% for m in machines %}
-        <option value="{{ m.table_name }}">{{ m.system_name }} — {{ m.location }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <div id="ma-rules-panel" style="display:none;margin-top:16px;">
+    <div id="ma-rules-panel" style="display:none;">
       <form id="ma-rules-form" method="POST">
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Enabled</th>
-                <th>Notify Emails</th>
-              </tr>
-            </thead>
-            <tbody id="ma-rules-tbody">
-              <!-- filled by loadMachineAlertRules() -->
-            </tbody>
-          </table>
+        <div class="ma-rows" id="ma-rules-tbody"><!-- filled by loadMachineAlertRules() --></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+          <button type="submit" class="btn btn-primary">Save machine routing</button>
         </div>
-        <button type="submit" class="btn btn-primary" style="margin-top:14px;">Save Machine Alert Rules</button>
       </form>
     </div>
   </div>
   {% endif %}
 
-  <div class="card">
-    <div class="card-title">All Machine Overrides <span style="font-size:11px;color:var(--text-muted);font-weight:400;">(across every machine)</span></div>
+  <div class="panel">
+    <div class="panel-head"><div>
+      <div class="panel-title">All machine rules</div>
+      <div class="panel-sub">Every machine-specific setting, across the fleet</div>
+    </div></div>
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
             <th>Machine</th>
-            <th>Type</th>
+            <th>Alert</th>
             <th>Enabled</th>
-            <th>Notify Emails</th>
+            <th>Notify</th>
             <th class="hide-mobile">Updated</th>
             {% if current_user.is_admin %}<th></th>{% endif %}
           </tr>
@@ -187,51 +303,40 @@
           {% for o in machine_overrides %}
           <tr>
             <td>
-              <span class="mono" style="font-size:12px">{{ o.system_name or o.table_name }}</span>
-              {% if o.location %}<div class="text-muted" style="font-size:11px;">{{ o.location }}</div>{% endif %}
+              <span class="mono" style="font-size:13px;font-weight:600;">{{ o.system_name or o.table_name }}</span>
+              {% if o.location %}<div class="text-muted" style="font-size:12px;">{{ o.location }}</div>{% endif %}
             </td>
-            <td>
-              <span style="font-size:16px">
-                {% if o.alert_type=='offline' %}🔴
-                {% elif o.alert_type=='online' %}🟢
-                {% elif o.alert_type=='cpu' %}🔥
-                {% elif o.alert_type=='ram' %}🧠
-                {% elif o.alert_type=='disk' %}💿
-                {% elif o.alert_type=='temp' %}🌡️
-                {% else %}🔔{% endif %}
-              </span>
-              <span class="mono" style="font-size:12px">{{ o.alert_type }}</span>
-            </td>
+            <td><span class="cell-type {{ type_grad(o.alert_type) }}"><span class="mini-icon">{{ type_icon(o.alert_type) }}</span>{{ TYPE_LABELS.get(o.alert_type, o.alert_type) }}</span></td>
             {% if current_user.is_admin %}
             <td>
-              <select form="ma-row-{{ o.id }}" name="enabled" style="width:auto;padding:5px 8px">
-                <option value="1" {% if o.enabled %}selected{% endif %}>On</option>
-                <option value="0" {% if not o.enabled %}selected{% endif %}>Off</option>
-              </select>
+              <label class="toggle toggle-sm" style="margin:0;">
+                <input form="ma-row-{{ o.id }}" type="checkbox" name="enabled" value="1" {% if o.enabled %}checked{% endif %} aria-label="Enabled">
+                <span class="toggle-slider"></span>
+              </label>
               <input form="ma-row-{{ o.id }}" type="hidden" name="alert_type" value="{{ o.alert_type }}">
               <input form="ma-row-{{ o.id }}" type="hidden" name="table_name" value="{{ o.table_name }}">
             </td>
-            <td style="min-width:220px;">
+            <td style="min-width:240px;">
               {{ macros.recipient_picker('recipient_emails', recipients, o.notify_emails, form_id='ma-row-' ~ o.id) }}
             </td>
-            <td class="text-muted hide-mobile" style="font-size:12px">
-              {{ o.updated_at.strftime('%m-%d %H:%M') if o.updated_at else '—' }}
+            <td class="text-muted hide-mobile" style="font-size:12px;white-space:nowrap;">
+              {{ o.updated_at.strftime('%d %b %H:%M') if o.updated_at else '—' }}
             </td>
-            <td style="display:flex;gap:6px;">
-              <button type="submit" form="ma-row-{{ o.id }}" class="btn btn-ghost btn-sm">Save</button>
-              <button type="submit" form="ma-del-{{ o.id }}" class="btn btn-danger btn-sm"
-                      onclick="return confirm('Remove this machine alert rule?')">Delete</button>
+            <td>
+              <div style="display:flex;gap:6px;">
+                <button type="submit" form="ma-row-{{ o.id }}" class="btn btn-ghost btn-sm">Save</button>
+                <button type="submit" form="ma-del-{{ o.id }}" class="btn btn-danger btn-sm"
+                        onclick="return confirm('Remove this machine alert rule?')">Delete</button>
+              </div>
             </td>
             {% else %}
-            <td><span class="badge badge-{{ 'online' if o.enabled else 'offline' }}">{{ 'ON' if o.enabled else 'OFF' }}</span></td>
+            <td><span class="badge badge-{{ 'online' if o.enabled else 'offline' }}">{{ 'On' if o.enabled else 'Off' }}</span></td>
             <td style="font-size:12px;">{{ o.notify_emails or '—' }}</td>
-            <td class="hide-mobile text-muted" style="font-size:12px">{{ o.updated_at.strftime('%m-%d %H:%M') if o.updated_at else '—' }}</td>
+            <td class="hide-mobile text-muted" style="font-size:12px">{{ o.updated_at.strftime('%d %b %H:%M') if o.updated_at else '—' }}</td>
             {% endif %}
           </tr>
           {% else %}
-          <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">
-            No per-machine alert routing yet — select a machine above to set who gets notified for it.
-          </td></tr>
+          <tr class="empty-row"><td colspan="6">No machine-specific routing yet — pick a machine above to choose who is notified for it.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -246,93 +351,57 @@
   {% endif %}
 </div>
 
-<!-- ── DVR ALERTS ─────────────────────────────────────────────────── -->
-<div class="tab-panel" data-tabpanel="alerts" data-panelid="dvr">
-  <div class="card mb-2" style="max-width:560px">
-    <div class="card-title">DVR Alert Settings</div>
-    {% if current_user.is_admin %}
-    <form method="POST" action="{{ url_for('alerts.update_dvr') }}">
-      <div class="form-group">
-        <label>Alerts Enabled</label>
-        <select name="alerts_enabled">
-          <option value="1" {% if dvr_settings.get('alerts_enabled','1')=='1' %}selected{% endif %}>Yes — send email alerts</option>
-          <option value="0" {% if dvr_settings.get('alerts_enabled','1')!='1' %}selected{% endif %}>No — disable DVR alerts</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Ping Interval (seconds)</label>
-        <input type="number" name="ping_interval_sec" value="{{ dvr_settings.get('ping_interval_sec','30') }}" min="5" max="3600">
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">How often to ping each DVR. Default: 30s</div>
-      </div>
-      <div class="form-group">
-        <label>Alert Recipients</label>
-        {{ macros.recipient_picker('recipient_emails', recipients, dvr_settings.get('alert_emails','')) }}
-        <div style="font-size:11px;color:var(--text-muted);margin-top:8px">
-          Manage the list itself in <a href="{{ url_for('settings.index') }}#recipients" style="color:var(--accent)">Settings → Alert Recipients</a>.
-        </div>
-      </div>
-      <button type="submit" class="btn btn-primary">Save DVR Alert Settings</button>
-    </form>
-    {% else %}
-    <div class="grid-2">
-      <div>
-        <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Alerts</div>
-        <span class="badge badge-{{ 'online' if dvr_settings.get('alerts_enabled','1')=='1' else 'offline' }}">
-          {{ 'Enabled' if dvr_settings.get('alerts_enabled','1')=='1' else 'Disabled' }}
-        </span>
-      </div>
-      <div>
-        <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Ping Interval</div>
-        <span class="mono">{{ dvr_settings.get('ping_interval_sec','30') }}s</span>
-      </div>
-    </div>
-    {% endif %}
-  </div>
-</div>
-
 <!-- ── DB MONITOR ALERTS ──────────────────────────────────────────── -->
+{% if current_user.is_admin or current_user.can_view_dbmon %}
 <div class="tab-panel" data-tabpanel="alerts" data-panelid="dbmon">
-  <div class="card mb-2">
-    <div class="card-title">DB Monitor Watch Controls</div>
+  <div class="panel">
+    <div class="panel-head"><div>
+      <div class="panel-title">DB Monitor feeds</div>
+      <div class="panel-sub">Monitoring, alerts and recipients for each watched table — an email goes out when a feed stops sending rows</div>
+    </div>
+    <a href="{{ url_for('dbmonitor.index') }}" class="btn btn-ghost btn-sm">Open DB Monitor</a></div>
     {% if dbmon_watches %}
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Connection</th>
             <th>Table</th>
+            <th class="hide-mobile">Connection</th>
             <th>Monitoring</th>
             <th>Alerts</th>
-            <th>Alert Emails</th>
-            {% if current_user.is_admin %}<th>Save</th>{% endif %}
+            <th>Notify</th>
+            {% if current_user.is_admin %}<th></th>{% endif %}
           </tr>
         </thead>
         <tbody>
           {% for w in dbmon_watches %}
           <tr>
-            <td class="text-muted" style="font-size:12px">{{ w.conn_name }}</td>
-            <td class="mono" style="font-size:12px">{{ w.display_name or (w.schema_name+'.'+w.table_name) }}</td>
+            <td>
+              <div style="font-weight:600;">{{ w.display_name or (w.schema_name+'.'+w.table_name) }}</div>
+              <div class="mono text-muted" style="font-size:11px;">{{ w.schema_name }}.{{ w.table_name }}</div>
+            </td>
+            <td class="text-muted hide-mobile" style="font-size:12px">{{ w.conn_name }}</td>
             <td>
               {% if current_user.is_admin %}
-              <select form="dbmon-form-{{ w.id }}" name="monitoring" style="width:auto;padding:5px 8px">
-                <option value="1" {% if w.monitoring %}selected{% endif %}>On</option>
-                <option value="0" {% if not w.monitoring %}selected{% endif %}>Off</option>
-              </select>
+              <label class="toggle toggle-sm" style="margin:0;">
+                <input form="dbmon-form-{{ w.id }}" type="checkbox" name="monitoring" value="1" {% if w.monitoring %}checked{% endif %} aria-label="Monitoring">
+                <span class="toggle-slider"></span>
+              </label>
               {% else %}
               <span class="badge badge-{{ 'online' if w.monitoring else 'offline' }}">{{ 'On' if w.monitoring else 'Off' }}</span>
               {% endif %}
             </td>
             <td>
               {% if current_user.is_admin %}
-              <select form="dbmon-form-{{ w.id }}" name="alerts_enabled" style="width:auto;padding:5px 8px">
-                <option value="1" {% if w.alerts_enabled %}selected{% endif %}>On</option>
-                <option value="0" {% if not w.alerts_enabled %}selected{% endif %}>Off</option>
-              </select>
+              <label class="toggle toggle-sm" style="margin:0;">
+                <input form="dbmon-form-{{ w.id }}" type="checkbox" name="alerts_enabled" value="1" {% if w.alerts_enabled %}checked{% endif %} aria-label="Alerts">
+                <span class="toggle-slider"></span>
+              </label>
               {% else %}
               <span class="badge badge-{{ 'online' if w.alerts_enabled else 'offline' }}">{{ 'On' if w.alerts_enabled else 'Off' }}</span>
               {% endif %}
             </td>
-            <td style="min-width:200px;">
+            <td style="min-width:220px;">
               {% if current_user.is_admin %}
               {{ macros.recipient_picker('recipient_emails', recipients, w.alert_emails, form_id='dbmon-form-' ~ w.id) }}
               {% else %}
@@ -340,16 +409,13 @@
               {% endif %}
             </td>
             {% if current_user.is_admin %}
-            <td>
-              <button form="dbmon-form-{{ w.id }}" type="submit" class="btn btn-ghost btn-sm">Save</button>
-            </td>
+            <td><button form="dbmon-form-{{ w.id }}" type="submit" class="btn btn-ghost btn-sm">Save</button></td>
             {% endif %}
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    <!-- Standalone forms per row -->
     {% if current_user.is_admin %}
     {% for w in dbmon_watches %}
     <form id="dbmon-form-{{ w.id }}" method="POST"
@@ -358,79 +424,171 @@
     {% endfor %}
     {% endif %}
     {% else %}
-    <div style="text-align:center;color:var(--text-muted);padding:32px">No DB monitor watches configured yet. Add them in <a href="{{ url_for('dbmonitor.index') }}" style="color:var(--accent)">DB Monitor</a>.</div>
+    <div class="empty-chart"><b>No DB Monitor feeds yet</b>Add a watched table in <a href="{{ url_for('dbmonitor.index') }}" style="color:var(--accent)">DB Monitor</a>.</div>
     {% endif %}
   </div>
 </div>
+{% endif %}
 
 <!-- ── ALERT LOG ───────────────────────────────────────────────────── -->
 <div class="tab-panel" data-tabpanel="alerts" data-panelid="log">
-  <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-      <div class="card-title" style="margin:0">Unified Alert Log</div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <!-- Filter -->
-        <select id="log-source-filter" onchange="filterLog()" style="width:auto;padding:5px 10px;font-size:12px">
-          <option value="">All Sources</option>
-          <option value="system">System</option>
-          <option value="dvr">DVR</option>
-          <option value="dbmonitor">DB Monitor</option>
-        </select>
-        {% if current_user.is_admin %}
-        <form method="POST" action="{{ url_for('alerts.clear_log') }}" onsubmit="return confirm('Clear ALL alert logs?')">
-          <input type="hidden" name="source" value="all">
-          <button type="submit" class="btn btn-danger btn-sm">Clear All</button>
-        </form>
-        {% endif %}
+  <div class="panel">
+    <div class="panel-head">
+      <div><div class="panel-title">Alert log</div><div class="panel-sub">Most recent {{ logs|length }} alerts, newest first</div></div>
+      {% if current_user.is_admin %}
+      <form method="POST" action="{{ url_for('alerts.clear_log') }}" onsubmit="return confirm('Clear ALL alert logs? This cannot be undone.')">
+        <input type="hidden" name="source" value="all">
+        <button type="submit" class="btn btn-danger btn-sm">Clear log</button>
+      </form>
+      {% endif %}
+    </div>
+    <div class="log-tools">
+      <input type="search" id="log-search" placeholder="Search machine or subject…" oninput="filterLog()" aria-label="Search alert log">
+      <div class="chip-group" data-filter-group="source">
+        <button type="button" class="fchip active" data-value="">All sources</button>
+        <button type="button" class="fchip" data-value="system">Servers</button>
+        <button type="button" class="fchip" data-value="dbmonitor">DB Monitor</button>
       </div>
+      <span class="chip-sep"></span>
+      <div class="chip-group" data-filter-group="status">
+        <button type="button" class="fchip active" data-value="">Any status</button>
+        <button type="button" class="fchip" data-value="sent">Sent</button>
+        <button type="button" class="fchip" data-value="failed">Failed</button>
+      </div>
+      <span class="log-count" id="log-count"></span>
     </div>
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>Time</th><th>Source</th><th>Type</th><th>Machine</th><th>Subject</th><th>Status</th></tr>
+          <tr><th>Time</th><th>Alert</th><th class="hide-mobile">Source</th><th>Machine</th><th>Subject</th><th>Status</th></tr>
         </thead>
         <tbody id="log-tbody">
           {% for log in logs %}
-          <tr data-source="{{ log.get('source','system') }}">
+          {% set src = log.get('source') or 'system' %}
+          {% set base_t = (log.alert_type or '').split(':')[0] %}
+          <tr data-source="{{ src }}" data-status="{{ 'sent' if log.success else 'failed' }}"
+              data-text="{{ ((log.machine_key or '') ~ ' ' ~ (log.subject or '') ~ ' ' ~ (log.alert_type or ''))|lower }}">
             <td class="text-muted" style="font-size:12px;white-space:nowrap">
-              {{ log.sent_at.strftime('%Y-%m-%d %H:%M:%S') if log.sent_at else '—' }}
+              {{ log.sent_at.strftime('%d %b %Y, %H:%M') if log.sent_at else '—' }}
             </td>
-            <td><span class="badge badge-info">{{ log.get('source','system') }}</span></td>
-            <td><span class="badge badge-warning">{{ log.alert_type }}</span></td>
+            <td><span class="cell-type {{ type_grad(log.alert_type) }}"><span class="mini-icon">{{ type_icon(log.alert_type) }}</span>{{ TYPE_LABELS.get(base_t, log.alert_type) }}{% if ':' in (log.alert_type or '') %} <span class="mono text-muted" style="font-size:11px;font-weight:500;">{{ log.alert_type.split(':', 1)[1] }}</span>{% endif %}</span></td>
+            <td class="hide-mobile"><span class="src-badge {{ src }}">{{ 'Servers' if src == 'system' else ('DB Monitor' if src == 'dbmonitor' else src) }}</span></td>
             <td class="mono" style="font-size:12px">{{ log.machine_key }}</td>
-            <td style="font-size:12px">{{ log.subject }}</td>
+            <td><div class="log-subject" title="{{ log.subject }}">{{ log.subject }}</div></td>
             <td>
-              {% if log.success %}<span class="badge badge-online">sent</span>
-              {% else %}<span class="badge badge-offline">failed</span>{% endif %}
+              {% if log.success %}<span class="badge badge-online">Sent</span>
+              {% else %}<span class="badge badge-offline">Failed</span>{% endif %}
             </td>
           </tr>
-          {% else %}
-          <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px">No alerts logged yet.</td></tr>
           {% endfor %}
+          <tr class="empty-row" id="log-empty" {% if logs %}style="display:none"{% endif %}><td colspan="6">{{ 'No alerts match these filters.' if logs else 'No alerts logged yet.' }}</td></tr>
         </tbody>
       </table>
     </div>
+    <div class="log-more"><button type="button" class="btn btn-ghost btn-sm" id="log-more-btn" onclick="showMoreLog()" style="display:none;">Show more</button></div>
   </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-function filterLog(){
-  var src=document.getElementById('log-source-filter').value;
-  document.querySelectorAll('#log-tbody tr[data-source]').forEach(function(tr){
-    tr.style.display=(!src||tr.dataset.source===src)?'':'none';
-  });
-}
+// ── Overview charts ──
+var AL_OVERVIEW = {{ overview|tojson }};
+var AL_GRADS = ['g:sunset', 'g:ocean', 'g:violet', 'g:mint', 'g:pink'];
+var AL_NAMES = { offline: 'Server offline', online: 'Back online', cpu: 'High CPU', ram: 'High RAM', disk: 'Disk full',
+                 temp: 'High temperature', db_dead: 'DB feed stopped', other: 'Other' };
+function alName(t) { return AL_NAMES[t] || String(t).replace(/_/g, ' '); }
 
-const MA_RECIPIENTS = {{ recipients | tojson }};
-const MA_ICONS = {offline:'🔴', online:'🟢', cpu:'🔥', ram:'🧠', disk:'💿', temp:'🌡️'};
-
-function _maEscapeHtml(s){
+function _alEsc(s) {
   var d = document.createElement('div');
   d.textContent = s == null ? '' : String(s);
   return d.innerHTML;
 }
+
+if (AL_OVERVIEW && AL_OVERVIEW.total) {
+  var alSeries = AL_OVERVIEW.series || [];
+  RM.chart('ch-al-days', {
+    type: 'bar',
+    data: {
+      labels: AL_OVERVIEW.labels,
+      datasets: alSeries.map(function(sr, i) {
+        return { label: alName(sr.type), data: sr.data, rm: { bg: AL_GRADS[i % AL_GRADS.length] }, borderRadius: 6, maxBarThickness: 30 };
+      })
+    },
+    options: {
+      animation: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: { legend: { display: false }, tooltip: { filter: function(it) { return it.raw > 0; } } },
+      scales: {
+        x: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+        y: { stacked: true, beginAtZero: true, border: { display: false }, ticks: { precision: 0, maxTicksLimit: 5 } }
+      }
+    }
+  });
+  RM.chart('ch-al-types', {
+    type: 'doughnut',
+    data: { labels: alSeries.map(function(sr) { return alName(sr.type); }),
+            datasets: [{ data: alSeries.map(function(sr) { return sr.total; }),
+                         rm: { bg: alSeries.map(function(_, i) { return AL_GRADS[i % AL_GRADS.length]; }) }, borderRadius: 8, spacing: 3 }] },
+    options: { cutout: '72%', animation: false, plugins: { legend: { display: false } } }
+  });
+  document.getElementById('al-legend').innerHTML = alSeries.map(function(sr, i) {
+    return '<span><i style="background:' + RM.cssBg(AL_GRADS[i % AL_GRADS.length]) + '"></i>' + _alEsc(alName(sr.type)) + '</span>';
+  }).join('');
+  document.getElementById('al-types').innerHTML = alSeries.map(function(sr, i) {
+    return '<div class="al-type-row"><i style="background:' + RM.cssBg(AL_GRADS[i % AL_GRADS.length]) + '"></i>' +
+           '<span>' + _alEsc(alName(sr.type)) + '</span><b>' + (+sr.total || 0) + '</b></div>';
+  }).join('');
+}
+
+// ── Alert log: search + filter chips + "show more" ──
+var LOG_PAGE = 50, logLimit = LOG_PAGE;
+var logFilters = { source: '', status: '' };
+function filterLog() {
+  var q = (document.getElementById('log-search').value || '').trim().toLowerCase();
+  var rows = document.querySelectorAll('#log-tbody tr[data-source]');
+  var matched = 0, shown = 0;
+  rows.forEach(function(tr) {
+    var ok = (!logFilters.source || tr.dataset.source === logFilters.source) &&
+             (!logFilters.status || tr.dataset.status === logFilters.status) &&
+             (!q || tr.dataset.text.indexOf(q) !== -1);
+    if (ok) matched++;
+    var vis = ok && shown < logLimit;
+    if (vis) shown++;
+    tr.style.display = vis ? '' : 'none';
+  });
+  var empty = document.getElementById('log-empty');
+  if (empty) empty.style.display = matched === 0 ? '' : 'none';
+  var more = document.getElementById('log-more-btn');
+  if (more) more.style.display = matched > shown ? '' : 'none';
+  var cnt = document.getElementById('log-count');
+  if (cnt) cnt.textContent = rows.length ? ('Showing ' + shown + ' of ' + matched) : '';
+}
+function showMoreLog() { logLimit += LOG_PAGE; filterLog(); }
+document.querySelectorAll('[data-filter-group]').forEach(function(group) {
+  group.querySelectorAll('.fchip').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      group.querySelectorAll('.fchip').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      logFilters[group.dataset.filterGroup] = btn.dataset.value;
+      logLimit = LOG_PAGE;
+      filterLog();
+    });
+  });
+});
+filterLog();
+
+// ── Machine routing (per-machine enabled + recipients) ──
+const MA_RECIPIENTS = {{ recipients | tojson }};
+const MA_GRAD = { offline: 'k-red', online: 'k-mint', cpu: 'k-ocean', ram: 'k-violet', disk: 'k-sunset', temp: 'k-pink' };
+const MA_ICON_SVG = {
+  offline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l22 22"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>',
+  online:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>',
+  cpu:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>',
+  ram:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="10" rx="1"/><line x1="8" y1="7" x2="8" y2="17"/><line x1="16" y1="7" x2="16" y2="17"/></svg>',
+  disk:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>',
+  temp:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z"/></svg>'
+};
 
 async function loadMachineAlertRules(tableName){
   var panel = document.getElementById('ma-rules-panel');
@@ -438,7 +596,7 @@ async function loadMachineAlertRules(tableName){
   var form  = document.getElementById('ma-rules-form');
   if (!tableName){ panel.style.display = 'none'; return; }
 
-  form.action = '/alerts/machine/' + tableName + '/save-all';
+  form.action = '/alerts/machine/' + encodeURIComponent(tableName) + '/save-all';
 
   var rows;
   try {
@@ -447,30 +605,30 @@ async function loadMachineAlertRules(tableName){
   } catch(e){ console.error('failed to load machine alert rules', e); return; }
 
   tbody.innerHTML = rows.map(function(row){
-    var t = row.alert_type;
+    var t = String(row.alert_type).replace(/[^a-z_]/gi, '');
     var selected = (row.notify_emails || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
 
     var recipientHtml = MA_RECIPIENTS.length
       ? MA_RECIPIENTS.map(function(rc){
           var checked = selected.indexOf(rc.email) !== -1;
           return '<label class="recipient-chip' + (checked ? ' checked' : '') + '">' +
-            '<input type="checkbox" name="emails_' + t + '" value="' + _maEscapeHtml(rc.email) + '"' + (checked ? ' checked' : '') + '>' +
-            '<span>' + _maEscapeHtml(rc.label || rc.email) + '</span></label>';
+            '<input type="checkbox" name="emails_' + t + '" value="' + _alEsc(rc.email) + '"' + (checked ? ' checked' : '') + '>' +
+            '<span>' + _alEsc(rc.label || rc.email) + '</span></label>';
         }).join('')
       : '<span class="recipient-picker-empty">No recipients yet — add some in Settings → Alert Recipients.</span>';
 
-    var overrideBadge = row.has_override
-      ? ' <span class="badge badge-info" style="font-size:9px;">override</span>'
-      : ' <span class="text-muted" style="font-size:10px;">(using global default)</span>';
+    var badge = row.has_override
+      ? '<span class="badge badge-info" style="font-size:10px;margin-left:6px;">custom</span>'
+      : '<span class="text-muted" style="font-size:11px;font-weight:500;margin-left:6px;">default</span>';
 
-    return '<tr>' +
-      '<td><span style="font-size:16px">' + MA_ICONS[t] + '</span> <span class="mono" style="font-size:12px">' + t + '</span>' + overrideBadge + '</td>' +
-      '<td><select name="enabled_' + t + '" style="width:auto;padding:5px 8px">' +
-        '<option value="1"' + (row.enabled ? ' selected' : '') + '>On</option>' +
-        '<option value="0"' + (!row.enabled ? ' selected' : '') + '>Off</option>' +
-      '</select></td>' +
-      '<td style="min-width:220px;"><div class="recipient-picker">' + recipientHtml + '</div></td>' +
-    '</tr>';
+    return '<div class="ma-row">' +
+      '<div class="ma-type ' + (MA_GRAD[t] || 'k-ocean') + '"><span class="kpi-icon">' + (MA_ICON_SVG[t] || '') + '</span>' +
+        '<span>' + _alEsc(alName(t)) + badge + '</span></div>' +
+      '<label class="toggle" style="margin:0;" title="Enabled for this machine">' +
+        '<input type="checkbox" name="enabled_' + t + '" value="1"' + (row.enabled ? ' checked' : '') + ' aria-label="Enabled">' +
+        '<span class="toggle-slider"></span></label>' +
+      '<div class="recipient-picker">' + recipientHtml + '</div>' +
+    '</div>';
   }).join('');
 
   // Wire chip highlight state for the freshly-inserted checkboxes (mirrors

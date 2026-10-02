@@ -158,7 +158,7 @@ def _render_dvr_alert(kind, hospital, location, dvr_name, ip, port, rows, now=No
     <table style="width:100%;border-collapse:collapse;">{html_rows}</table>
   </div>
   <div style="background:#f7f7f9;padding:10px 22px;border-top:1px solid #eee;">
-    <span style="font-size:11px;color:#a0a4ab;">REFORMMED Monitor · automated alert</span>
+    <span style="font-size:11px;color:#a0a4ab;">Reformmed INFRA Monitor · automated alert</span>
   </div>
 </div>
 """

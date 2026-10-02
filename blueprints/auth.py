@@ -2,28 +2,38 @@ import base64
 import io
 import json
 import os
-import random
+import secrets
 
 import pyotp
 import qrcode
-from flask import Blueprint, render_template, redirect, url_for, request, flash, session, jsonify
+from flask import Blueprint, render_template, redirect, url_for, request, flash, session, jsonify, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from models import User
 from oauth import oauth
 from alert_sender import send_alert_email
+from security import RateLimiter, client_ip, safe_next_url
 
 auth_bp = Blueprint("auth", __name__)
+
+# 10 failed logins per IP+account per 15 min; 5 reset emails per IP per hour;
+# 20 OTP checks per IP per 15 min (each code also burns after 5 bad tries).
+_login_limiter = RateLimiter(10, 15 * 60)
+_reset_limiter = RateLimiter(5, 60 * 60)
+_otp_limiter   = RateLimiter(20, 15 * 60)
+_2fa_limiter   = RateLimiter(10, 15 * 60)
 
 
 def _start_2fa_challenge(user, next_url=None):
     """Common to password login and Google login: instead of logging the
     user in immediately, park them pending a correct 6-digit code."""
+    session.clear()  # fresh session for the new auth state (no fixation)
     session["pending_2fa_user_id"] = user.id
-    session["pending_2fa_next"] = next_url or url_for("home.index")
+    session["pending_2fa_next"] = safe_next_url(next_url, url_for("home.index"))
     return redirect(url_for("auth.verify_2fa"))
 
 
 def _complete_login(user):
+    session.clear()  # drop any pre-login session data (session fixation)
     session.permanent = True  # applies PERMANENT_SESSION_LIFETIME (7 days)
     login_user(user, remember=True)  # applies REMEMBER_COOKIE_DURATION (7 days)
     User.touch_login(user.id)
@@ -31,17 +41,26 @@ def _complete_login(user):
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("home.index"))
     if request.method == "POST":
         identifier = request.form.get("username", "").strip()
         password   = request.form.get("password", "")
+        rl_key = f"{client_ip()}|{identifier.lower()}"
+        if _login_limiter.blocked(rl_key):
+            flash("Too many failed attempts. Try again in a few minutes.", "danger")
+            return render_template("login.html", google_sso_enabled=bool(os.getenv("GOOGLE_CLIENT_ID"))), 429
         user = User.get_by_username(identifier)
         if not user:
             user = User.get_by_email(identifier)
         if user and user.check_password(password) and user.is_active:
+            _login_limiter.reset(rl_key)
+            next_url = safe_next_url(request.args.get("next"), url_for("home.index"))
             if user.totp_enabled:
-                return _start_2fa_challenge(user, request.args.get("next"))
+                return _start_2fa_challenge(user, next_url)
             _complete_login(user)
-            return redirect(request.args.get("next") or url_for("home.index"))
+            return redirect(next_url)
+        _login_limiter.hit(rl_key)
         flash("Invalid username/email or password.", "danger")
     return render_template("login.html", google_sso_enabled=bool(os.getenv("GOOGLE_CLIENT_ID")))
 
@@ -69,8 +88,9 @@ def google_login():
 def google_callback():
     try:
         token = oauth.google.authorize_access_token()
-    except Exception as e:
-        flash(f"Google sign-in failed: {e}", "danger")
+    except Exception:
+        current_app.logger.exception("Google sign-in failed")
+        flash("Google sign-in failed. Please try again.", "danger")
         return redirect(url_for("auth.login"))
 
     userinfo = token.get("userinfo") or {}
@@ -109,21 +129,28 @@ def verify_2fa():
         return redirect(url_for("auth.login"))
 
     if request.method == "POST":
+        rl_key = f"{client_ip()}|2fa|{user.id}"
+        if _2fa_limiter.blocked(rl_key):
+            session.pop("pending_2fa_user_id", None)
+            flash("Too many wrong codes. Sign in again in a few minutes.", "danger")
+            return redirect(url_for("auth.login"))
         code = request.form.get("code", "")
         if user.check_totp(code):
-            next_url = session.pop("pending_2fa_next", None) or url_for("home.index")
-            session.pop("pending_2fa_user_id", None)
+            _2fa_limiter.reset(rl_key)
+            next_url = safe_next_url(session.pop("pending_2fa_next", None), url_for("home.index"))
             _complete_login(user)
             return redirect(next_url)
+        _2fa_limiter.hit(rl_key)
         flash("Invalid code. Check your authenticator app and try again.", "danger")
 
     return render_template("login_2fa.html", username=user.username)
 
 
-@auth_bp.route("/logout")
+@auth_bp.route("/logout", methods=["POST"])
 @login_required
 def logout():
     logout_user()
+    session.clear()
     return redirect(url_for("auth.login"))
 
 
@@ -140,12 +167,16 @@ def forgot_password():
 def forgot_password_send():
     data = request.get_json(silent=True) or {}
     email = (data.get("email") or "").strip()
+    rl_key = f"{client_ip()}|reset"
+    if _reset_limiter.blocked(rl_key):
+        return jsonify({"ok": False, "error": "Too many requests. Try again later."}), 429
+    _reset_limiter.hit(rl_key)
     user = User.get_by_email(email)
     if user and user.is_active:
-        otp = f"{random.randint(0, 999999):06d}"
+        otp = f"{secrets.randbelow(1_000_000):06d}"
         User.set_reset_otp(user.id, otp)
         send_alert_email(
-            "REFORMMED Monitor — Password Reset Code",
+            "Reformmed INFRA Monitor — Password Reset Code",
             f"Your password reset code is: {otp}\n\n"
             f"This code expires in 15 minutes. If you didn't request this, "
             f"you can safely ignore this email.",
@@ -161,6 +192,10 @@ def forgot_password_verify():
     data = request.get_json(silent=True) or {}
     email = (data.get("email") or "").strip()
     code  = (data.get("code") or "").strip()
+    rl_key = f"{client_ip()}|otp"
+    if _otp_limiter.blocked(rl_key):
+        return jsonify({"ok": False, "error": "Too many attempts. Try again later."}), 429
+    _otp_limiter.hit(rl_key)
     user = User.get_by_email(email)
     if not user or not user.check_reset_otp(code):
         return jsonify({"ok": False, "error": "Invalid or expired code."}), 400
@@ -177,6 +212,10 @@ def forgot_password_reset():
     password = data.get("password") or ""
     confirm  = data.get("confirm") or ""
 
+    rl_key = f"{client_ip()}|otp"
+    if _otp_limiter.blocked(rl_key):
+        return jsonify({"ok": False, "error": "Too many attempts. Try again later."}), 429
+    _otp_limiter.hit(rl_key)
     user = User.get_by_email(email)
     if not user or not user.check_reset_otp(code):
         return jsonify({"ok": False, "error": "Invalid or expired code."}), 400
@@ -197,13 +236,89 @@ def profile():
         updates = {}
         new_email = request.form.get("email", "").strip()
         new_password = request.form.get("password", "").strip()
-        if new_email: updates["email"] = new_email
+        if new_email and new_email != current_user.email: updates["email"] = new_email
         if new_password: updates["password"] = new_password
         if updates:
+            if not current_user.check_password(request.form.get("current_password", "")):
+                flash("Enter your current password to change your email or password.", "danger")
+                return redirect(url_for("auth.profile"))
+            if new_password and len(new_password) < 8:
+                flash("Password must be at least 8 characters.", "danger")
+                return redirect(url_for("auth.profile"))
+            if "email" in updates:
+                other = User.get_by_email(new_email)
+                if other and other.id != current_user.id:
+                    flash("That email is already used by another account.", "danger")
+                    return redirect(url_for("auth.profile"))
             User.update(current_user.id, **updates)
             flash("Profile updated.", "success")
         return redirect(url_for("auth.profile"))
     return render_template("profile.html")
+
+
+# ── Profile photo ────────────────────────────────────────────────────────────
+
+AVATAR_MAX_BYTES = 3 * 1024 * 1024
+AVATAR_SIZE = 256
+
+
+def _normalise_avatar(data):
+    """Decode with Pillow and re-encode as a fresh 256×256 PNG. Re-encoding
+    means only pixels are stored — never the uploaded file itself — so a
+    disguised HTML/SVG/script upload can't be served back to anyone."""
+    from PIL import Image, ImageOps
+    Image.MAX_IMAGE_PIXELS = 40_000_000  # refuse decompression bombs
+    img = Image.open(io.BytesIO(data))
+    if img.format not in ("PNG", "JPEG", "WEBP", "GIF"):
+        raise ValueError("unsupported format")
+    img = ImageOps.exif_transpose(img).convert("RGBA")
+    img = ImageOps.fit(img, (AVATAR_SIZE, AVATAR_SIZE), Image.LANCZOS)
+    out = io.BytesIO()
+    img.save(out, format="PNG", optimize=True)
+    return out.getvalue()
+
+
+@auth_bp.route("/profile/avatar", methods=["POST"])
+@login_required
+def avatar_upload():
+    f = request.files.get("avatar")
+    if not f or not f.filename:
+        flash("Choose an image to upload.", "warning")
+        return redirect(url_for("auth.profile"))
+    data = f.read(AVATAR_MAX_BYTES + 1)
+    if len(data) > AVATAR_MAX_BYTES:
+        flash("That image is larger than 3 MB.", "danger")
+        return redirect(url_for("auth.profile"))
+    try:
+        png = _normalise_avatar(data)
+    except Exception:
+        flash("That file isn't a supported image (PNG, JPG, WEBP or GIF).", "danger")
+        return redirect(url_for("auth.profile"))
+    User.set_avatar(current_user.id, png)
+    flash("Profile photo updated.", "success")
+    return redirect(url_for("auth.profile"))
+
+
+@auth_bp.route("/profile/avatar/remove", methods=["POST"])
+@login_required
+def avatar_remove():
+    User.remove_avatar(current_user.id)
+    flash("Profile photo removed.", "success")
+    return redirect(url_for("auth.profile"))
+
+
+@auth_bp.route("/avatar/<int:user_id>")
+@login_required
+def avatar(user_id):
+    from flask import Response, abort
+    img = User.get_avatar(user_id)
+    if img is None:
+        abort(404)
+    resp = Response(img, mimetype="image/png")
+    # URLs carry ?v=<avatar_ver>, so a changed photo gets a new URL
+    resp.headers["Cache-Control"] = "private, max-age=86400"
+    resp.headers["Content-Security-Policy"] = "default-src 'none'"
+    return resp
 
 
 # ── Two-factor auth setup (self-service, from Profile) ──────────────────────
@@ -221,7 +336,7 @@ def totp_setup():
     if not current_user.totp_secret:
         User.start_totp_setup(current_user.id, secret)
 
-    uri = pyotp.TOTP(secret).provisioning_uri(name=current_user.email, issuer_name="REFORMMED Monitor")
+    uri = pyotp.TOTP(secret).provisioning_uri(name=current_user.email, issuer_name="Reformmed INFRA Monitor")
     img = qrcode.make(uri)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
@@ -251,6 +366,9 @@ def totp_disable():
     password = request.form.get("password", "")
     if not current_user.check_password(password):
         flash("Incorrect password.", "danger")
+        return redirect(url_for("auth.profile"))
+    if not current_user.check_totp(request.form.get("code", "")):
+        flash("Enter a current 6-digit code from your authenticator app to disable 2FA.", "danger")
         return redirect(url_for("auth.profile"))
     User.disable_totp(current_user.id)
     flash("Two-factor authentication disabled.", "success")

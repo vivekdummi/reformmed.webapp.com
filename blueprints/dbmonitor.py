@@ -25,8 +25,22 @@ import psycopg2.extras
 
 dbmonitor_bp = Blueprint("dbmonitor", __name__, url_prefix="/dbmonitor")
 
+
+@dbmonitor_bp.before_request
+def _require_dbmon_feature():
+    """can_view_dbmon used to only hide the nav link — enforce it on the routes too."""
+    if current_user.is_authenticated and not (current_user.is_admin or current_user.can_view_dbmon):
+        abort(403)
+
 DEAD_THRESHOLD_MINUTES = 5   # no rows in this window = DEAD
 ALERT_REPEAT_HOURS     = 1   # re-send alert every N hours while still dead
+
+
+def _qi(name):
+    """Quote a SQL identifier (schema/table/column names entered by an admin or
+    read from the external DB's catalog). Embedded double quotes are doubled,
+    so a name like  x"; DROP TABLE y; --  can't break out of the quoting."""
+    return '"' + str(name).replace('"', '""') + '"'
 
 
 def _admin_required():
@@ -373,6 +387,7 @@ def delete_connection(conn_id):
 @dbmonitor_bp.route("/connection/<int:conn_id>/test")
 @login_required
 def test_connection(conn_id):
+    _admin_required()  # opens an outbound DB connection — admin only
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute("SELECT * FROM dbmon_connections WHERE id=%s", (conn_id,))
@@ -381,10 +396,12 @@ def test_connection(conn_id):
         return jsonify({"ok": False, "error": "Not found"})
     try:
         c = _ext_conn(row)
-        cur2 = c.cursor()
-        cur2.execute("SELECT version()")
-        ver = cur2.fetchone()
-        c.close()
+        try:
+            cur2 = c.cursor()
+            cur2.execute("SELECT version()")
+            ver = cur2.fetchone()
+        finally:
+            c.close()
         return jsonify({"ok": True, "version": str(ver[0] if ver else "OK")})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
@@ -674,18 +691,18 @@ def _location_breakdown(cur2, schema, table, time_col):
         return loc_col, None, []
 
     area_col = _detect_area_col(cur2, schema, table)
-    area_select = f', "{area_col}" AS area' if area_col else ", NULL AS area"
-    group_cols  = f'"{loc_col}", "{area_col}"' if area_col else f'"{loc_col}"'
+    area_select = f', {_qi(area_col)} AS area' if area_col else ", NULL AS area"
+    group_cols  = f'{_qi(loc_col)}, {_qi(area_col)}' if area_col else f'{_qi(loc_col)}'
 
     cur2.execute(f"""
-        SELECT "{loc_col}" AS loc
+        SELECT {_qi(loc_col)} AS loc
                {area_select},
-               MAX("{time_col}") AS last_t,
+               MAX({_qi(time_col)}) AS last_t,
                COUNT(*) FILTER (
-                   WHERE "{time_col}" > NOW() - INTERVAL '{DEAD_THRESHOLD_MINUTES} minutes'
+                   WHERE {_qi(time_col)} > NOW() - INTERVAL '{DEAD_THRESHOLD_MINUTES} minutes'
                ) AS recent_cnt
-        FROM "{schema}"."{table}"
-        WHERE "{time_col}" > NOW() - INTERVAL '1 day'
+        FROM {_qi(schema)}.{_qi(table)}
+        WHERE {_qi(time_col)} > NOW() - INTERVAL '1 day'
         GROUP BY {group_cols}
     """)
     return loc_col, area_col, cur2.fetchall()
@@ -938,6 +955,7 @@ def watch_status(watch_id):
     if not watch["monitoring"]:
         return jsonify({"monitoring": False})
 
+    c = None
     try:
         c = _ext_conn(watch)
         cur2 = c.cursor()
@@ -976,7 +994,7 @@ def watch_status(watch_id):
         if time_col:
             # Use MAX on the time column — fast with an index, OK without
             cur2.execute(
-                f'SELECT MAX("{time_col}") as last_t FROM "{schema}"."{table}"'
+                f'SELECT MAX({_qi(time_col)}) as last_t FROM {_qi(schema)}.{_qi(table)}'
             )
             r = cur2.fetchone()
             if r and r["last_t"]:
@@ -984,15 +1002,15 @@ def watch_status(watch_id):
 
             # Count rows in last 5 minutes (dead threshold)
             cur2.execute(
-                f'SELECT COUNT(*) as cnt FROM "{schema}"."{table}" '
-                f'WHERE "{time_col}" > NOW() - INTERVAL \'{DEAD_THRESHOLD_MINUTES} minutes\''
+                f'SELECT COUNT(*) as cnt FROM {_qi(schema)}.{_qi(table)} '
+                f'WHERE {_qi(time_col)} > NOW() - INTERVAL \'{DEAD_THRESHOLD_MINUTES} minutes\''
             )
             rows_last_5min = cur2.fetchone()["cnt"]
 
             # Count rows in last 1 minute (rows/min rate)
             cur2.execute(
-                f'SELECT COUNT(*) as cnt FROM "{schema}"."{table}" '
-                f'WHERE "{time_col}" > NOW() - INTERVAL \'1 minute\''
+                f'SELECT COUNT(*) as cnt FROM {_qi(schema)}.{_qi(table)} '
+                f'WHERE {_qi(time_col)} > NOW() - INTERVAL \'1 minute\''
             )
             rows_last_1min = cur2.fetchone()["cnt"]
 
@@ -1074,3 +1092,6 @@ def watch_status(watch_id):
 
     except Exception as e:
         return jsonify({"error": str(e)})
+    finally:
+        if c is not None and not c.closed:
+            c.close()  # a failed query used to leak the external connection

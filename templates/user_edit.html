@@ -1,140 +1,188 @@
 {% extends "base.html" %}
-{% block title %}Edit {{ user.username }} — REFORMMED Monitor{% endblock %}
+{% import "_macros.html" as ui %}
+{% block title %}Edit {{ user.username }} — Reformmed INFRA Monitor{% endblock %}
 {% block page_title %}Edit User{% endblock %}
+
+{% block extra_css %}
+<style>
+.ue-head{display:flex;align-items:center;gap:16px;}
+.ue-head .avatar{box-shadow:0 0 0 4px var(--bg2),0 0 0 6px var(--accent-soft);}
+.ue-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;align-items:start;}
+@media(max-width:1000px){.ue-grid{grid-template-columns:1fr;}}
+.ue-col{display:flex;flex-direction:column;gap:16px;min-width:0;}
+.perm-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+@media(max-width:620px){.perm-cards{grid-template-columns:1fr;}}
+.perm-card{display:flex;flex-direction:column;gap:6px;padding:14px;border-radius:14px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;margin:0;color:var(--text);font-size:14px;font-weight:700;transition:border-color .15s,background .15s;}
+.perm-card:has(input:checked){border-color:var(--accent);background:var(--accent-soft);}
+.perm-card .top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.perm-card small{font-size:12px;color:var(--text-muted);font-weight:500;}
+.perm-card input{width:auto;margin:0;}
+.srv-tools{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+.srv-tools input{flex:1;min-width:160px;}
+.srv-box{max-height:260px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:6px;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;}
+.srv-chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:99px;border:1px solid var(--border-strong);font-size:12px;cursor:pointer;margin:0;color:var(--text);font-weight:600;}
+.srv-chip input{width:auto;margin:0;}
+.srv-chip:has(input:checked){background:var(--accent-soft);border-color:transparent;color:var(--accent);}
+.srv-chip span{color:var(--text-muted);font-weight:500;}
+.srv-count{font-size:12px;color:var(--text-muted);font-weight:600;}
+.admin-note{display:flex;gap:12px;align-items:center;padding:14px;border-radius:14px;background:color-mix(in srgb,var(--violet) 12%,transparent);color:var(--text);font-size:13px;}
+.sec-line{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;background:var(--bg3);margin-bottom:10px;font-size:13px;}
+.sec-line b{font-size:14px;}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;background:var(--bg3);margin:0 0 10px;cursor:pointer;color:var(--text);font-size:13px;font-weight:600;}
+.toggle-row small{display:block;font-weight:500;color:var(--text-muted);font-size:12px;}
+.sticky-save{position:sticky;bottom:16px;display:flex;justify-content:flex-end;gap:10px;margin-top:16px;padding:12px;border-radius:16px;background:var(--header-bg);border:1px solid var(--border);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:var(--shadow);z-index:5;}
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <div>
-    <h1>Edit User: <span class="mono">{{ user.username }}</span></h1>
-    <p>Update account details, feature permissions, and server access</p>
+  <div class="ue-head">
+    {{ ui.avatar(user, 64) }}
+    <div>
+      <h1>{{ user.username }}</h1>
+      <p>{{ user.email }} · {{ user.role|capitalize }}{% if not user.is_active %} · <span style="color:var(--red);font-weight:600;">Disabled</span>{% endif %}</p>
+    </div>
   </div>
-  <a href="{{ url_for('users.index') }}" class="btn btn-ghost">← Back</a>
+  <a href="{{ url_for('users.index') }}" class="btn btn-ghost">← All users</a>
 </div>
 
-<div class="card" style="max-width:720px">
-  <form method="POST" id="edit-user-form">
-    <div class="grid-2">
-      <div class="form-group">
-        <label>Username</label>
-        <input type="text" name="username" value="{{ user.username }}" required>
+<form method="POST" id="edit-user-form">
+<div class="ue-grid">
+  <div class="ue-col">
+    <div class="panel">
+      <div class="panel-head"><div><div class="panel-title">Account</div><div class="panel-sub">Sign-in details, role and status</div></div></div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="ue-name">Username</label>
+          <input type="text" id="ue-name" name="username" value="{{ user.username }}" required>
+        </div>
+        <div class="form-group">
+          <label for="ue-mail">Email</label>
+          <input type="email" id="ue-mail" name="email" value="{{ user.email }}" required>
+        </div>
       </div>
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" name="email" value="{{ user.email }}" required>
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="edit-role">Role</label>
+          <select name="role" id="edit-role" onchange="togglePermsSection(this.value,'edit')">
+            <option value="user" {% if user.role=='user' %}selected{% endif %}>User</option>
+            <option value="admin" {% if user.role=='admin' %}selected{% endif %}>Admin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="ue-active">Account status</label>
+          <select name="is_active" id="ue-active">
+            <option value="1" {% if user.is_active %}selected{% endif %}>Active</option>
+            <option value="0" {% if not user.is_active %}selected{% endif %}>Disabled</option>
+          </select>
+        </div>
       </div>
-    </div>
-    <div class="grid-2">
-      <div class="form-group">
-        <label>Role</label>
-        <select name="role" id="edit-role" onchange="togglePermsSection(this.value,'edit')">
-          <option value="user" {% if user.role=='user' %}selected{% endif %}>User</option>
-          <option value="admin" {% if user.role=='admin' %}selected{% endif %}>Admin</option>
-        </select>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="ue-pw">New password <span class="text-muted" style="font-weight:500;">(leave blank to keep the current one)</span></label>
+        <input type="password" id="ue-pw" name="password" placeholder="Leave blank to keep unchanged" minlength="8" autocomplete="new-password">
       </div>
-      <div class="form-group">
-        <label>Account Status</label>
-        <select name="is_active">
-          <option value="1" {% if user.is_active %}selected{% endif %}>Active</option>
-          <option value="0" {% if not user.is_active %}selected{% endif %}>Disabled</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-group">
-      <label>New Password <span class="text-muted">(leave blank to keep current)</span></label>
-      <input type="password" name="password" placeholder="Leave blank to keep unchanged">
     </div>
 
-    <!-- Feature permissions + server access (hidden for admin) -->
-    <div id="edit-perms-section" {% if user.role=='admin' %}style="display:none"{% endif %}>
-      <hr class="divider">
-      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Feature Permissions</div>
-      <div class="grid-2" style="margin-bottom:14px">
-        <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
-          <input type="checkbox" name="can_view_servers" value="1" {% if user.can_view_servers %}checked{% endif %} style="width:auto;margin:0">
-          <span>Servers page</span>
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
-          <input type="checkbox" name="can_view_dvr" value="1" {% if user.can_view_dvr %}checked{% endif %} style="width:auto;margin:0">
-          <span>DVR Monitor</span>
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
-          <input type="checkbox" name="can_view_dbmon" value="1" {% if user.can_view_dbmon %}checked{% endif %} style="width:auto;margin:0">
-          <span>DB Monitor</span>
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
-          <input type="checkbox" name="can_view_alerts" value="1" {% if user.can_view_alerts %}checked{% endif %} style="width:auto;margin:0">
-          <span>Alerts page</span>
-        </label>
+    <div class="panel">
+      <div class="panel-head"><div><div class="panel-title">Permissions</div><div class="panel-sub">Which parts of the app this user can open</div></div></div>
+      <div id="edit-admin-note" class="admin-note" {% if user.role!='admin' %}style="display:none"{% endif %}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Admins always have full access to every page and every server.
       </div>
-      <hr class="divider">
-      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Server Access</div>
-      <div style="max-height:200px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px">
+      <!-- Feature permissions + server access (hidden for admin) -->
+      <div id="edit-perms-section" {% if user.role=='admin' %}style="display:none"{% endif %}>
+        <div class="perm-cards">
+          <label class="perm-card"><span class="top">Servers <input type="checkbox" name="can_view_servers" value="1" {% if user.can_view_servers %}checked{% endif %}></span><small>Server list, details & reports</small></label>
+          <label class="perm-card"><span class="top">DB Monitor <input type="checkbox" name="can_view_dbmon" value="1" {% if user.can_view_dbmon %}checked{% endif %}></span><small>External data-feed health</small></label>
+          <label class="perm-card"><span class="top">Alerts <input type="checkbox" name="can_view_alerts" value="1" {% if user.can_view_alerts %}checked{% endif %}></span><small>Alert log & configuration</small></label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ue-col">
+    <div class="panel" id="edit-srv-panel" {% if user.role=='admin' %}style="display:none"{% endif %}>
+      <div class="panel-head">
+        <div><div class="panel-title">Server access</div><div class="panel-sub">Servers this user can see on Home, Servers and Reports</div></div>
+        <span class="srv-count" id="srv-count"></span>
+      </div>
+      <div class="srv-tools">
+        <input type="search" id="srv-filter" placeholder="Filter servers…" aria-label="Filter servers">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="setAllSrv(true)">Select all</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="setAllSrv(false)">Clear</button>
+      </div>
+      <div class="srv-box" id="srv-box">
         {% for srv in servers %}
-        <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
-          <input type="checkbox" name="server_access" value="{{ srv.table_name }}"
-                 {% if srv.table_name in current_access %}checked{% endif %}
-                 style="width:auto;margin:0">
-          <span class="mono" style="font-size:12px;color:var(--accent)">{{ srv.system_name }}</span>
-          <span class="text-muted">— {{ srv.location }}</span>
+        <label class="srv-chip" data-search="{{ (srv.system_name ~ ' ' ~ srv.location)|lower }}">
+          <input type="checkbox" name="server_access" value="{{ srv.table_name }}" {% if srv.table_name in current_access %}checked{% endif %}>
+          {{ srv.system_name }} <span>· {{ srv.location }}</span>
         </label>
         {% else %}
         <span class="text-muted" style="font-size:13px">No servers registered.</span>
         {% endfor %}
       </div>
+    </div>
 
-      <hr class="divider">
-      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">DVR Hospital Access <span style="text-transform:none;font-weight:400;">(only used when "DVR Monitor" is checked above; leave all unchecked to block DVR entirely)</span></div>
-      <div style="max-height:200px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px">
-        {% for hosp in hospitals %}
-        <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);cursor:pointer">
-          <input type="checkbox" name="hospital_access" value="{{ hosp.id }}"
-                 {% if hosp.id in current_hospital_access %}checked{% endif %}
-                 style="width:auto;margin:0">
-          <span>{{ hosp.name }}</span>
-        </label>
-        {% else %}
-        <span class="text-muted" style="font-size:13px">No hospitals registered.</span>
-        {% endfor %}
+    <div class="panel">
+      <div class="panel-head"><div><div class="panel-title">Security</div><div class="panel-sub">Two-factor authentication</div></div></div>
+      <div class="sec-line">
+        <span><b>Status</b></span>
+        {% if user.totp_enabled %}<span class="badge badge-online">2FA enabled</span>
+        {% else %}<span class="badge" style="background:var(--bg2);color:var(--text-muted);">Not set up</span>{% endif %}
       </div>
-    </div>
-
-    <div style="display:flex;gap:10px;margin-top:18px">
-      <button type="submit" class="btn btn-primary">Save Changes</button>
-      <a href="{{ url_for('users.index') }}" class="btn btn-ghost">Cancel</a>
-    </div>
-  </form>
-
-  <hr class="divider">
-  <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Two-Factor Authentication</div>
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-    <div style="font-size:13px;">
-      Status:
-      {% if user.totp_enabled %}
-        <span class="badge badge-online">Enabled</span>
-      {% else %}
-        <span class="badge" style="background:rgba(100,116,139,.15);color:var(--text-muted);">Not set up</span>
-      {% endif %}
-      <label style="display:inline-flex;align-items:center;gap:6px;margin-left:18px;font-size:13px;cursor:pointer;">
-        <input type="checkbox" name="totp_required" value="1" form="edit-user-form"
-               {% if user.totp_required %}checked{% endif %} style="width:auto;margin:0;">
-        Require 2FA for this user
+      <label class="toggle-row">
+        <span>Require 2FA for this user<small>They must set it up on their next sign-in</small></span>
+        <span class="toggle"><input type="checkbox" name="totp_required" value="1" {% if user.totp_required %}checked{% endif %}><span class="toggle-slider"></span></span>
       </label>
+      {% if user.totp_enabled %}
+      <button type="submit" form="reset-2fa-form" class="btn btn-ghost" style="width:100%;">Reset 2FA (lost device)</button>
+      {% endif %}
     </div>
-    {% if user.totp_enabled %}
-    <form method="POST" action="{{ url_for('users.reset_2fa', user_id=user.id) }}"
-          onsubmit="return confirm('Reset 2FA for {{ user.username }}? They will need to set it up again on next login.');">
-      <button type="submit" class="btn btn-ghost">Reset 2FA</button>
-    </form>
-    {% endif %}
   </div>
 </div>
+
+<div class="sticky-save">
+  <a href="{{ url_for('users.index') }}" class="btn btn-ghost">Cancel</a>
+  <button type="submit" class="btn btn-primary">Save changes</button>
+</div>
+</form>
+
+{% if user.totp_enabled %}
+<form method="POST" id="reset-2fa-form" action="{{ url_for('users.reset_2fa', user_id=user.id) }}"
+      data-msg="Reset 2FA for {{ user.username }}? They will need to set it up again on next login." onsubmit="return confirm(this.dataset.msg)"></form>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
 function togglePermsSection(role, prefix){
-  var el=document.getElementById(prefix+'-perms-section');
-  if(el) el.style.display=role==='admin'?'none':'';
+  var admin = role === 'admin';
+  ['edit-perms-section', 'edit-srv-panel'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.style.display = admin ? 'none' : '';
+  });
+  var note = document.getElementById('edit-admin-note');
+  if (note) note.style.display = admin ? '' : 'none';
 }
+function updateSrvCount(){
+  var all = document.querySelectorAll('#srv-box input[type=checkbox]');
+  var on = document.querySelectorAll('#srv-box input[type=checkbox]:checked');
+  var el = document.getElementById('srv-count');
+  if (el) el.textContent = on.length + ' of ' + all.length + ' selected';
+}
+function setAllSrv(v){
+  document.querySelectorAll('#srv-box .srv-chip').forEach(function(c){
+    if (c.style.display !== 'none') c.querySelector('input').checked = v;
+  });
+  updateSrvCount();
+}
+document.getElementById('srv-filter').addEventListener('input', function(){
+  var q = this.value.trim().toLowerCase();
+  document.querySelectorAll('#srv-box .srv-chip').forEach(function(c){
+    c.style.display = !q || c.dataset.search.indexOf(q) !== -1 ? '' : 'none';
+  });
+});
+document.getElementById('srv-box').addEventListener('change', updateSrvCount);
+updateSrvCount();
 </script>
 {% endblock %}

@@ -112,25 +112,6 @@ def _collect_data():
         data["alerts_failed"]    = sum(1 for a in alerts if not a["success"])
         data["recent_alerts"]    = alerts[:20]
 
-        # ── DVR status ──
-        try:
-            cur.execute("""
-                SELECT d.name, d.ip, d.port, d.status,
-                       l.name AS location, h.name AS hospital
-                FROM dvr_devices d
-                JOIN dvr_locations l ON l.id = d.location_id
-                JOIN dvr_hospitals h ON h.id = l.hospital_id
-                ORDER BY h.name, l.name, d.name
-            """)
-            dvrs = cur.fetchall()
-            data["total_dvrs"]   = len(dvrs)
-            data["online_dvrs"]  = sum(1 for d in dvrs if d["status"] == "online")
-            data["offline_dvrs"] = sum(1 for d in dvrs if d["status"] == "offline")
-            data["dvr_list"]     = [dict(d) for d in dvrs]
-        except Exception:
-            data["total_dvrs"] = data["online_dvrs"] = data["offline_dvrs"] = 0
-            data["dvr_list"] = []
-
         # ── DB Monitor watches ──
         try:
             cur.execute("""
@@ -156,11 +137,10 @@ def _build_prompt(data):
     """Build a concise, structured prompt for Claude."""
     lines = [
         "You are an infrastructure monitoring assistant for REFORMMED, a healthcare analytics platform.",
-        "Analyze the following real-time data from the REFORMMED Monitor system and provide a clear, actionable summary.",
+        "Analyze the following real-time data from the Reformmed INFRA Monitor system and provide a clear, actionable summary.",
         "",
         "## Infrastructure Snapshot",
         f"- Machines: {data['online_machines']} online / {data['offline_machines']} offline (total: {data['total_machines']})",
-        f"- DVRs: {data['online_dvrs']} online / {data['offline_dvrs']} offline (total: {data['total_dvrs']})",
         f"- DB Monitor watches: {data['db_watches']} total, {data['db_watches_dead']} in DEAD state",
         f"- Alerts in last 24h: {data['alerts_24h']} ({data['alerts_failed']} failed to send)",
         "",
@@ -198,7 +178,7 @@ def _build_prompt(data):
         "1. **Overall Health** — one sentence verdict (healthy / degraded / critical)",
         "2. **Issues Requiring Attention** — list only real problems (offline machines, high CPU/RAM/disk, dead DB watches, alert spikes)",
         "3. **Machine Status** — brief per-machine summary, highlight anything above 80% CPU/RAM or 85% disk",
-        "4. **DVR Status** — any offline DVRs",
+        "4. **Data Feeds** — any stopped DB Monitor feeds",
         "5. **Recommendations** — 2-3 specific, actionable next steps",
         "",
         "Be concise. Use bullet points. Flag critical issues clearly. Do not repeat data that is already normal.",

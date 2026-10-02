@@ -1,11 +1,97 @@
 """
-Alerts blueprint — unified system + DVR + DB monitor alerts.
+Alerts blueprint — unified system + DB monitor alerts (DVR alerts are no longer shown).
 """
+import os
+
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, jsonify
 from flask_login import login_required, current_user
 from db import get_db, list_alert_recipients
 
 alerts_bp = Blueprint("alerts", __name__, url_prefix="/alerts")
+
+
+@alerts_bp.before_request
+def _require_alerts_feature():
+    """can_view_alerts used to only hide the nav link — enforce it on the routes too."""
+    if current_user.is_authenticated and not (current_user.is_admin or current_user.can_view_alerts):
+        abort(403)
+
+
+OVERVIEW_DAYS = 14
+
+
+def _visible_log_filter(cur):
+    """Returns a predicate for alert_log rows this user may see: admins see
+    everything; others only their own servers' alerts (+ DB Monitor alerts
+    with that permission). DVR alerts are hidden — that feature was removed."""
+    allowed = current_user.allowed_servers()
+    keys = None
+    if allowed is not None:
+        cur.execute("SELECT system_name, location, table_name FROM machine_registry")
+        keys = {f"{r['system_name']}@{r['location']}" for r in cur.fetchall() if r["table_name"] in allowed}
+    can_db = current_user.is_admin or current_user.can_view_dbmon
+
+    def visible(row):
+        src = row.get("source") or "system"
+        if src == "dvr":
+            return False
+        if src == "dbmonitor":
+            return can_db
+        return keys is None or row.get("machine_key") in keys
+    return visible
+
+
+def _alert_overview(cur, visible):
+    """KPIs + chart data for the overview strip: per-day counts by alert type
+    for the last OVERVIEW_DAYS days (IST — the DB session timezone)."""
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    cur.execute("""
+        SELECT sent_at::date AS d, COALESCE(source,'system') AS source,
+               split_part(alert_type, ':', 1) AS atype, machine_key, success,
+               sent_at::date = CURRENT_DATE AS is_today,
+               sent_at >= NOW() - INTERVAL '7 days' AS in_7d
+        FROM alert_log
+        WHERE sent_at >= date_trunc('day', NOW()) - make_interval(days => %s)
+        LIMIT 50000
+    """, (OVERVIEW_DAYS - 1,))
+    today = datetime.now(ZoneInfo("Asia/Kolkata")).date()
+    days = [today - timedelta(days=i) for i in range(OVERVIEW_DAYS - 1, -1, -1)]
+    idx = {d: i for i, d in enumerate(days)}
+    per_type, totals = {}, {}
+    k = {"today": 0, "week": 0, "sent": 0, "failed": 0}
+    for r in cur.fetchall():
+        if not visible(r):
+            continue
+        t = r["atype"] or "other"
+        i = idx.get(r["d"])
+        if i is not None:
+            per_type.setdefault(t, [0] * OVERVIEW_DAYS)[i] += 1
+        totals[t] = totals.get(t, 0) + 1
+        if r["is_today"]:
+            k["today"] += 1
+        if r["in_7d"]:
+            k["week"] += 1
+            k["sent" if r["success"] else "failed"] += 1
+    ranked = sorted(totals, key=lambda t: -totals[t])
+    # Keep the five biggest types; fold the rest into "other"
+    if len(ranked) > 5:
+        other = [0] * OVERVIEW_DAYS
+        for t in ranked[4:]:
+            other = [a + b for a, b in zip(other, per_type.get(t, [0] * OVERVIEW_DAYS))]
+        series = [{"type": t, "data": per_type.get(t, [0] * OVERVIEW_DAYS), "total": totals[t]} for t in ranked[:4]]
+        series.append({"type": "other", "data": other, "total": sum(totals[t] for t in ranked[4:])})
+    else:
+        series = [{"type": t, "data": per_type.get(t, [0] * OVERVIEW_DAYS), "total": totals[t]} for t in ranked]
+    week_total = k["sent"] + k["failed"]
+    return {
+        "labels": [d.strftime("%d %b") for d in days],
+        "series": series,
+        "total": sum(totals.values()),
+        "today": k["today"], "week": k["week"],
+        "sent": k["sent"], "failed": k["failed"],
+        "delivered_pct": round(k["sent"] / week_total * 100) if week_total else None,
+    }
 
 
 @alerts_bp.route("/")
@@ -16,13 +102,15 @@ def index():
         # System alert configs
         cur.execute("SELECT * FROM alert_config ORDER BY id")
         configs = cur.fetchall()
-        # Unified alert log (all sources)
-        cur.execute("SELECT * FROM alert_log ORDER BY sent_at DESC LIMIT 200")
-        logs = cur.fetchall()
-        # DVR settings for DVR alerts tab
-        cur.execute("SELECT key, value FROM dvr_settings")
-        dvr_raw = cur.fetchall()
-        dvr_settings = {r["key"]: r["value"] for r in dvr_raw}
+        visible = _visible_log_filter(cur)
+        # Unified alert log (no DVR — that feature was removed from the app)
+        cur.execute("""
+            SELECT * FROM alert_log
+            WHERE COALESCE(source,'system') <> 'dvr'
+            ORDER BY sent_at DESC LIMIT 500
+        """)
+        logs = [r for r in cur.fetchall() if visible(r)]
+        overview = _alert_overview(cur, visible)
         # DB monitor watches for DB alerts tab
         cur.execute("""
             SELECT w.*, c.name AS conn_name
@@ -31,12 +119,17 @@ def index():
             ORDER BY c.name, w.display_name
         """)
         dbmon_watches = cur.fetchall()
+        if not (current_user.is_admin or current_user.can_view_dbmon):
+            dbmon_watches = []
         # Machines (for the "add machine alert" picker) + existing overrides
         cur.execute("""
-            SELECT system_name, location, table_name FROM machine_registry
+            SELECT system_name, location, table_name, alerts_enabled FROM machine_registry
             ORDER BY system_name
         """)
         machines = cur.fetchall()
+        allowed = current_user.allowed_servers()
+        if allowed is not None:
+            machines = [m for m in machines if m["table_name"] in allowed]
         cur.execute("""
             SELECT o.*, m.system_name, m.location
             FROM machine_alert_overrides o
@@ -44,11 +137,18 @@ def index():
             ORDER BY m.system_name, o.alert_type
         """)
         machine_overrides = cur.fetchall()
+        if allowed is not None:
+            machine_overrides = [o for o in machine_overrides if o["table_name"] in allowed]
+
+    overview["rules_on"] = sum(1 for c in configs if c["enabled"])
+    overview["rules_total"] = len(configs)
+    overview["muted"] = sum(1 for m in machines if not m["alerts_enabled"])
+    overview["overridden"] = len({o["table_name"] for o in machine_overrides})
 
     return render_template("alerts.html",
                            configs=configs,
                            logs=logs,
-                           dvr_settings=dvr_settings,
+                           overview=overview,
                            dbmon_watches=dbmon_watches,
                            machines=machines,
                            machine_overrides=machine_overrides,
@@ -246,10 +346,14 @@ def test_alert(alert_type):
         flash("Alert type not found.", "danger")
         return redirect(url_for("alerts.index"))
     from alert_sender import send_alert_email
+    # Global notify_emails is no longer editable in the UI, so fall back to
+    # ALERT_TO and then to every registered recipient.
+    recipients = (config.get("notify_emails") or os.getenv("ALERT_TO", "")
+                  or ", ".join(r["email"] for r in list_alert_recipients()))
     ok = send_alert_email(
-        subject=f"[TEST] {alert_type.upper()} alert — REFORMMED",
-        body=f"This is a test alert for type '{alert_type}'.\nSent from REFORMMED Monitor.",
-        recipients=config["notify_emails"],
+        subject=f"[TEST] {alert_type.upper()} alert — Reformmed INFRA Monitor",
+        body=f"This is a test alert for type '{alert_type}'.\nSent from Reformmed INFRA Monitor.",
+        recipients=recipients,
     )
     flash(f"Test email {'sent' if ok else 'failed'} for '{alert_type}'.", "success" if ok else "danger")
     return redirect(url_for("alerts.index") + "#system")

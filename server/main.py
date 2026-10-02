@@ -1,11 +1,12 @@
 """
-REFORMMED Monitor API — Receives metrics from agents
+Reformmed INFRA Monitor API — Receives metrics from agents
 Improvements:
   - SQL injection protection via table_name whitelist validation
   - /machines endpoint to list registered machines
   - /machines/{table_name}/status endpoint for individual machine status
   - Proper startup/shutdown lifespan handler (replaces deprecated @app.on_event)
 """
+import hmac
 import re
 import json
 import logging
@@ -95,12 +96,27 @@ async def lifespan(app: FastAPI):
     yield
     await pool.close()
 
-app = FastAPI(title="REFORMMED Monitor API", lifespan=lifespan)
+app = FastAPI(title="Reformmed INFRA Monitor API", lifespan=lifespan)
 
 # ── auth helper ──────────────────────────────────────────────────────────────
 def _check_auth(x_api_key: str):
-    if x_api_key != API_SECRET:
+    # Constant-time compare, and never accept anything when no secret is set.
+    if not API_SECRET or not hmac.compare_digest((x_api_key or "").encode(), API_SECRET.encode()):
         raise HTTPException(401, "Invalid API key")
+
+
+async def _ensure_known_table(table_name: str):
+    """Like _assert_known_table, but on a cache miss re-checks the DB. Uvicorn
+    runs several workers, each with its own in-memory whitelist, so a machine
+    registered via worker A was rejected (404) by worker B until a restart."""
+    if not _TABLE_RE.match(table_name or ""):
+        raise HTTPException(400, "Invalid table_name format")
+    if table_name not in registered_tables:
+        async with pool.acquire() as conn:
+            hit = await conn.fetchval("SELECT 1 FROM machine_registry WHERE table_name=$1", table_name)
+        if not hit:
+            raise HTTPException(404, f"Unknown machine table: {table_name!r}")
+        registered_tables.add(table_name)
 
 # ── endpoints ────────────────────────────────────────────────────────────────
 
@@ -127,7 +143,7 @@ async def list_machines(x_api_key: str = Header(...)):
 async def machine_status(table_name: str, x_api_key: str = Header(...)):
     """Return the latest metrics snapshot for a specific machine."""
     _check_auth(x_api_key)
-    _assert_known_table(table_name, registered_tables)
+    await _ensure_known_table(table_name)
 
     async with pool.acquire() as conn:
         reg = await conn.fetchrow(
@@ -229,7 +245,7 @@ async def metrics(request: Request, x_api_key: str = Header(...)):
         raise HTTPException(400, "table_name required")
 
     # Validate against whitelist — prevents SQL injection via table_name
-    _assert_known_table(table_name, registered_tables)
+    await _ensure_known_table(table_name)
 
     cpu_per_core    = json.dumps(data.get("cpu_per_core"))    if data.get("cpu_per_core")    else None
     gpu_info        = json.dumps(data.get("gpu_info"))        if data.get("gpu_info")        else None
@@ -239,7 +255,10 @@ async def metrics(request: Request, x_api_key: str = Header(...)):
     pm2_processes   = json.dumps(data.get("pm2_processes"))   if data.get("pm2_processes")   else None
 
     boot_time_str = data.get("boot_time")
-    boot_time = datetime.fromisoformat(boot_time_str) if boot_time_str else None
+    try:
+        boot_time = datetime.fromisoformat(boot_time_str) if boot_time_str else None
+    except (TypeError, ValueError):
+        boot_time = None  # malformed value from an agent shouldn't 500 the whole push
 
     async with pool.acquire() as conn:
         await conn.execute("""

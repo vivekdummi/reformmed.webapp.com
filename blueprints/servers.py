@@ -1,9 +1,17 @@
 import json
 from flask import Blueprint, render_template, abort, jsonify, request
 from flask_login import login_required, current_user
+from psycopg2 import sql
 from db import get_db
 
 servers_bp = Blueprint("servers", __name__, url_prefix="/servers")
+
+
+@servers_bp.before_request
+def _require_servers_feature():
+    """can_view_servers used to only hide the nav link — enforce it on the routes too."""
+    if current_user.is_authenticated and not (current_user.is_admin or current_user.can_view_servers):
+        abort(403)
 
 
 def _check_access(table_name):
@@ -27,7 +35,7 @@ def index():
             """)
         else:
             if not allowed:
-                return render_template("servers.html", machines=[])
+                return render_template("servers.html", machines=[], thresholds={})
             placeholders = ",".join(["%s"] * len(allowed))
             cur.execute(f"""
                 SELECT system_name, location, table_name, os_type, hostname,
@@ -36,9 +44,43 @@ def index():
                 ORDER BY system_name, location
             """, list(allowed))
 
-        machines = cur.fetchall()
+        machines = [dict(m) for m in cur.fetchall()]
 
-    return render_template("servers.html", machines=machines)
+        # Alert thresholds — used to flag servers over the fleet-wide limits
+        cur.execute("SELECT alert_type, threshold FROM alert_config")
+        th = {r["alert_type"]: r["threshold"] for r in cur.fetchall()}
+        thresholds = {"cpu": th.get("cpu") or 90, "ram": th.get("ram") or 90,
+                      "disk": th.get("disk") or 85}
+
+        # Latest reading per machine for the CPU / RAM / disk meters. One
+        # LIMIT 1 query per machine table; a broken table just shows "—".
+        for m in machines:
+            m["cpu"] = m["ram"] = m["disk"] = None
+            try:
+                cur.execute(sql.SQL(
+                    "SELECT cpu_percent, ram_percent, disk_partitions FROM {} ORDER BY ts DESC LIMIT 1"
+                ).format(sql.Identifier(m["table_name"])))
+                row = cur.fetchone()
+            except Exception:
+                conn.rollback()
+                continue
+            if not row:
+                continue
+            m["cpu"] = round(float(row["cpu_percent"] or 0), 1)
+            m["ram"] = round(float(row["ram_percent"] or 0), 1)
+            disks = row.get("disk_partitions")
+            try:
+                disks = json.loads(disks) if isinstance(disks, str) else (disks or [])
+                pcts = [float(d.get("percent") or 0) for d in disks
+                        if isinstance(d, dict) and d.get("fstype") != "squashfs"
+                        and not str(d.get("mountpoint") or "").startswith(("/snap/", "/proc", "/sys", "/dev", "/run"))]
+                m["disk"] = round(max(pcts), 1) if pcts else None
+            except Exception:
+                m["disk"] = None
+            m["hot"] = ((m["cpu"] or 0) >= thresholds["cpu"] or (m["ram"] or 0) >= thresholds["ram"]
+                        or (m["disk"] or 0) >= thresholds["disk"])
+
+    return render_template("servers.html", machines=machines, thresholds=thresholds)
 
 
 def _safe_gpu_list(raw):

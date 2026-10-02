@@ -1,65 +1,187 @@
 {% extends "base.html" %}
-{% block title %}Profile — REFORMMED{% endblock %}
+{% import "_macros.html" as ui %}
+{% block title %}Profile — Reformmed INFRA Monitor{% endblock %}
 {% block page_title %}My Profile{% endblock %}
+
+{% block extra_css %}
+<style>
+.profile-hero{position:relative;background:var(--bg2);border:1px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:var(--shadow-1);margin-bottom:16px;}
+.profile-hero .banner{height:110px;background:linear-gradient(120deg,var(--g-ocean-a),var(--g-ocean-b) 45%,var(--brand-green));opacity:.9;}
+.profile-hero .body{display:flex;align-items:flex-start;gap:22px;padding:0 28px 22px;margin-top:-56px;flex-wrap:wrap;}
+.avatar-edit{position:relative;flex-shrink:0;border-radius:50%;padding:5px;background:var(--bg2);}
+.avatar-edit .avatar,.avatar-edit img.preview{width:112px;height:112px;border-radius:50%;object-fit:cover;display:flex;}
+.avatar-edit .cam{position:absolute;right:6px;bottom:6px;width:36px;height:36px;border-radius:50%;border:3px solid var(--bg2);background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s;}
+.avatar-edit .cam:hover{transform:scale(1.08);}
+.avatar-edit .cam svg{width:16px;height:16px;}
+.hero-info{flex:1;min-width:220px;padding-top:82px;}
+.hero-info h2{color:var(--text);font-family:var(--font-head);font-size:26px;font-weight:800;letter-spacing:-.5px;line-height:1.15;}
+.hero-info .email{color:var(--text-muted);font-size:14px;margin-top:2px;}
+.hero-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.hero-actions{display:flex;gap:8px;flex-wrap:wrap;padding-top:84px;}
+@media(max-width:700px){.hero-info{padding-top:0;}.hero-actions{padding-top:0;}}
+.photo-hint{font-size:12px;color:var(--text-muted);padding:0 28px 18px;margin-top:-8px;}
+.pf-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;}
+@media(max-width:960px){.pf-grid{grid-template-columns:1fr;}}
+.field-hint{font-size:12px;color:var(--text-muted);margin-top:5px;}
+.sec-row{display:flex;align-items:center;gap:14px;padding:14px;border-radius:14px;background:var(--bg3);margin-bottom:14px;}
+.sec-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;}
+.sec-icon svg{width:20px;height:20px;}
+.sec-row b{display:block;font-size:14px;}
+.sec-row span{font-size:12px;color:var(--text-muted);}
+.panel-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px;flex-wrap:wrap;}
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <div><h1>Profile</h1><p>Update your account details</p></div>
+  <div><h1>My Profile</h1><p>Your photo, account details and sign-in security</p></div>
 </div>
 
-<div class="card" style="max-width:480px">
-  <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid var(--border)">
-    <div style="width:60px;height:60px;background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:white;">
-      {{ current_user.username[0].upper() }}
+<!-- ═══ Profile header ═══ -->
+<div class="profile-hero">
+  <div class="banner"></div>
+  <div class="body">
+    <div class="avatar-edit">
+      <span id="avatar-current">{{ ui.avatar(current_user, 112) }}</span>
+      <img id="avatar-preview" class="preview" alt="New photo preview" style="display:none;">
+      <label class="cam" for="avatar-input" title="Change photo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </label>
     </div>
-    <div>
-      <div style="font-size:18px;font-weight:700;">{{ current_user.username }}</div>
-      <div style="font-size:13px;color:var(--text-muted);">{{ current_user.email }}</div>
-      <span class="badge badge-{{ 'admin' if current_user.is_admin else 'info' }}" style="margin-top:4px;display:inline-block;">
-        {{ current_user.role.upper() }}
-      </span>
-    </div>
-  </div>
-
-  <form method="POST">
-    <div class="form-group">
-      <label>Email Address</label>
-      <input type="email" name="email" value="{{ current_user.email }}" placeholder="{{ current_user.email }}">
-    </div>
-    <div class="form-group">
-      <label>New Password <span class="text-muted">(leave blank to keep current)</span></label>
-      <input type="password" name="password" placeholder="••••••••">
-    </div>
-    <button type="submit" class="btn btn-primary">Save Changes</button>
-  </form>
-</div>
-
-<div class="card" style="max-width:480px;margin-top:16px;">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-    <div style="font-size:15px;font-weight:700;">Two-Factor Authentication</div>
-    {% if current_user.totp_enabled %}
-      <span class="badge badge-online">Enabled</span>
-    {% else %}
-      <span class="badge" style="background:rgba(100,116,139,.15);color:var(--text-muted);">Disabled</span>
-    {% endif %}
-  </div>
-  <p class="text-muted" style="font-size:13px;margin-bottom:16px;">
-    Adds a 6-digit code from an authenticator app (Google Authenticator, Authy, etc.) on top of your password.
-    {% if current_user.totp_required and not current_user.totp_enabled %}
-      <br><strong style="color:var(--red);">Your administrator requires this on your account.</strong>
-    {% endif %}
-  </p>
-
-  {% if current_user.totp_enabled %}
-    <form method="POST" action="{{ url_for('auth.totp_disable') }}" onsubmit="return confirm('Turn off two-factor authentication?');">
-      <div class="form-group">
-        <label>Confirm your password to disable</label>
-        <input type="password" name="password" placeholder="••••••••" required>
+    <div class="hero-info">
+      <h2>{{ current_user.username }}</h2>
+      <div class="email">{{ current_user.email }}</div>
+      <div class="hero-badges">
+        <span class="badge badge-{{ 'admin' if current_user.is_admin else 'info' }}">{{ current_user.role|capitalize }}</span>
+        {% if current_user.totp_enabled %}<span class="badge badge-online">2FA on</span>
+        {% else %}<span class="badge badge-warning">2FA off</span>{% endif %}
+        <span class="badge badge-online">Active</span>
       </div>
-      <button type="submit" class="btn btn-ghost">Disable 2FA</button>
-    </form>
-  {% else %}
-    <a href="{{ url_for('auth.totp_setup') }}" class="btn btn-primary">Set Up 2FA</a>
-  {% endif %}
+    </div>
+    <div class="hero-actions">
+      <form method="POST" action="{{ url_for('auth.avatar_upload') }}" enctype="multipart/form-data" id="avatar-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="file" name="avatar" id="avatar-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+        <span id="avatar-pending" style="display:none;gap:8px;">
+          <button type="submit" class="btn btn-primary">Save photo</button>
+          <button type="button" class="btn btn-ghost" onclick="cancelAvatar()">Cancel</button>
+        </span>
+        <label for="avatar-input" class="btn btn-ghost" id="avatar-choose">{{ 'Change photo' if current_user.has_avatar else 'Upload photo' }}</label>
+      </form>
+      {% if current_user.has_avatar %}
+      <form method="POST" action="{{ url_for('auth.avatar_remove') }}" data-msg="Remove your profile photo?" onsubmit="return confirm(this.dataset.msg)">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-danger" id="avatar-remove">Remove</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="photo-hint" id="avatar-hint">PNG, JPG, WEBP or GIF up to 3 MB. It's cropped to a square and shown across the app.</div>
 </div>
+
+<div class="pf-grid">
+  <!-- ═══ Account details ═══ -->
+  <div class="panel">
+    <div class="panel-head"><div><div class="panel-title">Account details</div><div class="panel-sub">Change your email or password — your current password is required</div></div></div>
+    <form method="POST" autocomplete="off">
+      <div class="form-group">
+        <label for="pf-email">Email address</label>
+        <input type="email" id="pf-email" name="email" value="{{ current_user.email }}" autocomplete="email">
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="pf-pw">New password</label>
+          <input type="password" id="pf-pw" name="password" placeholder="Leave blank to keep" minlength="8" autocomplete="new-password">
+          <div class="field-hint">At least 8 characters</div>
+        </div>
+        <div class="form-group">
+          <label for="pf-cur">Current password</label>
+          <input type="password" id="pf-cur" name="current_password" placeholder="••••••••" autocomplete="current-password">
+          <div class="field-hint">Needed to save changes</div>
+        </div>
+      </div>
+      <div class="panel-actions"><button type="submit" class="btn btn-primary">Save changes</button></div>
+    </form>
+  </div>
+
+  <!-- ═══ Security ═══ -->
+  <div class="panel" id="security" style="scroll-margin-top:130px;">
+    <div class="panel-head"><div><div class="panel-title">Security</div><div class="panel-sub">Two-factor authentication</div></div></div>
+    <div class="sec-row">
+      <span class="sec-icon" style="background:{{ 'var(--g-mint)' if current_user.totp_enabled else 'var(--g-sunset)' }};">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+      </span>
+      <div style="flex:1;min-width:0;">
+        <b>{{ 'Two-factor authentication is on' if current_user.totp_enabled else 'Two-factor authentication is off' }}</b>
+        <span>A 6-digit code from Google Authenticator, Authy or similar is asked for at every sign-in.</span>
+      </div>
+    </div>
+    {% if current_user.totp_required and not current_user.totp_enabled %}
+    <div class="flash danger" style="margin-bottom:14px;">Your administrator requires 2FA on this account.</div>
+    {% endif %}
+
+    {% if current_user.totp_enabled %}
+    <form method="POST" action="{{ url_for('auth.totp_disable') }}" data-msg="Turn off two-factor authentication?" onsubmit="return confirm(this.dataset.msg)">
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="tf-pw">Your password</label>
+          <input type="password" id="tf-pw" name="password" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <div class="form-group">
+          <label for="tf-code">Current 6-digit code</label>
+          <input type="text" id="tf-code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="123456" required autocomplete="one-time-code">
+        </div>
+      </div>
+      <div class="panel-actions"><button type="submit" class="btn btn-danger">Disable 2FA</button></div>
+    </form>
+    {% else %}
+    <div class="panel-actions" style="justify-content:flex-start;">
+      <a href="{{ url_for('auth.totp_setup') }}" class="btn btn-primary">Set up 2FA</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Live preview of the chosen photo before it is uploaded.
+(function(){
+  var input = document.getElementById('avatar-input');
+  var prev = document.getElementById('avatar-preview');
+  var cur = document.getElementById('avatar-current');
+  var pending = document.getElementById('avatar-pending');
+  var choose = document.getElementById('avatar-choose');
+  var hint = document.getElementById('avatar-hint');
+  var objUrl = null;
+  input.addEventListener('change', function(){
+    var f = input.files && input.files[0];
+    if (!f) return;
+    if (f.size > 3 * 1024 * 1024) {
+      hint.textContent = 'That image is larger than 3 MB — choose a smaller one.';
+      hint.style.color = 'var(--red)';
+      input.value = '';
+      return;
+    }
+    if (objUrl) URL.revokeObjectURL(objUrl);
+    objUrl = URL.createObjectURL(f);
+    prev.src = objUrl;
+    prev.style.display = 'flex';
+    cur.style.display = 'none';
+    pending.style.display = 'inline-flex';
+    choose.style.display = 'none';
+    hint.style.color = '';
+    hint.textContent = 'Preview — click "Save photo" to keep it.';
+  });
+  window.cancelAvatar = function(){
+    input.value = '';
+    if (objUrl) { URL.revokeObjectURL(objUrl); objUrl = null; }
+    prev.style.display = 'none';
+    cur.style.display = '';
+    pending.style.display = 'none';
+    choose.style.display = '';
+    hint.textContent = 'PNG, JPG, WEBP or GIF up to 3 MB. It’s cropped to a square and shown across the app.';
+  };
+})();
+</script>
 {% endblock %}

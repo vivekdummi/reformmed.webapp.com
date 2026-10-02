@@ -28,6 +28,18 @@ class User(UserMixin):
         # Forgot-password OTP (hashed)
         self.reset_otp_hash    = row.get("reset_otp_hash")
         self.reset_otp_expires = row.get("reset_otp_expires")
+        # Profile photo version (0 = none) — used to cache-bust the image URL
+        self.avatar_ver = row.get("avatar_ver") or 0
+        self.last_login = row.get("last_login")
+        self.created_at = row.get("created_at")
+
+    @property
+    def has_avatar(self):
+        return self.avatar_ver > 0
+
+    @property
+    def initial(self):
+        return (self.username or "?")[:1].upper()
 
     @property
     def is_active(self):
@@ -97,11 +109,14 @@ class User(UserMixin):
             "username", "email", "role", "is_active", "password_hash",
             "can_view_dvr", "can_view_dbmon", "can_view_alerts", "can_view_servers",
         }
+        # Hash before filtering — "password" itself isn't a column, so filtering
+        # first used to drop it and a password-only update silently did nothing.
+        if kwargs.get("password"):
+            kwargs["password_hash"] = generate_password_hash(kwargs.pop("password"))
+        kwargs.pop("password", None)
         fields = {k: v for k, v in kwargs.items() if k in allowed}
         if not fields:
             return
-        if "password" in kwargs:
-            fields["password_hash"] = generate_password_hash(kwargs["password"])
         set_clause = ", ".join(f"{k}=%s" for k in fields)
         with get_db() as conn:
             cur = conn.cursor()
@@ -115,6 +130,33 @@ class User(UserMixin):
         with get_db() as conn:
             cur = conn.cursor()
             cur.execute("DELETE FROM webapp_users WHERE id=%s", (user_id,))
+
+    # ── Profile photo ─────────────────────────────────────────────────────────
+
+    @staticmethod
+    def set_avatar(user_id, png_bytes):
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO user_avatars (user_id, image, updated_at) VALUES (%s, %s, NOW())
+                ON CONFLICT (user_id) DO UPDATE SET image=EXCLUDED.image, updated_at=NOW()
+            """, (user_id, png_bytes))
+            cur.execute("UPDATE webapp_users SET avatar_ver = avatar_ver + 1 WHERE id=%s", (user_id,))
+
+    @staticmethod
+    def remove_avatar(user_id):
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM user_avatars WHERE user_id=%s", (user_id,))
+            cur.execute("UPDATE webapp_users SET avatar_ver = 0 WHERE id=%s", (user_id,))
+
+    @staticmethod
+    def get_avatar(user_id):
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT image FROM user_avatars WHERE user_id=%s", (user_id,))
+            row = cur.fetchone()
+        return bytes(row["image"]) if row else None
 
     @staticmethod
     def touch_login(user_id):
@@ -180,7 +222,7 @@ class User(UserMixin):
 
     def totp_provisioning_uri(self, secret):
         """otpauth:// URI for a QR code, using a given (possibly not-yet-saved) secret."""
-        return pyotp.TOTP(secret).provisioning_uri(name=self.email, issuer_name="REFORMMED Monitor")
+        return pyotp.TOTP(secret).provisioning_uri(name=self.email, issuer_name="Reformmed INFRA Monitor")
 
     @staticmethod
     def start_totp_setup(user_id, secret):
@@ -226,12 +268,17 @@ class User(UserMixin):
         with get_db() as conn:
             cur = conn.cursor()
             cur.execute(
-                "UPDATE webapp_users SET reset_otp_hash=%s, reset_otp_expires=%s WHERE id=%s",
+                "UPDATE webapp_users SET reset_otp_hash=%s, reset_otp_expires=%s, "
+                "reset_otp_attempts=0 WHERE id=%s",
                 (generate_password_hash(otp), expires, user_id)
             )
 
+    MAX_RESET_OTP_ATTEMPTS = 5
+
     def check_reset_otp(self, otp):
-        """True only if a code was issued, hasn't expired, and matches."""
+        """True only if a code was issued, hasn't expired, and matches.
+        Every wrong guess is counted; after MAX_RESET_OTP_ATTEMPTS the code is
+        burned, so the 6-digit space can't be brute-forced in the 15 minutes."""
         from datetime import datetime, timezone
         if not self.reset_otp_hash or not self.reset_otp_expires:
             return False
@@ -239,7 +286,21 @@ class User(UserMixin):
         now = datetime.now(timezone.utc) if expires.tzinfo is not None else datetime.utcnow()
         if now > expires:
             return False
-        return check_password_hash(self.reset_otp_hash, str(otp).strip())
+        if check_password_hash(self.reset_otp_hash, str(otp).strip()):
+            return True
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE webapp_users SET reset_otp_attempts = reset_otp_attempts + 1 "
+                "WHERE id=%s RETURNING reset_otp_attempts", (self.id,)
+            )
+            row = cur.fetchone()
+            if row and row["reset_otp_attempts"] >= self.MAX_RESET_OTP_ATTEMPTS:
+                cur.execute(
+                    "UPDATE webapp_users SET reset_otp_hash=NULL, reset_otp_expires=NULL "
+                    "WHERE id=%s", (self.id,)
+                )
+        return False
 
     @staticmethod
     def clear_reset_otp(user_id):

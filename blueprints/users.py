@@ -116,6 +116,17 @@ def edit(user_id):
         if new_password:
             updates["password"] = new_password
 
+        # Never let the fleet end up with no active admin (self-demotion,
+        # deactivating yourself, or demoting the last other admin).
+        if user.is_admin and (updates.get("role") != "admin" or not new_active):
+            with get_db() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT COUNT(*) AS n FROM webapp_users "
+                            "WHERE role='admin' AND is_active AND id<>%s", (user_id,))
+                if cur.fetchone()["n"] == 0:
+                    flash("This is the last active admin — promote another admin first.", "danger")
+                    return redirect(url_for("users.edit", user_id=user_id))
+
         try:
             User.update(user_id, **updates)
             User.set_totp_required(user_id, request.form.get("totp_required") == "1")
