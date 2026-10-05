@@ -500,9 +500,10 @@ var AL_NAMES = { offline: 'Server offline', online: 'Back online', cpu: 'High CP
 function alName(t) { return AL_NAMES[t] || String(t).replace(/_/g, ' '); }
 
 function _alEsc(s) {
-  var d = document.createElement('div');
-  d.textContent = s == null ? '' : String(s);
-  return d.innerHTML;
+  // Also escapes quotes — the result is used inside attribute values too.
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+  });
 }
 
 if (AL_OVERVIEW && AL_OVERVIEW.total) {
@@ -579,7 +580,7 @@ document.querySelectorAll('[data-filter-group]').forEach(function(group) {
 filterLog();
 
 // ── Machine routing (per-machine enabled + recipients) ──
-const MA_RECIPIENTS = {{ recipients | tojson }};
+const MA_RECIPIENTS = {{ (recipients if current_user.is_admin else []) | tojson }};
 const MA_GRAD = { offline: 'k-red', online: 'k-mint', cpu: 'k-ocean', ram: 'k-violet', disk: 'k-sunset', temp: 'k-pink' };
 const MA_ICON_SVG = {
   offline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l22 22"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>',

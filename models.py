@@ -49,6 +49,17 @@ class User(UserMixin):
     def is_admin(self):
         return self.role == "admin"
 
+    def session_fingerprint(self):
+        """Short digest of the password hash. Changes whenever the password
+        does, so sessions / remember-me cookies issued before a password
+        change or reset stop working."""
+        import hashlib
+        return hashlib.sha256((self.password_hash or "").encode()).hexdigest()[:16]
+
+    def get_id(self):
+        # Flask-Login stores this in the session and the remember-me cookie.
+        return f"{self.id}:{self.session_fingerprint()}"
+
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 

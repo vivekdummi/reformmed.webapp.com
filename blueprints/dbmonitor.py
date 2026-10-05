@@ -19,6 +19,7 @@ from email.mime.text import MIMEText
 from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort
 from flask_login import login_required, current_user
+from alert_sender import clean_header
 from db import get_db, list_alert_recipients, alerts_master_enabled, get_encrypted_setting, get_setting
 import psycopg2
 import psycopg2.extras
@@ -148,6 +149,9 @@ def _ext_conn(row):
         host=row["host"], port=row["port"], dbname=row["dbname"],
         user=row["username"], password=row["password"],
         connect_timeout=5,
+        # Bound every query on the external DB — /status is polled every
+        # 10s by every viewer and runs aggregates on possibly huge tables.
+        options="-c statement_timeout=15000",
         cursor_factory=psycopg2.extras.RealDictCursor
     )
 
@@ -270,7 +274,7 @@ def _send_alert(watch_row, subject, body, machine_key=None, alert_emails=None):
         if smtp_host and smtp_user and smtp_pass:
             try:
                 msg = MIMEText(body, "plain")
-                msg["Subject"] = subject
+                msg["Subject"] = clean_header(subject)
                 msg["From"]    = from_addr
                 msg["To"]      = ", ".join(emails)
                 ctx = ssl.create_default_context()
@@ -303,7 +307,8 @@ def _send_alert(watch_row, subject, body, machine_key=None, alert_emails=None):
 def index():
     with get_db() as conn:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM dbmon_connections ORDER BY name")
+        # Explicit columns: keep the stored DB password out of the template context.
+        cur.execute("SELECT id, name, host, port, dbname, username, created_at FROM dbmon_connections ORDER BY name")
         connections = cur.fetchall()
         cur.execute("""
             SELECT w.*, c.name as conn_name
@@ -676,6 +681,12 @@ def update_area_emails(watch_id, area_id):
     return jsonify({"ok": True})
 
 
+# Cap on distinct (location, area) pairs tracked per watch. The values come
+# from the external table, so without a cap a flood of distinct values would
+# create unbounded rows here and an alert email per value.
+MAX_LOCATION_ROWS = 500
+
+
 def _location_breakdown(cur2, schema, table, time_col):
     """
     Group the external table by Location (and Area, if present), bounded to
@@ -704,6 +715,8 @@ def _location_breakdown(cur2, schema, table, time_col):
         FROM {_qi(schema)}.{_qi(table)}
         WHERE {_qi(time_col)} > NOW() - INTERVAL '1 day'
         GROUP BY {group_cols}
+        ORDER BY last_t DESC
+        LIMIT {MAX_LOCATION_ROWS}
     """)
     return loc_col, area_col, cur2.fetchall()
 
@@ -804,7 +817,7 @@ def _sync_and_check_locations(watch, watch_id, schema, table, area_col, raw_rows
                     "area":           av,
                     "monitoring":     a["monitoring"],
                     "alerts_enabled": a["alerts_enabled"],
-                    "alert_emails":   a["alert_emails"],
+                    "alert_emails":   a["alert_emails"] if current_user.is_admin else "",
                     "is_dead":        a_is_dead if a["monitoring"] else None,
                     "last_seen":      a_last_t.isoformat() if a_last_t else None,
                     "recent_rows":    a_recent,
@@ -869,7 +882,7 @@ def _sync_and_check_locations(watch, watch_id, schema, table, area_col, raw_rows
                 "location":       lv,
                 "monitoring":     loc["monitoring"],
                 "alerts_enabled": loc["alerts_enabled"],
-                "alert_emails":   loc["alert_emails"],
+                "alert_emails":   loc["alert_emails"] if current_user.is_admin else "",
                 "is_dead":        loc_is_dead if loc["monitoring"] else None,
                 "last_seen":      last_t.isoformat() if last_t else None,
                 "recent_rows":    recent_cnt,
@@ -1091,7 +1104,10 @@ def watch_status(watch_id):
         })
 
     except Exception as e:
-        return jsonify({"error": str(e)})
+        # Driver errors name the internal host/port/DB user — only admins
+        # (who can already see the connection settings) get the details.
+        print(f"[dbmonitor] status check for watch {watch_id} failed: {e}")
+        return jsonify({"error": str(e) if current_user.is_admin else "Status check failed."})
     finally:
         if c is not None and not c.closed:
             c.close()  # a failed query used to leak the external connection

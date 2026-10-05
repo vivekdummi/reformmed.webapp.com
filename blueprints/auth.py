@@ -3,6 +3,8 @@ import io
 import json
 import os
 import secrets
+import threading
+import time
 
 import pyotp
 import qrcode
@@ -21,6 +23,26 @@ _login_limiter = RateLimiter(10, 15 * 60)
 _reset_limiter = RateLimiter(5, 60 * 60)
 _otp_limiter   = RateLimiter(20, 15 * 60)
 _2fa_limiter   = RateLimiter(10, 15 * 60)
+
+# A TOTP code stays valid for up to ~90 s (valid_window=1), so remember the
+# codes already used to sign in and refuse to accept one a second time —
+# otherwise a shoulder-surfed or phished code could be replayed.
+_TOTP_REPLAY_SECS = 120
+_used_totp = {}
+_used_totp_lock = threading.Lock()
+
+
+def _totp_already_used(user_id, code):
+    """Record (user_id, code) as used; True if it had been used already."""
+    now = time.monotonic()
+    key = (user_id, str(code).strip())
+    with _used_totp_lock:
+        for k in [k for k, t in _used_totp.items() if now - t > _TOTP_REPLAY_SECS]:
+            del _used_totp[k]
+        if key in _used_totp:
+            return True
+        _used_totp[key] = now
+        return False
 
 
 def _start_2fa_challenge(user, next_url=None):
@@ -135,7 +157,7 @@ def verify_2fa():
             flash("Too many wrong codes. Sign in again in a few minutes.", "danger")
             return redirect(url_for("auth.login"))
         code = request.form.get("code", "")
-        if user.check_totp(code):
+        if user.check_totp(code) and not _totp_already_used(user.id, code):
             _2fa_limiter.reset(rl_key)
             next_url = safe_next_url(session.pop("pending_2fa_next", None), url_for("home.index"))
             _complete_login(user)
@@ -149,8 +171,11 @@ def verify_2fa():
 @auth_bp.route("/logout", methods=["POST"])
 @login_required
 def logout():
-    logout_user()
+    # Order matters: logout_user() marks the remember-me cookie for deletion
+    # in the session, so clearing the session afterwards would undo that and
+    # the remember cookie would silently log the user straight back in.
     session.clear()
+    logout_user()
     return redirect(url_for("auth.login"))
 
 
@@ -251,6 +276,10 @@ def profile():
                     flash("That email is already used by another account.", "danger")
                     return redirect(url_for("auth.profile"))
             User.update(current_user.id, **updates)
+            if "password" in updates:
+                # The new password invalidates every existing session (see
+                # User.get_id) — re-issue this one so the user stays signed in.
+                login_user(User.get_by_id(current_user.id), remember=True)
             flash("Profile updated.", "success")
         return redirect(url_for("auth.profile"))
     return render_template("profile.html")

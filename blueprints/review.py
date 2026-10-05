@@ -6,6 +6,7 @@ import json
 import os
 from flask import Blueprint, render_template, Response, stream_with_context, abort, jsonify
 from flask_login import login_required, current_user
+from psycopg2 import sql
 from db import get_db
 
 review_bp = Blueprint("review", __name__, url_prefix="/review")
@@ -67,12 +68,12 @@ def _collect_data():
         for m in machines:
             tbl = m["table_name"]
             try:
-                cur.execute(f"""
+                cur.execute(sql.SQL("""
                     SELECT ts, cpu_percent, ram_percent, swap_percent,
                            cpu_temp, net_bytes_sent, net_bytes_recv,
                            disk_partitions
-                    FROM {tbl} ORDER BY ts DESC LIMIT 1
-                """)
+                    FROM {} ORDER BY ts DESC LIMIT 1
+                """).format(sql.Identifier(tbl)))
                 row = cur.fetchone()
                 if row:
                     disks = []
@@ -93,7 +94,9 @@ def _collect_data():
                         "last_seen":   str(row["ts"]),
                     })
             except Exception:
-                pass
+                # A failed query aborts the transaction — roll back so the
+                # remaining machines (and sections below) still get queried.
+                conn.rollback()
         data["machine_metrics"] = machine_metrics
 
         # ── Alert summary (last 24h) ──

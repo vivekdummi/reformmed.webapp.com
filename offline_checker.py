@@ -5,6 +5,7 @@ Falls back to env vars if table not yet populated.
 """
 
 import asyncio
+import html as html_lib
 import json
 import logging
 import os
@@ -12,6 +13,8 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 import asyncpg
+
+from alert_sender import clean_header
 
 IST = ZoneInfo("Asia/Kolkata")
 
@@ -177,10 +180,14 @@ def _render_alert(alert_type: str, system_name: str, location: str,
     plain_lines += [f"{lbl}: {val}" for lbl, val in all_rows]
     plain = "\n".join(plain_lines)
 
+    # Machine names, locations and mount points come from agents — escape
+    # them so a crafted value can't inject HTML (e.g. phishing links) into
+    # an email sent from our real alert address.
+    esc = lambda v: html_lib.escape(str(v))
     html_rows = "".join(
         f'<tr>'
-        f'<td style="padding:7px 0;color:#8a8f98;font-size:13px;width:120px;">{lbl}</td>'
-        f'<td style="padding:7px 0;color:#1c1e21;font-size:13px;font-weight:600;">{val}</td>'
+        f'<td style="padding:7px 0;color:#8a8f98;font-size:13px;width:120px;">{esc(lbl)}</td>'
+        f'<td style="padding:7px 0;color:#1c1e21;font-size:13px;font-weight:600;">{esc(val)}</td>'
         f'</tr>'
         for lbl, val in all_rows
     )
@@ -189,7 +196,7 @@ def _render_alert(alert_type: str, system_name: str, location: str,
             border:1px solid #e6e6e9;border-radius:10px;overflow:hidden;">
   <div style="background:{color};padding:16px 22px;">
     <span style="color:#ffffff;font-size:15px;font-weight:700;letter-spacing:.2px;">
-      {icon}&nbsp; {label}
+      {icon}&nbsp; {html_lib.escape(label)}
     </span>
   </div>
   <div style="padding:20px 22px;background:#ffffff;">
@@ -211,7 +218,7 @@ def _send_email(subject: str, plain: str, html: str, to_list: list[str]) -> bool
         return False
     try:
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"[REFORMMED] {subject}"
+        msg["Subject"] = clean_header(f"[REFORMMED] {subject}")
         msg["From"]    = _smtp_runtime["from_addr"] or user
         msg["To"]      = ", ".join(to_list)
         msg.attach(MIMEText(plain, "plain"))

@@ -96,7 +96,31 @@ async def lifespan(app: FastAPI):
     yield
     await pool.close()
 
-app = FastAPI(title="Reformmed INFRA Monitor API", lifespan=lifespan)
+# No public Swagger/OpenAPI pages — this API is only for the agents.
+app = FastAPI(title="Reformmed INFRA Monitor API", lifespan=lifespan,
+              docs_url=None, redoc_url=None, openapi_url=None)
+
+# Agent payloads are a few KB; cap them so a key holder can't exhaust memory
+# (the whole body is buffered) or bloat the DB with huge JSONB rows.
+MAX_BODY_BYTES = 1024 * 1024
+
+
+async def _read_json(request: Request) -> dict:
+    cl = request.headers.get("content-length", "")
+    if cl.isdigit() and int(cl) > MAX_BODY_BYTES:
+        raise HTTPException(413, "Request body too large")
+    body = bytearray()
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > MAX_BODY_BYTES:
+            raise HTTPException(413, "Request body too large")
+    try:
+        data = json.loads(body)
+    except ValueError:
+        raise HTTPException(400, "Body must be JSON")
+    if not isinstance(data, dict):
+        raise HTTPException(400, "Body must be a JSON object")
+    return data
 
 # ── auth helper ──────────────────────────────────────────────────────────────
 def _check_auth(x_api_key: str):
@@ -166,7 +190,7 @@ async def machine_status(table_name: str, x_api_key: str = Header(...)):
 async def register(request: Request, x_api_key: str = Header(...)):
     _check_auth(x_api_key)
 
-    data = await request.json()
+    data = await _read_json(request)
     system_name = data.get("system_name")
     location = data.get("location")
 
@@ -238,7 +262,7 @@ async def register(request: Request, x_api_key: str = Header(...)):
 async def metrics(request: Request, x_api_key: str = Header(...)):
     _check_auth(x_api_key)
 
-    data = await request.json()
+    data = await _read_json(request)
     table_name = data.get("table_name")
 
     if not table_name:

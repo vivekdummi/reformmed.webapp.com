@@ -13,6 +13,13 @@ from email.mime.multipart import MIMEMultipart
 
 log = logging.getLogger(__name__)
 
+
+def clean_header(value, max_len=200) -> str:
+    """Collapse CR/LF/tabs and bound the length of a value going into an email
+    header. Subjects include agent- and external-DB-supplied strings (machine
+    names, locations, mount points), which must not be able to inject headers."""
+    return " ".join(str(value).split())[:max_len]
+
 GMAIL_USER = os.getenv("GMAIL_USER", "")
 GMAIL_PASS = os.getenv("GMAIL_APP_PASS", "")
 SMTP_HOST  = os.getenv("SMTP_HOST", "smtp.gmail.com")
@@ -40,7 +47,7 @@ def send_alert_email(subject: str, body: str, recipients: str) -> bool:
 
     try:
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
+        msg["Subject"] = clean_header(subject)
         msg["From"]    = GMAIL_USER
         msg["To"]      = ", ".join(to_list)
         msg.attach(MIMEText(body, "plain"))

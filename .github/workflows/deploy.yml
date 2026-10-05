@@ -28,11 +28,14 @@ jobs:
             cd /opt/reformmed.webapp.com
 
             echo "📥 Pulling latest code..."
-            cp .env /tmp/.env.backup
+            # Private (0600) temp copy of the secrets, removed right after.
+            ENV_BACKUP=$(umask 077; mktemp)
+            cp .env "$ENV_BACKUP"
             git fetch origin
             git checkout "$DEPLOY_REF"
             git pull origin "$DEPLOY_REF"
-            cp /tmp/.env.backup .env
+            cp "$ENV_BACKUP" .env
+            rm -f "$ENV_BACKUP"
 
             echo "🐳 Rebuilding containers..."
             docker compose up -d --build

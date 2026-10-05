@@ -354,7 +354,15 @@ def _parse_report_request(body):
     Shared validation for /generate and /download. Returns
     (table_names, metric_ids, mode, start, end, error_response_or_None).
     """
-    table_names = _allowed_table_names(body.get("table_names") or [])
+    requested = body.get("table_names") or []
+    if not isinstance(requested, list) or not all(
+            isinstance(t, str) and _TABLE_RE.match(t) for t in requested):
+        return None, None, None, None, None, (jsonify({"error": "Invalid server id."}), 400)
+    if len(requested) > MAX_SERVERS:
+        return None, None, None, None, None, (jsonify({
+            "error": f"Select at most {MAX_SERVERS} servers per report."
+        }), 400)
+    table_names = _allowed_table_names(requested)
     mode        = body.get("mode") or "latest"
     if mode not in ("latest", "range", "events"):
         mode = "latest"
@@ -372,9 +380,20 @@ def _parse_report_request(body):
             return None, None, None, None, None, (jsonify({
                 "error": "Pick both a start and end date/time."
             }), 400)
-        if str(start) >= str(end):
+        # Parse (not just string-compare) so malformed input is a clean 400
+        # rather than a DB error, and cap the span so one request can't
+        # scan months of every selected machine's metrics.
+        try:
+            start_dt, end_dt = _parse_dt(start, "start"), _parse_dt(end, "end")
+        except ReportError as e:
+            return None, None, None, None, None, (jsonify({"error": str(e)}), 400)
+        if start_dt >= end_dt:
             return None, None, None, None, None, (jsonify({
                 "error": "Start must be before end."
+            }), 400)
+        if end_dt - start_dt > timedelta(days=MAX_RANGE_DAYS):
+            return None, None, None, None, None, (jsonify({
+                "error": f"The period can be at most {MAX_RANGE_DAYS} days."
             }), 400)
 
     return table_names, metric_ids, mode, start, end, None

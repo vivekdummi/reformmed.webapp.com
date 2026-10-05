@@ -4,8 +4,12 @@ Internal JSON API — consumed by frontend JS (session-auth only).
 from flask import Blueprint, jsonify, request, url_for
 from flask_login import login_required, current_user
 from db import get_db
+from security import RateLimiter
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+
+# Each ARIA message costs a paid Gemini call plus a query per machine table.
+_chat_limiter = RateLimiter(20, 60)
 
 
 # ── Machine summary / list ────────────────────────────────────────────────────
@@ -326,6 +330,10 @@ def agent_context():
 @login_required
 def agent_chat():
     """Simple (non-streaming) Gemini response for the AI agent popup."""
+    rl_key = f"chat|{current_user.id}"
+    if _chat_limiter.blocked(rl_key):
+        return jsonify({"error": "Too many messages — wait a minute and try again."}), 429
+    _chat_limiter.hit(rl_key)
     import json, urllib.request, urllib.error, os
     from flask import request
 
@@ -427,7 +435,7 @@ Be concise, direct, and use bullet points for lists. For normal conversation, re
         # failed — includes network errors (DNS/timeout/connection refused),
         # JSON parse errors on a malformed response, etc.
         print(f"[api/aria] Non-HTTP error ({type(e).__name__}): {e}")
-        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+        return jsonify({"error": "AI service unavailable. Check the server log."}), 500
 
 
 # ── Universal search (top bar) ────────────────────────────────────────────────

@@ -28,10 +28,16 @@ DB_PASS = os.getenv("POSTGRES_PASSWORD")
 
 GRAFANA_URL  = os.getenv("GRAFANA_URL", "http://reformmed_grafana:3000")
 GRAFANA_USER = os.getenv("GRAFANA_USER", "admin")
-GRAFANA_PASS = os.getenv("GRAFANA_PASS", "admin")
+GRAFANA_PASS = os.getenv("GRAFANA_PASS", "")
 DS_UID       = "PCC52D03280B7034C"
 
 # ── Grafana HTTP helper with retry ───────────────────────────────────────────
+def _sql_lit(value):
+    """Escape a value for use inside a single-quoted SQL literal in the
+    dashboard's rawSql — system_name/location are agent-supplied."""
+    return str(value).replace("'", "''")
+
+
 def grafana_request(path, method="GET", data=None, *, retries=3, delay=5):
     url = f"{GRAFANA_URL}{path}"
     auth_str = f"{GRAFANA_USER}:{GRAFANA_PASS}"
@@ -112,7 +118,7 @@ def create_smart_dashboard(system_name, location, table_name, gpu_config):
     panels = [
         # ── Row 1: Status Cards ──────────────────────────────────────────────
         {"id": 1,  "type": "stat",      "title": "Status",       "gridPos": {"h": 4, "w": 3, "x": 0,  "y": 0}, "datasource": ds(),
-         "targets": [{"rawSql": f"SELECT NOW() as time, status FROM machine_registry WHERE system_name='{system_name}' AND location='{location}'", "format": "table"}],
+         "targets": [{"rawSql": f"SELECT NOW() as time, status FROM machine_registry WHERE system_name='{_sql_lit(system_name)}' AND location='{_sql_lit(location)}'", "format": "table"}],
          "options": {"colorMode": "background", "graphMode": "none", "textMode": "value", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "/^status$/"}},
          "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"online": {"color": "green", "text": "🟢 ONLINE"}, "offline": {"color": "red", "text": "🔴 OFFLINE"}}}]}}},
         {"id": 2,  "type": "stat",      "title": "⏱ Uptime",     "gridPos": {"h": 4, "w": 3, "x": 3,  "y": 0}, "datasource": ds(),

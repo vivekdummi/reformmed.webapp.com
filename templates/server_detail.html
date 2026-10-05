@@ -500,7 +500,7 @@ function toggleAlerts() {
       <span class="dash-card-title">CPU per core (now)</span>
       <button type="button" class="chart-expand-btn" aria-label="Expand chart" onclick="openChartModal('cores')" title="Expand">⤢</button>
     </div>
-    {% if chart_cores and chart_cores != '[]' %}
+    {% if chart_cores %}
     <div style="height:150px;position:relative;"><canvas id="chart-cores"></canvas></div>
     {% else %}
     <p style="font-size:12px;color:var(--text-muted);padding:20px;">Per-core data not reported by this agent yet.</p>
@@ -776,13 +776,13 @@ function pct(v) { return (Math.round(v * 10) / 10).toFixed(1) + '%'; }
 const MAX_POINTS = 60;
 
 // ── Base metric history (seeded from Flask context) ──
-let labels   = {{ chart_labels   | safe }};
-let cpuData  = {{ chart_cpu      | safe }};
-let ramData  = {{ chart_ram      | safe }};
-let swapData = {{ chart_swap     | safe }};
-let tempData = {{ chart_temp     | safe }};
-let sentData = {{ chart_net_sent | safe }};
-let recvData = {{ chart_net_recv | safe }};
+let labels   = {{ chart_labels   | tojson }};
+let cpuData  = {{ chart_cpu      | tojson }};
+let ramData  = {{ chart_ram      | tojson }};
+let swapData = {{ chart_swap     | tojson }};
+let tempData = {{ chart_temp     | tojson }};
+let sentData = {{ chart_net_sent | tojson }};
+let recvData = {{ chart_net_recv | tojson }};
 
 // Pad to MAX_POINTS
 function padArr(arr, val) {
@@ -1044,7 +1044,7 @@ charts.netBar = makeNetBar('chart-net-bar', sentData, recvData);
 // Per-core CPU multi-line chart (real data from cpu_per_core — replaces the
 // "Load Average" widget from the reference image, since this agent doesn't
 // collect Unix load averages)
-var coresData = {{ chart_cores | safe }};
+var coresData = {{ chart_cores | tojson }};
 charts.cores = makeCoresChart('chart-cores', lastValues(coresData));
 
 // Temperature gauge (semicircle zones + needle)

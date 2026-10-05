@@ -1,6 +1,7 @@
 """
 Reformmed INFRA Monitor — Flask Web Dashboard
 """
+import hmac
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
@@ -72,7 +73,19 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id):
-        return User.get_by_id(int(user_id))
+        # user_id is "<id>:<password fingerprint>" (see User.get_id). Reject
+        # sessions from before a password change, and any session of a
+        # deactivated account — Flask-Login itself doesn't check is_active
+        # for already-logged-in users.
+        uid, _, fingerprint = str(user_id).partition(":")
+        if not uid.isdigit() or not fingerprint:
+            return None
+        user = User.get_by_id(int(uid))
+        if not user or not user.is_active:
+            return None
+        if not hmac.compare_digest(fingerprint, user.session_fingerprint()):
+            return None
+        return user
 
     # An admin can mark a user as totp_required — this catches every request
     # from that user until they've actually completed 2FA setup, and bounces
@@ -143,5 +156,5 @@ if __name__ == "__main__":
     app.run(
         host=os.getenv("WEBAPP_HOST", "0.0.0.0"),
         port=int(os.getenv("WEBAPP_PORT", "5000")),
-        debug=os.getenv("FLASK_DEBUG", "0") == "0",
+        debug=os.getenv("FLASK_DEBUG", "0") == "1",
     )

@@ -1,4 +1,6 @@
 import json
+import re
+from datetime import datetime
 from flask import Blueprint, render_template, abort, jsonify, request
 from flask_login import login_required, current_user
 from psycopg2 import sql
@@ -14,7 +16,15 @@ def _require_servers_feature():
         abort(403)
 
 
+# Same shape the ingest API (server/main.py) creates. Several queries below
+# interpolate the table name, so refuse anything else outright.
+_TABLE_RE = re.compile(r"^machine_[a-z0-9_]{1,60}$")
+HISTORY_MAX_DAYS = 93
+
+
 def _check_access(table_name):
+    if not _TABLE_RE.match(table_name):
+        abort(404)
     allowed = current_user.allowed_servers()
     if allowed is not None and table_name not in allowed:
         abort(403)
@@ -346,14 +356,19 @@ def detail(table_name):
         raw = r.get("cpu_per_core")
         if raw:
             arr = json.loads(raw) if isinstance(raw, str) else raw
-            core_count = max(core_count, len(arr))
+            if isinstance(arr, list):
+                core_count = max(core_count, len(arr))
     if core_count:
         chart_cores = [[] for _ in range(core_count)]
         for r in history_rows:
             raw = r.get("cpu_per_core")
             arr = (json.loads(raw) if isinstance(raw, str) else raw) if raw else []
+            if not isinstance(arr, list):
+                arr = []
             for ci in range(core_count):
-                chart_cores[ci].append(arr[ci] if ci < len(arr) else 0)
+                # Agent-supplied — coerce to a number so nothing but numbers
+                # can ever reach the page's <script> block.
+                chart_cores[ci].append(_safe_float(arr[ci]) if ci < len(arr) else 0)
 
     # ── Trend deltas for the top stat cards — current value vs the average
     # over the loaded window, so "↑8.4%" means "8.4 points above the recent
@@ -420,14 +435,14 @@ def detail(table_name):
         procs=procs,
         alert_history=alert_history,
         alert_total=alert_total,
-        chart_labels=json.dumps(chart_labels),
-        chart_cpu=json.dumps(chart_cpu),
-        chart_ram=json.dumps(chart_ram),
-        chart_swap=json.dumps(chart_swap),
-        chart_temp=json.dumps(chart_temp),
-        chart_net_sent=json.dumps(chart_net_sent),
-        chart_net_recv=json.dumps(chart_net_recv),
-        chart_cores=json.dumps(chart_cores),
+        chart_labels=chart_labels,
+        chart_cpu=chart_cpu,
+        chart_ram=chart_ram,
+        chart_swap=chart_swap,
+        chart_temp=chart_temp,
+        chart_net_sent=chart_net_sent,
+        chart_net_recv=chart_net_recv,
+        chart_cores=chart_cores,
         last_net_sent=(chart_net_sent[-1] if chart_net_sent else 0),
         last_net_recv=(chart_net_recv[-1] if chart_net_recv else 0),
         trend_cpu=trend_cpu,
@@ -480,6 +495,14 @@ def history(table_name):
     end   = request.args.get("end", "").strip()
     if not start or not end:
         return jsonify({"error": "Pick both a start and end date/time."}), 400
+    try:
+        start_dt, end_dt = datetime.fromisoformat(start), datetime.fromisoformat(end)
+        span = end_dt - start_dt
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid date range."}), 400
+    if span.total_seconds() <= 0 or span.days > HISTORY_MAX_DAYS:
+        # Bounded so a huge range can't force full-table window scans.
+        return jsonify({"error": f"Range must be between 1 minute and {HISTORY_MAX_DAYS} days."}), 400
 
     with get_db() as conn:
         cur = conn.cursor()
@@ -503,8 +526,8 @@ def history(table_name):
                 ORDER BY ts ASC
             """, (start, end))
             rows = cur.fetchall()
-        except Exception as e:
-            return jsonify({"error": f"Invalid date range: {e}"}), 400
+        except Exception:
+            return jsonify({"error": "Invalid date range."}), 400
 
     if not rows:
         return jsonify({
