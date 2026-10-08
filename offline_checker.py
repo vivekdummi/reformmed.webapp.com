@@ -45,6 +45,12 @@ PURGE_INTERVAL_HOURS   = float(os.getenv("PURGE_INTERVAL_HOURS", "6"))
 
 SKIP_MOUNT_PREFIXES = ("/snap/", "/proc", "/sys", "/dev", "/run")
 
+# DVR pings and DB Monitor checks (moved here from the web request path).
+# DVRs are pinged every Settings → DVR ping interval; DB watches every:
+DBMON_CHECK_INTERVAL_SECS = int(os.getenv("DBMON_CHECK_INTERVAL_SECS", "60"))
+DVR_CONCURRENCY           = int(os.getenv("DVR_CONCURRENCY", "16"))
+DBMON_CONCURRENCY         = int(os.getenv("DBMON_CONCURRENCY", "4"))
+
 # ── cooldown tracker ─────────────────────────────────────────────────────────
 _last_alert: dict[tuple, datetime] = {}
 
@@ -224,7 +230,7 @@ def _send_email(subject: str, plain: str, html: str, to_list: list[str]) -> bool
         msg.attach(MIMEText(plain, "plain"))
         msg.attach(MIMEText(html, "html"))
         ctx = ssl.create_default_context()
-        with smtplib.SMTP_SSL(_smtp_runtime["host"], _smtp_runtime["port"], context=ctx) as srv:
+        with smtplib.SMTP_SSL(_smtp_runtime["host"], _smtp_runtime["port"], timeout=15, context=ctx) as srv:
             srv.login(user, password)
             srv.sendmail(user, to_list, msg.as_string())
         log.info("📧 Alert sent: %s", subject)
@@ -307,7 +313,7 @@ async def _alert(conn, config: dict, machine_key: str, alert_type: str,
     if _cooldown_ok(machine_key, alert_type, cooldown):
         subject, plain, html = _render_alert(alert_type, system_name, location, rows)
         to_list = _recipients(config, alert_type)
-        ok = _send_email(subject, plain, html, to_list)
+        ok = await asyncio.to_thread(_send_email, subject, plain, html, to_list)
         _mark_sent(machine_key, alert_type)
         await _log_alert(conn, alert_type, machine_key, subject, plain, ok)
 
@@ -384,6 +390,61 @@ async def _run_purge():
         log.error("Retention purge failed: %s", e)
 
 
+# ── DVR + DB Monitor loops ──────────────────────────────────────────────────
+# Their check logic is shared, synchronous psycopg2 code living in the
+# blueprints; it runs here in a dedicated thread pool so the asyncio loop
+# (offline detection, metric alerts) keeps its cadence.
+
+async def _run_checks(executor, fn, ids, concurrency, label):
+    loop = asyncio.get_running_loop()
+    sem = asyncio.Semaphore(concurrency)
+
+    async def one(item_id):
+        async with sem:
+            try:
+                await loop.run_in_executor(executor, fn, item_id)
+            except Exception as e:
+                log.error("%s check failed for id %s: %s", label, item_id, e)
+
+    await asyncio.gather(*(one(i) for i in ids))
+
+
+async def _dvr_loop(executor):
+    from blueprints.dvr import check_device, device_ids_to_check, get_setting, clean_ping_interval
+    loop = asyncio.get_running_loop()
+    while True:
+        interval = 30
+        try:
+            ids = await loop.run_in_executor(executor, device_ids_to_check)
+            await _run_checks(executor, check_device, ids, DVR_CONCURRENCY, "DVR")
+            interval = clean_ping_interval(
+                await loop.run_in_executor(executor, get_setting, "ping_interval_sec", "30"))
+        except Exception as e:
+            log.error("DVR loop error: %s", e)
+        await asyncio.sleep(interval)
+
+
+async def _dbmon_loop(executor):
+    from blueprints.dbmonitor import check_watch, monitored_watch_ids
+    loop = asyncio.get_running_loop()
+    while True:
+        try:
+            ids = await loop.run_in_executor(executor, monitored_watch_ids)
+            await _run_checks(executor, check_watch, ids, DBMON_CONCURRENCY, "DB Monitor")
+        except Exception as e:
+            log.error("DB Monitor loop error: %s", e)
+        await asyncio.sleep(DBMON_CHECK_INTERVAL_SECS)
+
+
+def _ensure_monitor_tables():
+    """The webapp normally creates these; do it here too in case the checker
+    starts first (all statements are IF NOT EXISTS)."""
+    from blueprints.dbmonitor import init_dbmonitor_tables
+    from blueprints.dvr import init_dvr_tables
+    init_dbmonitor_tables()
+    init_dvr_tables()
+
+
 async def main():
     log.info("🚀 Offline Checker v2 (DB-driven alerts) starting...")
     pool = await asyncpg.create_pool(
@@ -396,14 +457,31 @@ async def main():
     loop = asyncio.get_running_loop()
     last_purge = float("-inf")  # first purge right after start
     purge_task = None
+    last_master = None  # log master-switch changes once, not every cycle
+
+    from concurrent.futures import ThreadPoolExecutor
+    monitor_pool = ThreadPoolExecutor(max_workers=DVR_CONCURRENCY + DBMON_CONCURRENCY + 2,
+                                      thread_name_prefix="monitor")
+    try:
+        await loop.run_in_executor(monitor_pool, _ensure_monitor_tables)
+    except Exception as e:
+        log.error("Could not ensure DVR / DB Monitor tables: %s", e)
+    # Keep references so the tasks aren't garbage-collected; the heartbeat
+    # stops (container goes unhealthy) if either loop ever dies.
+    monitor_tasks = [asyncio.create_task(_dvr_loop(monitor_pool)),
+                     asyncio.create_task(_dbmon_loop(monitor_pool))]
+    log.info("✅ DVR and DB Monitor checks running in the background")
 
     while True:
         try:
             async with pool.acquire() as conn:
                 master_enabled = await _refresh_smtp_and_master_switch(conn)
-                if not master_enabled:
-                    log.info("🔕 Alerts master switch is OFF — skipping this cycle's alert checks "
-                             "(status tracking still runs normally)")
+                if not master_enabled and last_master is not False:
+                    log.info("🔕 Alerts master switch is OFF — skipping alert checks until it's "
+                             "back on (status tracking still runs normally)")
+                elif master_enabled and last_master is False:
+                    log.info("🔔 Alerts master switch is back ON")
+                last_master = master_enabled
 
                 config    = await _get_alert_config(conn)
                 overrides = await _get_machine_overrides(conn)
@@ -471,11 +549,28 @@ async def main():
                 last_purge = loop.time()
                 purge_task = asyncio.create_task(_run_purge())
 
+            if all(not t.done() for t in monitor_tasks):
+                _heartbeat()
+            else:
+                log.error("A DVR / DB Monitor loop has stopped — heartbeat withheld")
             await asyncio.sleep(CHECK_INTERVAL_SECS)
 
         except Exception as e:
             log.error("Check error: %s", e)
             await asyncio.sleep(5)
+
+
+HEARTBEAT_FILE = os.getenv("CHECKER_HEARTBEAT_FILE", "/tmp/checker_heartbeat")
+
+
+def _heartbeat():
+    """Touch a file after every completed cycle — the container healthcheck
+    flags the checker unhealthy if this goes stale (e.g. a hung loop)."""
+    try:
+        with open(HEARTBEAT_FILE, "w") as f:
+            f.write(str(datetime.now(timezone.utc).timestamp()))
+    except OSError:
+        pass
 
 
 if __name__ == "__main__":

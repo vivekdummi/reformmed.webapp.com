@@ -88,7 +88,7 @@ a.health-item:hover{background:var(--bg-hover);}
 <div class="page-header">
   <div>
     <h1>Infrastructure Overview</h1>
-    <p>Servers, alerts and data feeds at a glance — live data refreshes every <span id="refresh-interval">2</span>s</p>
+    <p>Servers, alerts and data feeds at a glance — live data refreshes every <span id="refresh-interval">{{ [5, (home_refresh_secs|default(5))|int]|max }}</span>s</p>
   </div>
   <span class="ov-head-chip"><span class="pulse"></span> Live</span>
 </div>
@@ -201,8 +201,8 @@ a.health-item:hover{background:var(--bg-hover);}
   <div class="panel">
     <div class="panel-head"><div><div class="panel-title">Health at a glance</div><div class="panel-sub">Share of each fleet that is up right now</div></div></div>
     <div class="health-rings">
-      <div class="hring"><div class="hring-box"><canvas id="ring-servers"></canvas><div class="donut-mid"><b>{{ '%.0f'|format(avail) }}%</b></div></div>
-        <div class="hring-lbl">Servers</div><div class="hring-sub">{{ online }} of {{ total }} up</div></div>
+      <div class="hring"><div class="hring-box"><canvas id="ring-servers"></canvas><div class="donut-mid"><b id="ring-servers-pct">{{ '%.0f'|format(avail) }}%</b></div></div>
+        <div class="hring-lbl">Servers</div><div class="hring-sub" id="ring-servers-sub">{{ online }} of {{ total }} up</div></div>
       {% if dbmon_summary and dbmon_summary.total %}
       {% set mon = (dbmon_summary.total - (dbmon_summary.paused or 0)) %}
       {% set db_pct = ((dbmon_summary.live or 0) / mon * 100) if mon else 0 %}
@@ -296,8 +296,10 @@ a.health-item:hover{background:var(--bg-hover);}
 {% block extra_js %}
 {% set avail = ((online / total * 100) if total else 0) %}
 <script>
-var _refreshTimer = null;
-var _refreshSecs  = 2;
+var _homePoller  = null;
+// Home refresh interval comes from the server (non-admins can't read
+// /api/settings); never poll faster than every 5s.
+var _refreshSecs  = Math.max(5, parseInt({{ (home_refresh_secs|default(5))|tojson }}, 10) || 5);
 
 // Machine names, hostnames, alert subjects etc. come from agents — always
 // escape them before they go into innerHTML.
@@ -313,7 +315,7 @@ var FLEET       = {{ fleet|tojson }};
 var TYPE_GRADS  = ['g:sunset', 'g:ocean', 'g:violet', 'g:mint', 'g:pink'];
 var TYPE_NAMES  = { cpu: 'High CPU', ram: 'High RAM', disk: 'Disk full', temp: 'High temperature',
                     offline: 'Server offline', online: 'Back online', db_dead: 'DB feed stopped',
-                    dvr_offline: 'DVR offline', other: 'Other' };
+                    dvr_offline: 'DVR offline', dvr_online: 'DVR back online', other: 'Other' };
 function typeName(t) { return TYPE_NAMES[t] || String(t).replace(/_/g, ' '); }
 
 function ring(id, pct, grad) {
@@ -394,7 +396,7 @@ if (FLEET && FLEET.length) {
   });
 }
 
-ring('ring-servers', {{ '%.1f'|format(avail) }}, 'g:ocean');
+var ringServers = ring('ring-servers', {{ '%.1f'|format(avail) }}, 'g:ocean');
 {% if dbmon_summary and dbmon_summary.total %}{% set mon = (dbmon_summary.total - (dbmon_summary.paused or 0)) %}ring('ring-db', {{ '%.1f'|format(((dbmon_summary.live or 0) / mon * 100) if mon else 0) }}, 'g:mint');{% endif %}
 
 function fmtDate(s){
@@ -425,36 +427,27 @@ function applyHomeData(d){
   setIfChanged('avail-pct', pct + '%');
   var bar = document.getElementById('avail-bar');
   if (bar) bar.style.width = pct + '%';
+  // Keep the "Health at a glance" servers ring in step with #avail-pct.
+  setIfChanged('ring-servers-pct', pct + '%');
+  setIfChanged('ring-servers-sub', d.online + ' of ' + d.total + ' up');
+  if (ringServers) {
+    var rd = ringServers.data.datasets[0].data;
+    if (rd[0] !== pct) { ringServers.data.datasets[0].data = [pct, Math.max(0, 100 - pct)]; ringServers.update('none'); }
+  }
 
 }
 
 function updateHome(){
-  fetch('/api/home/data')
+  return fetch('/api/home/data')
     .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
     .then(function(d){ applyHomeData(d); })
     .catch(function(){}); // silent — keep showing last good data
 }
 
-function startRefreshTimer(secs){
-  if(_refreshTimer) clearInterval(_refreshTimer);
-  _refreshTimer = setInterval(updateHome, secs * 1000);
-}
-
-updateHome();
-// Load settings first, THEN start the timer — no double-timer problem
-fetch('/api/settings')
-  .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
-  .then(function(s){
-    if(s && s.home_refresh_secs){
-      _refreshSecs = parseInt(s.home_refresh_secs) || 2;
-      var el = document.getElementById('refresh-interval');
-      if(el) el.textContent = _refreshSecs;
-    }
-  })
-  .catch(function(){})
-  .finally(function(){
-    // Start timer AFTER settings load (or fail) — single timer only
-    startRefreshTimer(_refreshSecs);
-  });
+var _refreshEl = document.getElementById('refresh-interval');
+if (_refreshEl) _refreshEl.textContent = _refreshSecs;
+// Single poller: no overlapping requests, paused while the tab is hidden.
+_homePoller = RM.poll(updateHome, _refreshSecs * 1000);
+_homePoller.start();
 </script>
 {% endblock %}

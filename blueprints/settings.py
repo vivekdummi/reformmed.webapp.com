@@ -1,12 +1,17 @@
 """
 Settings blueprint — app-wide configuration via UI.
 """
+import logging
+import threading
+
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort
 from flask_login import login_required, current_user
 from db import (
     get_db, purge_old_data, list_alert_recipients, RETENTION_MIN_DAYS, RETENTION_MAX_DAYS,
     alerts_master_enabled, set_encrypted_setting, get_encrypted_setting,
 )
+
+log = logging.getLogger(__name__)
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/settings")
 
@@ -117,15 +122,19 @@ def save():
 @login_required
 def purge_now():
     _admin_required()
-    try:
-        r = purge_old_data()
-        msg = (f"Purge complete — removed {r['metric_rows']:,} metric rows from {r['tables']} "
-               f"tables and {r['alert_rows']:,} alert log entries older than {r['days']} days.")
-        if r["errors"]:
-            msg += f" {r['errors']} table(s) were skipped (see the webapp log)."
-        flash(msg, "warning" if r["errors"] else "success")
-    except Exception as e:
-        flash(f"Purge failed: {e}", "danger")
+    # A large purge can run for minutes — do it off the request thread so it
+    # can't tie up the webserver or time out at the proxy. The result shows
+    # under "Last purge" on this page once it finishes.
+    def _run():
+        try:
+            r = purge_old_data()
+            if not r.get("skipped"):
+                log.info("Manual purge: %s", r)
+        except Exception:
+            log.exception("Manual purge failed")
+    threading.Thread(target=_run, name="manual-purge", daemon=True).start()
+    flash("Purge started in the background — refresh this page in a minute to see the result "
+          "under Last purge.", "success")
     return redirect(url_for("settings.index") + "#data")
 
 

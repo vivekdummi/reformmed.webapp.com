@@ -17,4 +17,4 @@ USER app
 EXPOSE 5000
 
 # One worker so the in-memory login rate limiter is shared (matches docker-compose).
-CMD ["gunicorn", "-w", "1", "--threads", "8", "-b", "0.0.0.0:5000", "--timeout", "90", "app:create_app()"]
+CMD ["gunicorn", "-w", "1", "--threads", "12", "-b", "0.0.0.0:5000", "--timeout", "90", "app:create_app()"]

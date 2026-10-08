@@ -104,12 +104,15 @@ def index():
         configs = cur.fetchall()
         visible = _visible_log_filter(cur)
         # Unified alert log (no DVR — that feature was removed from the app)
-        cur.execute("""
+        # Visibility is applied in SQL so non-admins still get a full 500 rows.
+        from blueprints.api import alert_visibility_sql
+        vis_sql, vis_params = alert_visibility_sql(cur)
+        cur.execute(f"""
             SELECT * FROM alert_log
-            WHERE COALESCE(source,'system') <> 'dvr'
+            WHERE COALESCE(source,'system') <> 'dvr' AND {vis_sql}
             ORDER BY sent_at DESC LIMIT 500
-        """)
-        logs = [r for r in cur.fetchall() if visible(r)]
+        """, vis_params)
+        logs = cur.fetchall()
         overview = _alert_overview(cur, visible)
         # DB monitor watches for DB alerts tab
         cur.execute("""
@@ -298,8 +301,11 @@ def update_dvr():
         abort(403)
     with get_db() as conn:
         cur = conn.cursor()
+        from blueprints.dvr import clean_ping_interval
         for k in ("ping_interval_sec", "alerts_enabled"):
             v = request.form.get(k, "").strip()
+            if k == "ping_interval_sec":
+                v = str(clean_ping_interval(v))
             if v is not None:
                 cur.execute("""
                     INSERT INTO dvr_settings (key, value) VALUES (%s, %s)

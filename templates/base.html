@@ -556,9 +556,12 @@
     var method = (init.method || (input && input.method) || 'GET').toUpperCase();
     var url = typeof input === 'string' ? input : (input && input.url) || '';
     var sameOrigin = url.indexOf('://') === -1 || url.indexOf(location.origin) === 0;
-    if (sameOrigin && method !== 'GET' && method !== 'HEAD') {
+    if (sameOrigin) {
+      // Accept: JSON so the server answers API calls (incl. auth/CSRF errors)
+      // with JSON rather than an HTML redirect page.
       var h = new Headers(init.headers || (input && input.headers) || {});
-      if (!h.has('X-CSRFToken')) h.set('X-CSRFToken', token);
+      if (!h.has('Accept')) h.set('Accept', 'application/json');
+      if (method !== 'GET' && method !== 'HEAD' && !h.has('X-CSRFToken')) h.set('X-CSRFToken', token);
       init.headers = h;
     }
     return _fetch.call(this, input, init);
@@ -748,6 +751,37 @@ var RM = window.RM = {
   }
 };
 RM.applyDefaults();
+// ── Polling — every page poller goes through this so requests never stack up
+// (busy guard) and nothing polls from a hidden tab. fn may return a promise;
+// the next tick is skipped until it settles. Returns {start, stop}; a poller
+// stopped by page code stays stopped across tab visibility changes. ──
+RM.poll = function(fn, ms){
+  var timer = null, busy = false, wanted = false;
+  function tick(){
+    if (busy || document.hidden) return;
+    busy = true;
+    var p;
+    try { p = fn(); } catch(e) { busy = false; return; }
+    if (p && typeof p.then === 'function') {
+      p.then(function(){ busy = false; }, function(){ busy = false; });
+    } else busy = false;
+  }
+  function run(){ if (timer === null) timer = setInterval(tick, ms); }
+  function halt(){ if (timer !== null) { clearInterval(timer); timer = null; } }
+  document.addEventListener('visibilitychange', function(){
+    if (!wanted) return;
+    if (document.hidden) halt();
+    else if (timer === null) { run(); tick(); }
+  });
+  return {
+    start: function(immediate){
+      wanted = true;
+      if (timer !== null) return;
+      if (!document.hidden) { run(); if (immediate !== false) tick(); }
+    },
+    stop: function(){ wanted = false; halt(); }
+  };
+};
 // Vertical crosshair on line charts while hovering, so the tooltip's point in
 // time is easy to read across every series.
 if (window.Chart) Chart.register({
@@ -1024,8 +1058,11 @@ var _agentHistory = [];   // [{role,content}]
 var _agentBusy    = false;
 var _userInitial  = ({{ current_user.username|tojson }} || '?').charAt(0).toUpperCase();
 
-// Pre-load context when page loads (silent)
+// Context is loaded lazily the first time the popup opens.
+var _agentCtxLoading = false;
 function loadAgentContext(){
+  if(_agentCtxLoading) return;
+  _agentCtxLoading = true;
   fetch('/api/agent/context')
     .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
     .then(function(d){
@@ -1036,14 +1073,15 @@ function loadAgentContext(){
     .catch(function(){
       var sub = document.getElementById('agent-status-sub');
       if(sub) sub.textContent = 'AI Infrastructure Agent';
-    });
+    })
+    .finally(function(){ _agentCtxLoading = false; });
 }
-loadAgentContext();
 
 function toggleAgent(){
   _agentOpen = !_agentOpen;
   document.getElementById('agent-popup').classList.toggle('open', _agentOpen);
   if(_agentOpen){
+    if(!_agentCtx) loadAgentContext();
     setTimeout(function(){ document.getElementById('agent-input').focus(); }, 220);
   }
 }
@@ -1120,7 +1158,12 @@ function sendAgent(){
       page:     window.location.pathname,
     }),
   })
-  .then(function(resp){ return resp.json(); })
+  .then(function(resp){
+    return resp.json().catch(function(){ return {}; }).then(function(d){
+      if(!resp.ok && !d.error) d.error = 'Request failed (' + resp.status + ')';
+      return d;
+    });
+  })
   .then(function(d){
     removeTyping();
     if(d.error){

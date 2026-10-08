@@ -8,6 +8,7 @@ from flask import Blueprint, render_template, Response, stream_with_context, abo
 from flask_login import login_required, current_user
 from psycopg2 import sql
 from db import get_db
+from security import ai_slots
 
 review_bp = Blueprint("review", __name__, url_prefix="/review")
 
@@ -110,6 +111,7 @@ def _collect_data():
             """)
             alerts = [dict(r, sent_at=str(r["sent_at"])) for r in cur.fetchall()]
         except Exception:
+            conn.rollback()
             alerts = []
         data["alerts_24h"]       = len(alerts)
         data["alerts_failed"]    = sum(1 for a in alerts if not a["success"])
@@ -119,7 +121,9 @@ def _collect_data():
         try:
             cur.execute("""
                 SELECT w.display_name, w.schema_name, w.table_name,
-                       w.monitoring, w.alerts_enabled, w.last_checked, w.last_status,
+                       w.monitoring, w.alerts_enabled, NULL::timestamptz AS last_checked,
+                       CASE WHEN NOT w.monitoring THEN 'paused'
+                            WHEN w.was_dead THEN 'dead' ELSE 'live' END AS last_status,
                        c.name AS connection_name, c.host
                 FROM dbmon_watches w
                 JOIN dbmon_connections c ON c.id = w.conn_id
@@ -130,6 +134,7 @@ def _collect_data():
             data["db_watches_dead"] = sum(1 for w in watches if w["last_status"] == "dead")
             data["db_watch_list"]   = [dict(w, last_checked=str(w["last_checked"])) for w in watches]
         except Exception:
+            conn.rollback()
             data["db_watches"] = data["db_watches_dead"] = 0
             data["db_watch_list"] = []
 
@@ -207,6 +212,9 @@ def stream():
         import urllib.request
         import urllib.error
 
+        if not ai_slots.acquire(timeout=5):
+            yield f"data:{json.dumps({'error': 'AI service busy — try again in a moment.'})}\n\n"
+            return
         try:
             data   = _collect_data()
             prompt = _build_prompt(data)
@@ -244,6 +252,8 @@ def stream():
             else:
                 print(f"[review stream] Non-HTTP error ({type(e).__name__}): {e}")
                 yield f"data:{json.dumps({'error': f'{type(e).__name__}: {e}'})}\n\n"
+        finally:
+            ai_slots.release()
 
     return Response(
         stream_with_context(generate()),
@@ -262,6 +272,8 @@ def run():
     if not current_user.is_admin:
         abort(403)
     import urllib.request, urllib.error
+    if not ai_slots.acquire(timeout=5):
+        return jsonify({"error": "AI service busy — try again in a moment."}), 429
     try:
         data   = _collect_data()
         prompt = _build_prompt(data)
@@ -270,7 +282,7 @@ def run():
             data=_gemini_payload(prompt),
             headers=_gemini_headers(),
         )
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=90) as resp:
             result = json.loads(resp.read().decode())
             text = _extract_gemini_text(result)
             return jsonify({"text": text})
@@ -286,3 +298,5 @@ def run():
     except Exception as e:
         print(f"[review] Non-HTTP error ({type(e).__name__}): {e}")
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+    finally:
+        ai_slots.release()

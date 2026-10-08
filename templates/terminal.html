@@ -192,6 +192,7 @@ function addTab(name){
     name: name || ('Query ' + _tabCounter),
     sql: '',
     results: null,
+    data: null,   // last result set, for this tab's CSV download
   };
   _tabs.push(tab);
   renderTabs();
@@ -261,13 +262,13 @@ function toggleSchema(tbl){
   panel.classList.toggle('open');
   if(panel.classList.contains('open') && !_schemaCache[tbl]){
     fetch('/terminal/schema/'+tbl, {credentials:'include'})
-      .then(function(r){ return r.json(); })
+      .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
       .then(function(d){
         _schemaCache[tbl] = d;
         var html = '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">'+
           d.stats.count+' rows · '+d.stats.oldest.slice(0,10)+' – '+d.stats.newest.slice(0,10)+'</div>';
         d.columns.forEach(function(c){
-          html += '<div class="schema-col"><span>'+c.column_name+'</span><span>'+c.data_type.replace('timestamp with time zone','timestamptz')+'</span></div>';
+          html += '<div class="schema-col"><span>'+escHtml(c.column_name)+'</span><span>'+escHtml(String(c.data_type).replace('timestamp with time zone','timestamptz'))+'</span></div>';
         });
         panel.innerHTML = html;
       }).catch(function(){ panel.innerHTML = '<span style="color:var(--red);font-size:11px">Failed to load</span>'; });
@@ -292,7 +293,6 @@ function setQuick(type){
 }
 
 // ── Query execution ───────────────────────────────────────────────────────────
-var _lastData = null;
 
 function handleKey(e){
   if(e.ctrlKey && e.key==='Enter'){ e.preventDefault(); runQuery(); }
@@ -322,7 +322,7 @@ function runQuery(){
     if(d.error){
       html = '<div class="result-error">⚠️ ' + escHtml(d.error) + '</div>';
     } else {
-      _lastData = d;
+      if(tab) tab.data = d;
       var sqlShort = (d.sql||sql).slice(0,80) + ((d.sql||sql).length>80?'…':'');
       html += '<div class="result-meta">';
       html += '<span class="r-sql" title="'+escHtml(d.sql||sql)+'">'+escHtml(sqlShort)+'</span>';
@@ -365,17 +365,18 @@ function runQuery(){
 }
 
 function clearResults(){
-  _lastData = null;
   document.getElementById('results-area').innerHTML = '<div class="empty-state"><div class="empty-icon-wrap"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div><div>Run a query to see results</div></div>';
   var tab = _tabs.find(function(t){ return t.id===_activeTab; });
-  if(tab) tab.results = null;
+  if(tab){ tab.results = null; tab.data = null; }
 }
 
 // ── CSV download ──────────────────────────────────────────────────────────────
 function downloadCSV(){
-  if(!_lastData || !_lastData.columns) return;
-  var lines = [_lastData.columns.join(',')];
-  _lastData.rows.forEach(function(row){
+  var tab = _tabs.find(function(t){ return t.id===_activeTab; });
+  var data = tab && tab.data;
+  if(!data || !data.columns) return;
+  var lines = [data.columns.join(',')];
+  data.rows.forEach(function(row){
     lines.push(row.map(function(v){
       if(v===null||v===undefined) return '';
       var s = String(v);
@@ -387,9 +388,11 @@ function downloadCSV(){
   });
   var blob = new Blob([lines.join('\n')], {type:'text/csv'});
   var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  var url = URL.createObjectURL(blob);
+  a.href = url;
   a.download = 'query_result_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.csv';
   a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 0);
 }
 
 function escHtml(s){

@@ -63,3 +63,8 @@ class RateLimiter:
 def client_ip():
     # ProxyFix (app.py) has already applied X-Forwarded-For from the trusted proxy.
     return request.remote_addr or "?"
+
+
+# Gemini calls hold a request thread for tens of seconds; cap how many can run
+# at once so AI traffic can never occupy every gunicorn thread.
+ai_slots = threading.BoundedSemaphore(int(__import__("os").getenv("AI_MAX_CONCURRENT", "2")))

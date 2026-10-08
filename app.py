@@ -11,7 +11,7 @@ from flask import Flask, redirect, request, url_for
 from flask_login import LoginManager, current_user
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
-from db import init_db, get_db
+from db import init_db
 from models import User
 from oauth import init_oauth
 

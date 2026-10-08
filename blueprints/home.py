@@ -6,7 +6,7 @@ from flask import Blueprint, render_template
 from flask_login import login_required, current_user
 from psycopg2 import sql
 
-from db import get_db
+from db import get_db, get_setting
 
 home_bp = Blueprint("home", __name__)
 
@@ -261,32 +261,20 @@ def index():
         all_machines = cur.fetchall()
         recent = all_machines[:6]
 
-        # Recent alerts — use COALESCE so missing source column doesn't crash
-        try:
-            cur.execute("""
-                SELECT alert_type, COALESCE(source,'system') AS source,
-                       machine_key, subject, sent_at, success
-                FROM alert_log ORDER BY sent_at DESC LIMIT 10
-            """)
-        except Exception:
-            cur.execute("""
-                SELECT alert_type, 'system' AS source,
-                       machine_key, subject, sent_at, success
-                FROM alert_log ORDER BY sent_at DESC LIMIT 10
-            """)
+        # Recent alerts — non-admins only see their own servers' alerts (+ DVR /
+        # DB Monitor alerts with those permissions), filtered before the LIMIT.
+        from blueprints.api import alert_visibility_sql
+        vis_sql, vis_params = alert_visibility_sql(cur)
+        cur.execute(f"""
+            SELECT alert_type, COALESCE(source,'system') AS source,
+                   machine_key, subject, sent_at, success
+            FROM alert_log WHERE {vis_sql} ORDER BY sent_at DESC LIMIT 10
+        """, vis_params)
         alerts = cur.fetchall()
 
-        # Non-admins only see alerts for their own servers (+ DVR / DB Monitor
-        # alerts only with those permissions).
         allowed_keys = None
         if allowed is not None:
             allowed_keys = {f"{m['system_name']}@{m['location']}" for m in all_machines}
-            can_dvr = current_user.can_view_dvr
-            can_db = current_user.can_view_dbmon
-            alerts = [a for a in alerts
-                      if (a["source"] == "system" and a["machine_key"] in allowed_keys)
-                      or (a["source"] == "dvr" and can_dvr)
-                      or (a["source"] == "dbmonitor" and can_db)]
 
         try:
             alert_stats = _alert_overview(cur, allowed_keys)
@@ -350,7 +338,13 @@ def index():
         for k in ("cpu", "ram", "disk")
     }
 
+    try:
+        refresh_secs = max(5, int(get_setting("home_refresh_secs", "5") or 5))
+    except ValueError:
+        refresh_secs = 5
+
     return render_template("home.html",
+                           home_refresh_secs=refresh_secs,
                            total=total, online=online, offline=offline,
                            recent=recent, alerts=alerts,
                            dvr_summary=dvr_summary, dbmon_summary=dbmon_summary,

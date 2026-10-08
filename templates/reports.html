@@ -495,8 +495,8 @@ async function loadRaw() {
   try {
     var r = await fetch('/reports/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ table_names: p.table_names, mode: 'range', metrics: metrics, start: p.start, end: p.end }) });
+    if (!r.ok) { var e1 = await r.json().catch(function() { return {}; }); throw new Error(e1.error || 'failed (HTTP ' + r.status + ')'); }
     var d = await r.json();
-    if (!r.ok) throw new Error(d.error || 'failed');
     var shown = d.rows.slice(0, 300);
     sec.innerHTML = head + '<div class="table-wrap"><table class="doc-table"><thead><tr>' +
       d.columns.map(function(c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' +
@@ -519,8 +519,8 @@ async function generateReport() {
   btn.disabled = true; setStatus('Building report…');
   try {
     var r = await fetch('/reports/document', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) });
+    if (!r.ok) { var e2 = await r.json().catch(function() { return {}; }); throw new Error(e2.error || 'Failed to build the report (HTTP ' + r.status + ').'); }
     var d = await r.json();
-    if (!r.ok) throw new Error(d.error || 'Failed to build the report.');
     REPORT = d;
     renderDocument(d);
     document.getElementById('doc-actions').classList.add('show');

@@ -6,6 +6,7 @@ Improvements:
   - /machines/{table_name}/status endpoint for individual machine status
   - Proper startup/shutdown lifespan handler (replaces deprecated @app.on_event)
 """
+import hashlib
 import hmac
 import re
 import json
@@ -65,7 +66,9 @@ async def lifespan(app: FastAPI):
     pool = await asyncpg.create_pool(
         host=DB_HOST, port=DB_PORT, database=DB_NAME,
         user=DB_USER, password=DB_PASS,
-        min_size=5, max_size=20,
+        # Two uvicorn workers each get a pool — keep the total well inside
+        # Postgres' default max_connections alongside the webapp and checker.
+        min_size=1, max_size=10, command_timeout=30,
         server_settings={"timezone": "Asia/Kolkata"},
     )
     # Ensure registry table exists and pre-load known tables
@@ -240,8 +243,16 @@ async def register(request: Request, x_api_key: str = Header(...)):
                 status TEXT
             )
         """)
+        # Postgres truncates identifiers at 63 chars, so long table names could
+        # collide on one index name and leave a table unindexed — hash those.
+        idx_name = f"idx_{table_name}_ts"
+        if len(idx_name) > 63:
+            idx_name = f"idx_{hashlib.md5(table_name.encode()).hexdigest()[:16]}_ts"
+        # DDL takes an exclusive lock before the IF NOT EXISTS check; don't let
+        # a long-running query on this table stall every insert behind us.
+        await conn.execute("SET lock_timeout = '3s'")
         await conn.execute(
-            f"CREATE INDEX IF NOT EXISTS idx_{table_name}_ts ON {table_name}(ts DESC)"
+            f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table_name}(ts DESC)"
         )
         # CREATE TABLE IF NOT EXISTS above is a no-op for machines that
         # already registered before this column existed — this explicit
@@ -249,9 +260,15 @@ async def register(request: Request, x_api_key: str = Header(...)):
         # restart), so already-registered machines pick up new columns
         # automatically the next time their agent restarts, with no manual
         # per-table SQL needed.
-        await conn.execute(
-            f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS pm2_processes JSONB"
-        )
+        has_col = await conn.fetchval("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = $1 AND column_name = 'pm2_processes'
+        """, table_name)
+        if not has_col:
+            await conn.execute(
+                f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS pm2_processes JSONB"
+            )
+        await conn.execute("RESET lock_timeout")
         await _load_registered_tables(conn)
 
     log.info(f"✅ Registered: {system_name} ({location}) → {table_name}")

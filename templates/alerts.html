@@ -591,19 +591,29 @@ const MA_ICON_SVG = {
   temp:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z"/></svg>'
 };
 
+// Bumped on every call so a slow response for a previously selected machine
+// can't overwrite the rules of the one selected now.
+var _maRulesSeq = 0;
 async function loadMachineAlertRules(tableName){
   var panel = document.getElementById('ma-rules-panel');
   var tbody = document.getElementById('ma-rules-tbody');
   var form  = document.getElementById('ma-rules-form');
+  var my = ++_maRulesSeq;
   if (!tableName){ panel.style.display = 'none'; return; }
-
-  form.action = '/alerts/machine/' + encodeURIComponent(tableName) + '/save-all';
 
   var rows;
   try {
     var r = await fetch('/alerts/machine/' + encodeURIComponent(tableName) + '/overrides');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     rows = await r.json();
-  } catch(e){ console.error('failed to load machine alert rules', e); return; }
+    if (!Array.isArray(rows)) throw new Error('unexpected response');
+  } catch(e){
+    if (my !== _maRulesSeq) return;
+    console.error('failed to load machine alert rules', e);
+    panel.style.display = 'none';   // never leave another machine's rules on screen
+    return;
+  }
+  if (my !== _maRulesSeq) return;  // a newer selection is in flight / done
 
   tbody.innerHTML = rows.map(function(row){
     var t = String(row.alert_type).replace(/[^a-z_]/gi, '');
@@ -641,6 +651,8 @@ async function loadMachineAlertRules(tableName){
     });
   });
 
+  // Point the form at this machine only once its rules are on screen.
+  form.action = '/alerts/machine/' + encodeURIComponent(tableName) + '/save-all';
   panel.style.display = '';
 }
 </script>

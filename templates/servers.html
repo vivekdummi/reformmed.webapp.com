@@ -220,17 +220,22 @@ tr.machine-row:hover .srv-name-txt{color:var(--accent);}
 <script>
   function toggleRowAlerts(el) {
     const tableName = el.dataset.table;
+    if (el.dataset.busy) return;
+    el.dataset.busy = '1';
     fetch(`/servers/${encodeURIComponent(tableName)}/toggle-alerts`, { method: "POST" })
-      .then(r => r.json())
+      .then(r => r.json().catch(() => ({})).then(data => {
+        if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
+        return data;
+      }))
       .then(data => {
-        if (data.error) return;
         const on = data.alerts_enabled;
         el.style.background = on ? "var(--accent)" : "var(--chart-track)";
         el.querySelector(".alerts-toggle-knob").style.left = on ? "19px" : "3px";
         el.setAttribute('aria-checked', on ? 'true' : 'false');
         el.title = on ? 'Alerts on' : 'Alerts muted';
       })
-      .catch(() => {});
+      .catch(e => alert('Could not change alert setting: ' + e.message))
+      .finally(() => { delete el.dataset.busy; });
   }
 
   // ── Search + status chips ──

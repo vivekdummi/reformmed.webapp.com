@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
 
   api:
@@ -16,6 +22,12 @@ services:
       API_HOST:          0.0.0.0
       API_PORT:          8000
       TZ:                Asia/Kolkata
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging: *default-logging
     restart: unless-stopped
 
   webapp:
@@ -24,7 +36,8 @@ services:
     container_name: reformmed_webapp
     # Production WSGI server instead of the Werkzeug dev server. One worker so
     # the in-memory login rate limiter is shared; threads handle concurrency.
-    command: gunicorn -w 1 --threads 8 -b 0.0.0.0:5000 --timeout 90 "app:create_app()"
+    # Keep DB_POOL_MAX (default 25) >= 2x threads.
+    command: gunicorn -w 1 --threads 12 -b 0.0.0.0:5000 --timeout 90 "app:create_app()"
     network_mode: "host"
     environment:
       POSTGRES_HOST:     ${POSTGRES_HOST}
@@ -50,6 +63,12 @@ services:
     depends_on:
       api:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/login', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging: *default-logging
     restart: unless-stopped
 
   checker:
@@ -74,5 +93,16 @@ services:
       SMTP_PORT:           "465"
       OFFLINE_AFTER_SECS:  "60"
       CHECK_INTERVAL_SECS: "15"
+      # DVR pings + DB Monitor checks also run in this container now.
+      DBMON_CHECK_INTERVAL_SECS: "60"
+      DB_POOL_MAX:         "12"
       TZ:                  Asia/Kolkata
+    # The checker touches this file after every cycle; stale = hung loop.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, sys, time; sys.exit(time.time() - os.path.getmtime('/tmp/checker_heartbeat') > 180)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging: *default-logging
     restart: unless-stopped

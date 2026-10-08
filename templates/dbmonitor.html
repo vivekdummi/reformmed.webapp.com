@@ -557,6 +557,7 @@ function onGroupSelectChange(value) {
 async function loadStatus(id) {
   try {
     var r = await fetch('/dbmonitor/watch/' + id + '/status');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     var d = await r.json();
     var pill = document.getElementById('pill-' + id);
     var ptxt = document.getElementById('pill-txt-' + id);
@@ -570,6 +571,18 @@ async function loadStatus(id) {
       if (card) card.className = 'wcard dead';
       document.getElementById('stat-last-' + id).textContent = d.error.slice(0, 40);
       WATCH_STATE[id] = { monitoring: true, is_dead: true };
+      updateGroupPillFor(id);
+      return;
+    }
+
+    if (d.pending) {
+      // Background checker hasn't evaluated this watch yet (just added / just resumed).
+      pill.className = 'status-pill paused';
+      ptxt.textContent = 'CHECKING';
+      if (card) card.className = 'wcard';
+      document.getElementById('stat-last-' + id).textContent = 'Waiting for first check…';
+      document.getElementById('stat-dead-wrap-' + id).style.display = 'none';
+      WATCH_STATE[id] = { monitoring: true, is_dead: false };
       updateGroupPillFor(id);
       return;
     }
@@ -632,10 +645,15 @@ function toggleLocPanel(watchId) {
   if (nowOpen) OPEN_PANELS.add(watchId); else OPEN_PANELS.delete(watchId);
 }
 
+var LOC_RENDERED = {};  // watchId -> JSON of the last rendered locations
 function renderLocations(watchId, locationCol, locations) {
   const lbl    = document.getElementById('expand-lbl-' + watchId);
   const listEl = document.getElementById('wloc-list-' + watchId);
   if (!listEl) return;
+  // Skip the (large) re-render when nothing changed since the last poll.
+  const key = JSON.stringify([locationCol, locations]);
+  if (LOC_RENDERED[watchId] === key) return;
+  LOC_RENDERED[watchId] = key;
 
   if (!locationCol) {
     if (lbl) { lbl.textContent = ''; }
@@ -674,11 +692,11 @@ function renderLocations(watchId, locationCol, locations) {
       toggles = `
         <div class="wloc-toggles">
           <button class="wloc-tog ${loc.monitoring ? 'on-monitor' : ''}"
-                  onclick="event.stopPropagation(); toggleLocMonitor(${watchId}, ${loc.id})">
+                  onclick="event.stopPropagation(); toggleLocMonitor(${watchId}, ${loc.id}, this)">
             ${loc.monitoring ? '● MONITOR' : '○ MONITOR'}
           </button>
           <button class="wloc-tog ${loc.alerts_enabled ? 'on-alert' : ''}"
-                  onclick="event.stopPropagation(); toggleLocAlert(${watchId}, ${loc.id})">
+                  onclick="event.stopPropagation(); toggleLocAlert(${watchId}, ${loc.id}, this)">
             ${loc.alerts_enabled ? '🔔 ALERT' : '🔕 ALERT'}
           </button>
         </div>`;
@@ -705,7 +723,7 @@ function renderLocations(watchId, locationCol, locations) {
             <div class="wloc-name-click ${areas.length ? 'clickable' : ''} ${nameOpenClass}" id="${nameId}"${clickAttr}>
               ${chev}${escapeHtml(loc.location)}
             </div>
-            <div class="wloc-sub">${areaTxt}last seen: ${fmtTime(loc.last_seen)}</div>
+            <div class="wloc-sub">${areaTxt}last seen: ${escapeHtml(fmtTime(loc.last_seen))}</div>
           </div>
           <span class="wloc-pill ${pillClass}">${pillText}</span>
           ${toggles}
@@ -728,11 +746,11 @@ function renderAreas(watchId, areas) {
     if (IS_ADMIN) {
       toggles = `
         <button class="warea-tog ${a.monitoring ? 'on-monitor' : ''}"
-                onclick="toggleAreaMonitor(${watchId}, ${a.id})">
+                onclick="toggleAreaMonitor(${watchId}, ${a.id}, this)">
           ${a.monitoring ? '● MONITOR' : '○ MONITOR'}
         </button>
         <button class="warea-tog ${a.alerts_enabled ? 'on-alert' : ''}"
-                onclick="toggleAreaAlert(${watchId}, ${a.id})">
+                onclick="toggleAreaAlert(${watchId}, ${a.id}, this)">
           ${a.alerts_enabled ? '🔔 ALERT' : '🔕 ALERT'}
         </button>`;
     }
@@ -740,7 +758,7 @@ function renderAreas(watchId, areas) {
     return `
       <div class="warea-row ${rowClass}">
         <div class="warea-name">${escapeHtml(a.area)}
-          <div class="warea-sub">last seen: ${fmtTime(a.last_seen)}</div>
+          <div class="warea-sub">last seen: ${escapeHtml(fmtTime(a.last_seen))}</div>
         </div>
         <span class="warea-pill ${pillClass}">${pillText}</span>
         ${toggles}
@@ -765,24 +783,35 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
-async function toggleLocMonitor(watchId, locId) {
-  await fetch('/dbmonitor/watch/' + watchId + '/location/' + locId + '/toggle-monitoring', { method: 'POST' });
-  loadStatus(watchId);
+// POST a location/area toggle; the button stays disabled while it's in flight.
+async function postToggle(watchId, path, btn) {
+  if (btn) { if (btn.disabled) return; btn.disabled = true; }
+  try {
+    const r = await fetch('/dbmonitor/watch/' + watchId + path, { method: 'POST' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+  } catch (e) {
+    console.error('toggle failed', e);
+    alert('Could not save the change (' + e.message + '). Please try again.');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+  await loadStatus(watchId);
 }
 
-async function toggleLocAlert(watchId, locId) {
-  await fetch('/dbmonitor/watch/' + watchId + '/location/' + locId + '/toggle-alerts', { method: 'POST' });
-  loadStatus(watchId);
+function toggleLocMonitor(watchId, locId, btn) {
+  return postToggle(watchId, '/location/' + locId + '/toggle-monitoring', btn);
 }
 
-async function toggleAreaMonitor(watchId, areaId) {
-  await fetch('/dbmonitor/watch/' + watchId + '/area/' + areaId + '/toggle-monitoring', { method: 'POST' });
-  loadStatus(watchId);
+function toggleLocAlert(watchId, locId, btn) {
+  return postToggle(watchId, '/location/' + locId + '/toggle-alerts', btn);
 }
 
-async function toggleAreaAlert(watchId, areaId) {
-  await fetch('/dbmonitor/watch/' + watchId + '/area/' + areaId + '/toggle-alerts', { method: 'POST' });
-  loadStatus(watchId);
+function toggleAreaMonitor(watchId, areaId, btn) {
+  return postToggle(watchId, '/area/' + areaId + '/toggle-monitoring', btn);
+}
+
+function toggleAreaAlert(watchId, areaId, btn) {
+  return postToggle(watchId, '/area/' + areaId + '/toggle-alerts', btn);
 }
 
 // ── Hospital group rollup ───────────────────────────────────────────────
@@ -966,19 +995,20 @@ document.querySelectorAll('#filter-chips .fchip').forEach(function(btn) {
 });
 
 // ── Main refresh loop — waits for every status call before summarising
-// (the old fixed 600ms timeout counted tables that hadn't answered yet) ──
-var _refreshing = false;
+// (the old fixed 600ms timeout counted tables that hadn't answered yet).
+// At most 2 status requests are in flight at once so a page with many
+// watches can't tie up every server worker. ──
+var STATUS_CONCURRENCY = 2;
 async function refreshAll() {
-  if (_refreshing) return;
-  _refreshing = true;
-  try {
-    await Promise.all(WATCH_IDS.map(function(id) { return loadStatus(id); }));
-    updateOverview();
-  } finally {
-    _refreshing = false;
+  var queue = WATCH_IDS.slice();
+  async function worker() {
+    while (queue.length) await loadStatus(queue.shift());
   }
+  var workers = [];
+  for (var i = 0; i < Math.min(STATUS_CONCURRENCY, queue.length); i++) workers.push(worker());
+  await Promise.all(workers);
+  updateOverview();
 }
-refreshAll();
-setInterval(refreshAll, 10000);  // poll every 10s
+RM.poll(refreshAll, 30000).start();  // poll every 30s (paused while the tab is hidden)
 </script>
 {% endblock %}

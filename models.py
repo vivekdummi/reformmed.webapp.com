@@ -181,12 +181,18 @@ class User(UserMixin):
         """Returns set of table_names this user is allowed to view. None = all."""
         if self.is_admin:
             return None
+        # The user object is loaded fresh per request, so caching on it is a
+        # per-request memo — saves a pooled connection on every repeat call.
+        cached = getattr(self, "_allowed_servers_cache", None)
+        if cached is not None:
+            return set(cached)
         with get_db() as conn:
             cur = conn.cursor()
             cur.execute(
                 "SELECT table_name FROM user_server_access WHERE user_id=%s", (self.id,)
             )
-            return {r["table_name"] for r in cur.fetchall()}
+            self._allowed_servers_cache = frozenset(r["table_name"] for r in cur.fetchall())
+        return set(self._allowed_servers_cache)
 
     @staticmethod
     def set_server_access(user_id, table_names):
@@ -205,12 +211,18 @@ class User(UserMixin):
         """Returns set of dvr_hospitals.id this user is allowed to view. None = all."""
         if self.is_admin:
             return None
+        # The user object is loaded fresh per request, so caching on it is a
+        # per-request memo — saves a pooled connection on every repeat call.
+        cached = getattr(self, "_allowed_hospitals_cache", None)
+        if cached is not None:
+            return set(cached)
         with get_db() as conn:
             cur = conn.cursor()
             cur.execute(
                 "SELECT hospital_id FROM user_hospital_access WHERE user_id=%s", (self.id,)
             )
-            return {r["hospital_id"] for r in cur.fetchall()}
+            self._allowed_hospitals_cache = frozenset(r["hospital_id"] for r in cur.fetchall())
+        return set(self._allowed_hospitals_cache)
 
     @staticmethod
     def set_hospital_access(user_id, hospital_ids):

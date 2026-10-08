@@ -145,14 +145,28 @@ WATCH = {"id": 1, "monitoring": True, "host": "10.0.3.7", "port": 5432, "dbname"
          "table_name": "t", "alerts_enabled": False, "alert_emails": ""}
 
 
-def _status_as(client, monkeypatch, uid, username, role, **perms):
+_EXT_ERROR = ('connection to server at "10.0.3.7", port 5432 failed: '
+              'password authentication failed for user "u"')
+
+
+def test_dbmonitor_check_stores_connection_error(monkeypatch):
+    """The background check records the external-DB failure on the watch."""
     from blueprints import dbmonitor
     monkeypatch.setattr(dbmonitor, "get_db", lambda: contextlib.nullcontext(_FakeConn(WATCH)))
 
     def boom(row):
-        raise RuntimeError('connection to server at "10.0.3.7", port 5432 failed: '
-                           'password authentication failed for user "u"')
+        raise RuntimeError(_EXT_ERROR)
     monkeypatch.setattr(dbmonitor, "_ext_conn", boom)
+    stored = {}
+    monkeypatch.setattr(dbmonitor, "_store_check", lambda wid, result: stored.update({wid: result}))
+    dbmonitor.check_watch(1)
+    assert stored == {1: {"error": _EXT_ERROR}}
+
+
+def _status_as(client, monkeypatch, uid, username, role, **perms):
+    from blueprints import dbmonitor
+    row = dict(WATCH, last_check={"error": _EXT_ERROR}, last_checked_at=None)
+    monkeypatch.setattr(dbmonitor, "get_db", lambda: contextlib.nullcontext(_FakeConn(row)))
     make_user(uid, username, role=role, **perms)
     login(client, username)
     return client.get("/dbmonitor/watch/1/status").get_json()

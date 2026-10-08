@@ -20,10 +20,18 @@ def clean_header(value, max_len=200) -> str:
     names, locations, mount points), which must not be able to inject headers."""
     return " ".join(str(value).split())[:max_len]
 
-GMAIL_USER = os.getenv("GMAIL_USER", "")
-GMAIL_PASS = os.getenv("GMAIL_APP_PASS", "")
-SMTP_HOST  = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT  = int(os.getenv("SMTP_PORT", "465"))
+def _smtp_config():
+    """Settings → Email/SMTP from the DB (what the UI saves), else env vars."""
+    try:
+        from db import smtp_settings
+        return smtp_settings()
+    except Exception as e:
+        log.warning("Could not read SMTP settings from DB, using env: %s", e)
+        user = os.getenv("GMAIL_USER", "")
+        return {"host": os.getenv("SMTP_HOST", "smtp.gmail.com"),
+                "port": int(os.getenv("SMTP_PORT", "465")),
+                "username": user, "password": os.getenv("GMAIL_APP_PASS", ""),
+                "from_addr": user}
 
 
 def send_alert_email(subject: str, body: str, recipients: str) -> bool:
@@ -32,7 +40,8 @@ def send_alert_email(subject: str, body: str, recipients: str) -> bool:
     recipients: comma-separated email string or list of emails.
     Returns True on success, False on failure.
     """
-    if not GMAIL_USER or not GMAIL_PASS:
+    cfg = _smtp_config()
+    if not cfg["username"] or not cfg["password"]:
         log.warning("SMTP not configured — skipping email: %s", subject)
         return False
 
@@ -48,14 +57,14 @@ def send_alert_email(subject: str, body: str, recipients: str) -> bool:
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = clean_header(subject)
-        msg["From"]    = GMAIL_USER
+        msg["From"]    = cfg["from_addr"]
         msg["To"]      = ", ".join(to_list)
         msg.attach(MIMEText(body, "plain"))
 
         ctx = ssl.create_default_context()
-        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx) as srv:
-            srv.login(GMAIL_USER, GMAIL_PASS)
-            srv.sendmail(GMAIL_USER, to_list, msg.as_string())
+        with smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=10, context=ctx) as srv:
+            srv.login(cfg["username"], cfg["password"])
+            srv.sendmail(cfg["from_addr"], to_list, msg.as_string())
 
         log.info("📧 Alert sent: %s → %s", subject, to_list)
         return True

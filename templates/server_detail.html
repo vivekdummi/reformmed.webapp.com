@@ -257,16 +257,18 @@
 <script>
 function toggleAlerts() {
   fetch("{{ url_for('servers.toggle_alerts', table_name=machine.table_name) }}", { method: "POST" })
-    .then(r => r.json())
+    .then(r => r.json().catch(() => ({})).then(data => {
+      if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
+      return data;
+    }))
     .then(data => {
-      if (data.error) return;
       const on = data.alerts_enabled;
       document.getElementById("alerts-toggle-label").textContent = on ? "Alerts on" : "Alerts muted";
       document.getElementById("alerts-toggle-switch").style.background = on ? "var(--accent)" : "var(--chart-track)";
       document.getElementById("alerts-toggle-knob").style.background = on ? "var(--on-accent)" : "var(--text-muted)";
       document.getElementById("alerts-toggle-knob").style.left = on ? "18px" : "2px";
     })
-    .catch(() => {});
+    .catch(e => alert("Could not change alert setting: " + e.message));
 }
 </script>
 
@@ -1135,9 +1137,15 @@ function initGpuCharts() {
 }
 initGpuCharts();
 
+// Live GPU points are only appended while the default range (the one the
+// page was rendered with) is selected; other ranges stay a fixed history view.
+var GPU_DEFAULT_RANGE = '60';
+var gpuRange = GPU_DEFAULT_RANGE;
 async function loadGpuHistory(minutes) {
+  gpuRange = String(minutes);
   try {
     var r = await fetch('/servers/' + TABLE + '/gpu-history?minutes=' + minutes);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     var d = await r.json();
     if (d.error || !d.gpus) return;
     var lbls = buildGpuTimeLabels(d.labels || []);
@@ -1218,6 +1226,12 @@ async function pollLive() {
     var r = await fetch('/servers/' + TABLE + '/live');
     if (!r.ok) return;
     var d = await r.json();
+    updateLiveRate(d.status);
+
+    // Only append to the time-series charts when the agent sent a new row —
+    // polling faster than the agent reports would otherwise duplicate points.
+    var fresh = !!d.ts && d.ts !== lastLiveTs;
+    if (d.ts) lastLiveTs = d.ts;
 
     var cpu  = d.cpu_percent  || 0;
     var ram  = d.ram_percent  || 0;
@@ -1249,13 +1263,13 @@ async function pollLive() {
 
     setText('stat-ram-val', ram.toFixed(1) + '%');
     setWidth('stat-ram-bar', ram);
-    if (d.ram_used_gb !== undefined && d.ram_total_gb !== undefined)
-      setText('stat-ram-detail', d.ram_used_gb.toFixed(1) + ' / ' + d.ram_total_gb.toFixed(1) + ' GB');
+    if (d.ram_used_gb != null && d.ram_total_gb != null)
+      setText('stat-ram-detail', Number(d.ram_used_gb).toFixed(1) + ' / ' + Number(d.ram_total_gb).toFixed(1) + ' GB');
 
     setText('stat-swap-val', swap.toFixed(1) + '%');
     setWidth('stat-swap-bar', swap);
-    if (d.swap_used_gb !== undefined && d.swap_total_gb !== undefined)
-      setText('stat-swap-detail', d.swap_used_gb.toFixed(1) + ' / ' + d.swap_total_gb.toFixed(1) + ' GB');
+    if (d.swap_used_gb != null && d.swap_total_gb != null)
+      setText('stat-swap-detail', Number(d.swap_used_gb).toFixed(1) + ' / ' + Number(d.swap_total_gb).toFixed(1) + ' GB');
 
     setText('stat-temp-val', temp ? temp.toFixed(0) + '°C' : '—');
     var ts = tempStatusLabel(temp);
@@ -1264,46 +1278,50 @@ async function pollLive() {
 
     // ── CPU area chart + header value ──
     setText('cpuarea-val', cpu.toFixed(1) + '%');
-    pushPoint(charts.cpuArea, cpu, now);
-    pushPoint(charts.tempSpark, temp, now);
-    if (modalIsLiveFor('cpu')) pushPoint(modalChart, cpu, now);
+    if (fresh) {
+      pushPoint(charts.cpuArea, cpu, now);
+      pushPoint(charts.tempSpark, temp, now);
+      if (modalIsLiveFor('cpu')) pushPoint(modalChart, cpu, now);
+    }
 
     // ── RAM donut ──
-    if (d.ram_used_gb !== undefined && d.ram_total_gb !== undefined) {
-      updateDonut(charts.ramDonut, d.ram_used_gb, d.ram_total_gb);
+    if (d.ram_used_gb != null && d.ram_total_gb != null) {
+      var ramUsed = Number(d.ram_used_gb), ramTotal = Number(d.ram_total_gb);
+      updateDonut(charts.ramDonut, ramUsed, ramTotal);
       setText('ram-donut-center', ram.toFixed(1) + '%');
-      setText('ram-legend-used', d.ram_used_gb.toFixed(1) + ' GB');
-      setText('ram-legend-free', Math.max(0, d.ram_total_gb - d.ram_used_gb).toFixed(1) + ' GB');
+      setText('ram-legend-used', ramUsed.toFixed(1) + ' GB');
+      setText('ram-legend-free', Math.max(0, ramTotal - ramUsed).toFixed(1) + ' GB');
       if (modalIsLiveFor('ram')) {
-        updateDonut(modalChart, d.ram_used_gb, d.ram_total_gb);
+        updateDonut(modalChart, ramUsed, ramTotal);
         setText('chart-modal-donut-center', ram.toFixed(1) + '%');
-        renderModalDonutLegend(M.ram, d.ram_used_gb, d.ram_total_gb);
+        renderModalDonutLegend(M.ram, ramUsed, ramTotal);
       }
     }
 
     // ── Swap donut ──
-    if (d.swap_used_gb !== undefined && d.swap_total_gb !== undefined) {
-      updateDonut(charts.swapDonut, d.swap_used_gb, d.swap_total_gb);
+    if (d.swap_used_gb != null && d.swap_total_gb != null) {
+      var swapUsed = Number(d.swap_used_gb), swapTotal = Number(d.swap_total_gb);
+      updateDonut(charts.swapDonut, swapUsed, swapTotal);
       setText('swap-donut-center', swap.toFixed(1) + '%');
-      setText('swap-legend-used', d.swap_used_gb.toFixed(1) + ' GB');
-      setText('swap-legend-free', Math.max(0, d.swap_total_gb - d.swap_used_gb).toFixed(1) + ' GB');
+      setText('swap-legend-used', swapUsed.toFixed(1) + ' GB');
+      setText('swap-legend-free', Math.max(0, swapTotal - swapUsed).toFixed(1) + ' GB');
       if (modalIsLiveFor('swap')) {
-        updateDonut(modalChart, d.swap_used_gb, d.swap_total_gb);
+        updateDonut(modalChart, swapUsed, swapTotal);
         setText('chart-modal-donut-center', swap.toFixed(1) + '%');
-        renderModalDonutLegend(M.swap, d.swap_used_gb, d.swap_total_gb);
+        renderModalDonutLegend(M.swap, swapUsed, swapTotal);
       }
     }
 
     // ── Net traffic ──
     setText('net-up-val', sent);
     setText('net-down-val', recv);
-    if (charts.netBar) {
+    if (fresh && charts.netBar) {
       charts.netBar.data.labels.push(now); charts.netBar.data.labels.shift();
       charts.netBar.data.datasets[0].data.push(sent); charts.netBar.data.datasets[0].data.shift();
       charts.netBar.data.datasets[1].data.push(recv); charts.netBar.data.datasets[1].data.shift();
       charts.netBar.update('none');
     }
-    if (modalIsLiveFor('net')) {
+    if (fresh && modalIsLiveFor('net')) {
       modalChart.data.labels.push(now); modalChart.data.labels.shift();
       modalChart.data.datasets[0].data.push(sent); modalChart.data.datasets[0].data.shift();
       modalChart.data.datasets[1].data.push(recv); modalChart.data.datasets[1].data.shift();
@@ -1408,7 +1426,7 @@ async function pollLive() {
           setText('val-gpu-pwrpkg-'  + idx, pwrPkg.toFixed(1)  + 'W');
 
           if (gc) {
-            pushPoint(gc.area, load, now);
+            if (fresh && gpuRange === GPU_DEFAULT_RANGE) pushPoint(gc.area, load, now);
             updateRing(gc.ring, load);
             setText('gpu-ring-val-' + i, load.toFixed(0) + '%');
           }
@@ -1431,7 +1449,7 @@ async function pollLive() {
             setText('val-gpu-temp-' + idx, temp_g.toFixed(0) + '°C');
 
           if (gc) {
-            pushPoint(gc.area, load, now);
+            if (fresh && gpuRange === GPU_DEFAULT_RANGE) pushPoint(gc.area, load, now);
             updateRing(gc.ring, load);
             setText('gpu-ring-val-' + i, load.toFixed(0) + '%');
           }
@@ -1444,13 +1462,23 @@ async function pollLive() {
   }
 }
 
-{% if machine.status == 'offline' %}
-// Machine is offline — do not poll live data
-// Charts show last recorded historical data
-var liveInterval = null;
-{% else %}
-var liveInterval = setInterval(pollLive, 2000);
-{% endif %}
+// Live polling via RM.poll (no overlapping requests, paused in hidden tabs).
+// A machine that's offline is still polled, just slower, so the page
+// recovers on its own when the machine comes back.
+var LIVE_MS_ONLINE = 2000, LIVE_MS_OFFLINE = 10000;
+var lastLiveTs = labels.length ? (labels[labels.length - 1] || null) : null;
+var liveMs = {{ 'LIVE_MS_OFFLINE' if machine.status == 'offline' else 'LIVE_MS_ONLINE' }};
+var liveInterval = RM.poll(pollLive, liveMs);
+liveInterval.start(false);
+
+function updateLiveRate(status) {
+  var want = status === 'online' ? LIVE_MS_ONLINE : LIVE_MS_OFFLINE;
+  if (want === liveMs) return;
+  liveMs = want;
+  liveInterval.stop();
+  liveInterval = RM.poll(pollLive, liveMs);
+  if (!histBaseState) liveInterval.start(false);
+}
 
 // ── History range filter ─────────────────────────────────────────────────
 // Lets the person pick an older date/time window and see it charted instead
@@ -1459,11 +1487,24 @@ var liveInterval = setInterval(pollLive, 2000);
 // browsing so the fetched history doesn't get overwritten mid-view.
 var histBaseState = null;  // snapshot of live-mode chart data, for "Back to Live"
 
+// Snapshot what the charts currently show (they've been ticking since page
+// load), not the page-load seed arrays.
 function snapshotLiveState() {
+  var c = charts.cpuArea, n = charts.netBar;
   return {
-    labels: labels.slice(),
-    cpu: cpuData.slice(), sent: sentData.slice(), recv: recvData.slice(),
+    labels:    c ? c.data.labels.slice() : labels.slice(),
+    cpu:       c ? c.data.datasets[0].data.slice() : cpuData.slice(),
+    netLabels: n ? n.data.labels.slice() : labels.slice(),
+    sent:      n ? n.data.datasets[0].data.slice() : sentData.slice(),
+    recv:      n ? n.data.datasets[1].data.slice() : recvData.slice(),
   };
+}
+
+// datetime-local values are browser-local wall time; send them as an absolute
+// ISO instant so the server doesn't have to guess the viewer's timezone.
+function localInputToIso(v) {
+  var t = new Date(v);
+  return isNaN(t) ? v : t.toISOString();
 }
 
 function setChartData(chart, lbls, data) {
@@ -1504,8 +1545,8 @@ async function loadHistory() {
 
   try {
     var url = '/servers/' + TABLE + '/history' +
-      '?start=' + encodeURIComponent(fromEl.value) +
-      '&end='   + encodeURIComponent(toEl.value);
+      '?start=' + encodeURIComponent(localInputToIso(fromEl.value)) +
+      '&end='   + encodeURIComponent(localInputToIso(toEl.value));
     var r = await fetch(url);
     var d = await r.json();
 
@@ -1523,7 +1564,7 @@ async function loadHistory() {
     // Snapshot live data + pause polling the first time we enter history mode
     if (!histBaseState) {
       histBaseState = snapshotLiveState();
-      if (liveInterval) { clearInterval(liveInterval); liveInterval = null; }
+      liveInterval.stop();
     }
 
     var lbls = d.labels.map(fmtHistLabel);
@@ -1542,7 +1583,7 @@ async function loadHistory() {
 function backToLive() {
   if (!histBaseState) return;
   setChartData(charts.cpuArea, histBaseState.labels, histBaseState.cpu);
-  setNetBarData(charts.netBar, histBaseState.labels, histBaseState.sent, histBaseState.recv);
+  setNetBarData(charts.netBar, histBaseState.netLabels, histBaseState.sent, histBaseState.recv);
   histBaseState = null;
 
   document.getElementById('hist-live-btn').style.display = 'none';
@@ -1551,9 +1592,7 @@ function backToLive() {
   status.className = 'history-bar-title-sub';
   document.querySelectorAll('#hist-presets .hist-preset-btn').forEach(function(b){ b.classList.remove('active'); });
 
-  {% if machine.status != 'offline' %}
-  if (!liveInterval) liveInterval = setInterval(pollLive, 2000);
-  {% endif %}
+  liveInterval.start();
 }
 
 // ── Quick-range presets ──
@@ -1633,6 +1672,8 @@ function openChartModal(kind) {
   document.querySelectorAll('#modal-hist-presets .hist-preset-btn').forEach(function(b) { b.classList.remove('active'); });
 
   if (modalChart) { modalChart.destroy(); modalChart = null; }
+  // Open first so the canvas has its real size when Chart.js measures it.
+  document.getElementById('chart-modal-backdrop').classList.add('open');
 
   if (kind === 'cpu') {
     titleEl.textContent = 'CPU Usage %';
@@ -1706,8 +1747,6 @@ function openChartModal(kind) {
     gv.textContent = val.toFixed(0) + '°C';
     gs.textContent = ts.text; gs.style.color = ts.color;
   }
-
-  document.getElementById('chart-modal-backdrop').classList.add('open');
 }
 
 async function loadModalHistory() {
@@ -1727,8 +1766,8 @@ async function loadModalHistory() {
 
   try {
     var url = '/servers/' + TABLE + '/history' +
-      '?start=' + encodeURIComponent(fromEl.value) +
-      '&end='   + encodeURIComponent(toEl.value);
+      '?start=' + encodeURIComponent(localInputToIso(fromEl.value)) +
+      '&end='   + encodeURIComponent(localInputToIso(toEl.value));
     var r = await fetch(url);
     var d = await r.json();
 

@@ -111,6 +111,13 @@ def _safe_gpu_list(raw):
     return [g for g in arr if isinstance(g, dict)]
 
 
+def _net_kbs(cur, prev, field):
+    """KB/s between two metric rows — byte delta divided by the time between them."""
+    secs = (cur["ts"] - prev["ts"]).total_seconds() if cur.get("ts") and prev.get("ts") else 0
+    delta = max(0, (cur[field] or 0) - (prev[field] or 0))
+    return round(delta / 1024 / secs, 1) if secs > 0 else 0
+
+
 def _safe_float(v, default=0.0):
     try:
         return float(v)
@@ -345,8 +352,8 @@ def detail(table_name):
             chart_net_recv.append(0)
         else:
             prev = history_rows[i - 1]
-            chart_net_sent.append(max(0, (r["net_bytes_sent"] or 0) - (prev["net_bytes_sent"] or 0)) // 1024)
-            chart_net_recv.append(max(0, (r["net_bytes_recv"] or 0) - (prev["net_bytes_recv"] or 0)) // 1024)
+            chart_net_sent.append(_net_kbs(r, prev, "net_bytes_sent"))
+            chart_net_recv.append(_net_kbs(r, prev, "net_bytes_recv"))
 
     # ── Per-core CPU history — each row's cpu_per_core JSONB is an array of
     # core percentages at that instant; transpose into one series per core.
@@ -548,8 +555,8 @@ def history(table_name):
             net_recv.append(0)
         else:
             prev = rows[i - 1]
-            net_sent.append(max(0, (r["net_bytes_sent"] or 0) - (prev["net_bytes_sent"] or 0)) // 1024)
-            net_recv.append(max(0, (r["net_bytes_recv"] or 0) - (prev["net_bytes_recv"] or 0)) // 1024)
+            net_sent.append(_net_kbs(r, prev, "net_bytes_sent"))
+            net_recv.append(_net_kbs(r, prev, "net_bytes_recv"))
 
     return jsonify({
         "labels": labels, "cpu": cpu, "ram": ram, "swap": swap, "temp": temp,
@@ -605,8 +612,8 @@ def live(table_name):
 
     # Network KB/s
     if len(rows) >= 2:
-        latest["net_sent_kbs"] = max(0, (rows[0]["net_bytes_sent"] or 0) - (rows[1]["net_bytes_sent"] or 0)) // 1024
-        latest["net_recv_kbs"] = max(0, (rows[0]["net_bytes_recv"] or 0) - (rows[1]["net_bytes_recv"] or 0)) // 1024
+        latest["net_sent_kbs"] = _net_kbs(rows[0], rows[1], "net_bytes_sent")
+        latest["net_recv_kbs"] = _net_kbs(rows[0], rows[1], "net_bytes_recv")
     else:
         latest["net_sent_kbs"] = 0
         latest["net_recv_kbs"] = 0

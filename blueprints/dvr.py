@@ -2,8 +2,9 @@
 DVR Monitor — Hospital > Location > DVR hierarchy
 Ping-based online/offline detection with email alerts.
 """
-import os, ssl, smtplib, asyncio, subprocess
+import os, ssl, smtplib
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort
@@ -11,11 +12,19 @@ from flask_login import login_required, current_user
 from db import (
     get_db, list_alert_recipients,
     alerts_master_enabled as _alerts_master_enabled,
-    get_encrypted_setting as _get_encrypted_setting,
-    get_setting as _get_app_setting,
+    smtp_settings,
 )
 
 dvr_bp = Blueprint("dvr", __name__, url_prefix="/dvr")
+
+_IST = ZoneInfo("Asia/Kolkata")
+# A DVR is only declared offline after this many consecutive failed pings,
+# so one dropped TCP connect doesn't fire an OFFLINE/ONLINE email pair.
+_OFFLINE_AFTER_FAILS = int(os.getenv("DVR_OFFLINE_AFTER_FAILS", "2"))
+
+
+def _fmt_ist(dt):
+    return dt.astimezone(_IST).strftime("%d %b %Y, %I:%M %p") if dt else None
 
 def _admin_required():
     if not current_user.is_admin:
@@ -81,6 +90,7 @@ def init_dvr_tables():
                 value TEXT NOT NULL
             )
         """)
+        cur.execute("ALTER TABLE dvr_devices ADD COLUMN IF NOT EXISTS fail_count INTEGER NOT NULL DEFAULT 0")
         # Default settings
         for k, v in [("ping_interval_sec","30"),("alert_emails",""),("alerts_enabled","1")]:
             cur.execute("""
@@ -95,6 +105,14 @@ def get_setting(key, default=""):
         cur.execute("SELECT value FROM dvr_settings WHERE key=%s", (key,))
         row = cur.fetchone()
     return row["value"] if row else default
+
+
+def clean_ping_interval(value, default=30):
+    """Clamp a ping-interval setting to a sane range; blank/garbage -> default."""
+    try:
+        return max(10, min(3600, int(str(value).strip())))
+    except (TypeError, ValueError):
+        return default
 
 
 def _ping(ip, port, timeout=3):
@@ -133,7 +151,7 @@ def _render_dvr_alert(kind, hospital, location, dvr_name, ip, port, rows, now=No
         ("Location", location),
         ("DVR", dvr_name),
         ("Address", f"{ip}:{port}"),
-    ] + rows + [("Time", now.strftime("%d %b %Y, %I:%M %p"))]
+    ] + rows + [("Time", _fmt_ist(now))]
 
     plain_lines = [f"{label} — {dvr_name} ({hospital})", ""]
     plain_lines += [f"{lbl}: {val}" for lbl, val in all_rows]
@@ -176,14 +194,9 @@ def _send_alert(kind, hospital, location, dvr_name, ip, port, rows=None, machine
     # SMTP config now comes from Settings → Email/SMTP (DB-backed, password
     # encrypted) — falls back to GMAIL_USER/GMAIL_APP_PASS in .env for
     # anyone who hasn't set DB-based credentials yet.
-    gmail_user = _get_encrypted_setting("smtp_username", "") or os.getenv("GMAIL_USER", "")
-    gmail_pass = _get_encrypted_setting("smtp_password", "") or os.getenv("GMAIL_APP_PASS", "")
-    smtp_host  = _get_app_setting("smtp_host", "smtp.gmail.com") or os.getenv("SMTP_HOST", "smtp.gmail.com")
-    try:
-        smtp_port = int(_get_app_setting("smtp_port", "465") or os.getenv("SMTP_PORT", "465"))
-    except ValueError:
-        smtp_port = 465
-    from_addr = _get_app_setting("alert_from_email", "") or gmail_user
+    smtp = smtp_settings()  # one query instead of one connection per key
+    gmail_user, gmail_pass = smtp["username"], smtp["password"]
+    smtp_host, smtp_port, from_addr = smtp["host"], smtp["port"], smtp["from_addr"]
 
     recipients = [e.strip() for e in emails.split(",") if e.strip()]
     ok = False
@@ -196,7 +209,7 @@ def _send_alert(kind, hospital, location, dvr_name, ip, port, rows=None, machine
             msg.attach(MIMEText(plain, "plain"))
             msg.attach(MIMEText(html, "html"))
             ctx = ssl.create_default_context()
-            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=ctx) as srv:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10, context=ctx) as srv:
                 srv.login(gmail_user, gmail_pass)
                 srv.sendmail(from_addr, recipients, msg.as_string())
             ok = True
@@ -207,8 +220,8 @@ def _send_alert(kind, hospital, location, dvr_name, ip, port, rows=None, machine
         with get_db() as conn:
             conn.cursor().execute("""
                 INSERT INTO alert_log (alert_type, source, machine_key, subject, body, success)
-                VALUES ('dvr_offline', 'dvr', %s, %s, %s, %s)
-            """, (machine_key, subject, plain, ok))
+                VALUES (%s, 'dvr', %s, %s, %s, %s)
+            """, (f"dvr_{kind}", machine_key, subject, plain, ok))
     except Exception as e:
         print(f"DVR alert_log write failed: {e}")
     return ok
@@ -318,7 +331,7 @@ def settings():
         with get_db() as conn:
             cur = conn.cursor()
             cur.execute("UPDATE dvr_settings SET value=%s WHERE key=%s",
-                        (request.form.get("ping_interval_sec","").strip(), "ping_interval_sec"))
+                        (str(clean_ping_interval(request.form.get("ping_interval_sec"))), "ping_interval_sec"))
             cur.execute("UPDATE dvr_settings SET value=%s WHERE key=%s",
                         (request.form.get("alerts_enabled","").strip(), "alerts_enabled"))
             emails = ", ".join(request.form.getlist("recipient_emails"))
@@ -429,13 +442,18 @@ def delete_dvr(did):
 
 # ── Ping API ───────────────────────────────────────────────────────────────
 
-@dvr_bp.route("/dvr/<int:did>/ping")
-@login_required
-def ping_dvr(did):
+def check_device(did):
+    """
+    Ping one DVR and apply the online/offline transition + alert logic.
+    Called by the background checker (offline_checker.py) — never from a web
+    request, so pings and SMTP never hold a webserver thread, and alerts fire
+    whether or not anyone has the DVR page open. Returns the new state, or
+    None if the device no longer exists.
+    """
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute("""
-            SELECT d.*, l.hospital_id, l.name as loc_name, h.name as hosp_name
+            SELECT d.*, l.name as loc_name, h.name as hosp_name
             FROM dvr_devices d
             JOIN dvr_locations l ON l.id=d.location_id
             JOIN dvr_hospitals h ON h.id=l.hospital_id
@@ -443,62 +461,104 @@ def ping_dvr(did):
         """, (did,))
         dev = cur.fetchone()
     if not dev:
-        return jsonify({"error":"not found"}), 404
-    _check_hospital_access(dev["hospital_id"])
+        return None
 
     now    = datetime.now(timezone.utc)
     online = _ping(dev["ip"], dev["port"])
-    status = "online" if online else "offline"
     alerts_enabled = get_setting("alerts_enabled","1") == "1"
+    machine_key = f"{dev['name']}@{dev['ip']}"
 
+    # The state transition is decided under a row lock, so two viewers pinging
+    # the same DVR at once can't both "see" the change and both send an email.
+    # No email is sent while the connection is held.
     with get_db() as conn:
         cur = conn.cursor()
-        prev_status  = dev["status"]
-        went_offline = dev["went_offline"]
-        alert_sent   = dev["alert_sent"]
+        if online:
+            cur.execute("""
+                WITH old AS (SELECT status, went_offline FROM dvr_devices WHERE id=%s FOR UPDATE)
+                UPDATE dvr_devices d
+                   SET status='online', last_seen=%s, went_offline=NULL,
+                       alert_sent=FALSE, fail_count=0
+                  FROM old WHERE d.id=%s
+             RETURNING old.status AS prev_status, old.went_offline AS prev_went_offline,
+                       d.status, d.last_seen, d.went_offline
+            """, (did, now, did))
+        else:
+            cur.execute("""
+                WITH old AS (SELECT status, fail_count FROM dvr_devices WHERE id=%s FOR UPDATE)
+                UPDATE dvr_devices d
+                   SET fail_count = old.fail_count + 1,
+                       status = CASE WHEN old.fail_count + 1 >= %s THEN 'offline' ELSE d.status END,
+                       went_offline = CASE WHEN old.fail_count + 1 >= %s AND old.status <> 'offline'
+                                           THEN %s ELSE d.went_offline END,
+                       alert_sent = CASE WHEN old.fail_count + 1 >= %s AND old.status <> 'offline'
+                                         THEN FALSE ELSE d.alert_sent END
+                  FROM old WHERE d.id=%s
+             RETURNING old.status AS prev_status, NULL::timestamptz AS prev_went_offline,
+                       d.status, d.last_seen, d.went_offline
+            """, (did, _OFFLINE_AFTER_FAILS, _OFFLINE_AFTER_FAILS, now, _OFFLINE_AFTER_FAILS, did))
+        row = cur.fetchone()
+        if not row:
+            return None
 
-        if status == "offline" and prev_status != "offline":
-            went_offline = now
-            alert_sent   = False
+        # Claim the OFFLINE email atomically — only one request can win it.
+        claimed_offline = False
+        if row["status"] == "offline" and alerts_enabled:
+            cur.execute("""
+                UPDATE dvr_devices SET alert_sent=TRUE
+                 WHERE id=%s AND status='offline' AND NOT alert_sent RETURNING id
+            """, (did,))
+            claimed_offline = cur.fetchone() is not None
 
-        if status == "online" and prev_status == "offline":
-            offline_since = went_offline  # capture before we clear it below
-            went_offline = None
-            alert_sent   = False
-            if alerts_enabled:
-                _send_alert(
-                    "online", dev["hosp_name"], dev["loc_name"], dev["name"],
-                    dev["ip"], dev["port"],
-                    rows=[("Was offline since", offline_since.strftime("%d %b %Y, %I:%M %p") if offline_since else "unknown")],
-                    machine_key=f"{dev['name']}@{dev['ip']}"
-                )
+    if alerts_enabled and online and row["prev_status"] == "offline":
+        _send_alert(
+            "online", dev["hosp_name"], dev["loc_name"], dev["name"], dev["ip"], dev["port"],
+            rows=[("Was offline since", _fmt_ist(row["prev_went_offline"]) or "unknown")],
+            machine_key=machine_key,
+        )
+    if claimed_offline:
+        # Not retried on failure (the result is in alert_log): the checker
+        # runs every few seconds, so a retry would spam alert_log while SMTP
+        # is misconfigured. Same as DB Monitor alerts.
+        _send_alert(
+            "offline", dev["hosp_name"], dev["loc_name"], dev["name"], dev["ip"], dev["port"],
+            rows=[("Last seen", _fmt_ist(row["last_seen"]) or "never")],
+            machine_key=machine_key,
+        )
 
-        if status == "offline" and not alert_sent and alerts_enabled:
-            ok = _send_alert(
-                "offline", dev["hosp_name"], dev["loc_name"], dev["name"],
-                dev["ip"], dev["port"],
-                rows=[("Last seen", dev["last_seen"].strftime("%d %b %Y, %I:%M %p") if dev["last_seen"] else "never")],
-                machine_key=f"{dev['name']}@{dev['ip']}"
-            )
-            if ok:
-                alert_sent = True
+    return {"id": did, "status": row["status"]}
 
+
+def device_ids_to_check():
+    """Every DVR the checker should ping."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM dvr_devices ORDER BY id")
+        return [r["id"] for r in cur.fetchall()]
+
+
+@dvr_bp.route("/dvr/<int:did>/ping")
+@login_required
+def ping_dvr(did):
+    """Latest stored status for one DVR. The pinging itself is done by the
+    background checker; this only reads what it recorded."""
+    with get_db() as conn:
+        cur = conn.cursor()
         cur.execute("""
-            UPDATE dvr_devices SET status=%s,
-                last_seen=%s,
-                went_offline=%s,
-                alert_sent=%s
-            WHERE id=%s
-        """, (status,
-              now if online else dev["last_seen"],
-              went_offline,
-              alert_sent, did))
-
+            SELECT d.id, d.ip, d.port, d.status, d.last_seen, d.went_offline, l.hospital_id
+            FROM dvr_devices d
+            JOIN dvr_locations l ON l.id=d.location_id
+            WHERE d.id=%s
+        """, (did,))
+        dev = cur.fetchone()
+    if not dev:
+        return jsonify({"error":"not found"}), 404
+    _check_hospital_access(dev["hospital_id"])
     return jsonify({
-        "id": did, "status": status,
+        "id": did, "status": dev["status"],
         "ip": dev["ip"], "port": dev["port"],
         "last_seen": dev["last_seen"].isoformat() if dev["last_seen"] else None,
-        "went_offline": went_offline.isoformat() if went_offline else None,
+        "went_offline": dev["went_offline"].isoformat() if dev["went_offline"] else None,
     })
 
 
@@ -520,5 +580,5 @@ def ping_all_ids():
                 WHERE l.hospital_id = ANY(%s) ORDER BY d.id
             """, (list(allowed),))
         ids = [r["id"] for r in cur.fetchall()]
-    interval = int(get_setting("ping_interval_sec","30"))
+    interval = clean_ping_interval(get_setting("ping_interval_sec", "30"))
     return jsonify({"ids": ids, "interval": interval})

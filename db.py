@@ -7,6 +7,8 @@ import os
 import logging
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
+import threading
 from contextlib import contextmanager
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -26,18 +28,58 @@ DB_CONFIG = {
 }
 
 
+_POOL_MAX = int(os.getenv("DB_POOL_MAX", "25"))
+_pool = None
+_pool_pid = None
+_pool_sem = threading.BoundedSemaphore(_POOL_MAX)
+_pool_lock = threading.Lock()
+
+
+def _get_pool():
+    """Process-local pool, rebuilt after fork so workers never share sockets."""
+    global _pool, _pool_pid
+    if _pool is None or _pool_pid != os.getpid():
+        with _pool_lock:
+            if _pool is None or _pool_pid != os.getpid():
+                _pool = psycopg2.pool.ThreadedConnectionPool(
+                    1, _POOL_MAX, **DB_CONFIG,
+                    cursor_factory=psycopg2.extras.RealDictCursor,
+                    connect_timeout=int(os.getenv("POSTGRES_CONNECT_TIMEOUT", "10")),
+                    # Detect pooled connections silently dropped by a firewall/NAT.
+                    keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3,
+                )
+                _pool_pid = os.getpid()
+    return _pool
+
+
 @contextmanager
 def get_db():
-    """Yield a psycopg2 connection with RealDictCursor; auto-commit on exit."""
-    conn = psycopg2.connect(**DB_CONFIG, cursor_factory=psycopg2.extras.RealDictCursor)
+    """Yield a pooled psycopg2 connection with RealDictCursor; auto-commit on exit."""
+    # ThreadedConnectionPool raises instead of waiting when exhausted — the
+    # semaphore makes callers queue for a free connection instead.
+    if not _pool_sem.acquire(timeout=30):
+        raise psycopg2.OperationalError("database connection pool exhausted")
+    pool = _get_pool()
+    discard = False
+    try:
+        conn = pool.getconn()
+    except Exception:
+        _pool_sem.release()
+        raise
     try:
         yield conn
         conn.commit()
-    except Exception:
-        conn.rollback()
+    except Exception as e:
+        discard = conn.closed or isinstance(e, (psycopg2.OperationalError, psycopg2.InterfaceError))
+        if not conn.closed:
+            try:
+                conn.rollback()
+            except Exception:
+                discard = True
         raise
     finally:
-        conn.close()
+        pool.putconn(conn, close=discard or bool(conn.closed))
+        _pool_sem.release()
 
 
 def init_db():
@@ -175,6 +217,9 @@ def init_db():
             cur.execute("ALTER TABLE alert_log ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'system'")
         except Exception:
             pass
+        # Dashboard polling sorts/filters by sent_at every few seconds.
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_alert_log_sent_at ON alert_log (sent_at DESC)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_alert_log_key_sent ON alert_log (machine_key, sent_at DESC)")
 
         # ── App settings ─────────────────────────────────────────────────────
         cur.execute("""
@@ -331,6 +376,39 @@ def get_encrypted_setting(key, default=""):
         return default
 
 
+def smtp_settings():
+    """All SMTP settings in one query: Settings → Email/SMTP (password
+    decrypted), falling back to the GMAIL_* / SMTP_* env vars."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT key, value FROM app_settings WHERE key = ANY(%s)",
+                    (["smtp_host", "smtp_port", "smtp_username", "smtp_password", "alert_from_email"],))
+        raw = {r["key"]: r["value"] for r in cur.fetchall()}
+
+    def _decrypt(key):
+        f = _get_fernet() if raw.get(key) else None
+        if f is None:
+            return ""
+        try:
+            return f.decrypt(raw[key].encode()).decode()
+        except Exception as e:
+            log.error("Failed to decrypt setting '%s': %s", key, e)
+            return ""
+
+    user = _decrypt("smtp_username") or os.getenv("GMAIL_USER", "")
+    try:
+        port = int(raw.get("smtp_port") or os.getenv("SMTP_PORT", "465"))
+    except ValueError:
+        port = 465
+    return {
+        "host": raw.get("smtp_host") or os.getenv("SMTP_HOST", "smtp.gmail.com"),
+        "port": port,
+        "username": user,
+        "password": _decrypt("smtp_password") or os.getenv("GMAIL_APP_PASS", ""),
+        "from_addr": raw.get("alert_from_email") or user,
+    }
+
+
 def list_alert_recipients():
     """All registered alert recipients, for the recipient_picker macro."""
     with get_db() as conn:
@@ -376,6 +454,9 @@ def _batched_delete(conn, table, ts_col, days):
             return removed
 
 
+_PURGE_LOCK_ID = 74210301  # arbitrary constant shared by every purge caller
+
+
 def purge_old_data():
     """
     Delete metric rows and alert-log entries older than data_retention_days.
@@ -393,9 +474,20 @@ def purge_old_data():
         tables = [r["table_name"] for r in cur.fetchall()
                   if re.fullmatch(r"[a-z0-9_]{1,63}", r["table_name"] or "")]
 
-    result = {"days": days, "metric_rows": 0, "alert_rows": 0, "tables": 0, "errors": 0}
+    result = {"days": days, "metric_rows": 0, "alert_rows": 0, "tables": 0, "errors": 0,
+              "skipped": False}
     conn = psycopg2.connect(**DB_CONFIG, cursor_factory=psycopg2.extras.RealDictCursor)
     try:
+        # The checker daemon and the Settings "Purge now" button can both
+        # trigger this; a session-level advisory lock keeps them from overlapping.
+        lock_cur = conn.cursor()
+        lock_cur.execute("SELECT pg_try_advisory_lock(%s) AS ok", (_PURGE_LOCK_ID,))
+        if not lock_cur.fetchone()["ok"]:
+            conn.rollback()
+            result["skipped"] = True
+            log.info("purge_old_data: another purge is already running — skipped")
+            return result
+        conn.commit()
         for tbl in tables:
             try:
                 result["metric_rows"] += _batched_delete(conn, tbl, "ts", days)
