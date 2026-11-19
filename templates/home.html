@@ -15,7 +15,7 @@
 .type-row i{width:10px;height:10px;border-radius:4px;flex-shrink:0;}
 .type-row .t{flex:1;color:var(--text-muted);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .type-row b{font-variant-numeric:tabular-nums;font-weight:700;}
-.delivery{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);}
+.delivery{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:space-between;font-size:12px;color:var(--text-muted);}
 .delivery b{color:var(--text);}
 
 .health-rings{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
@@ -390,7 +390,7 @@ if (FLEET && FLEET.length) {
         tooltip: { callbacks: { label: function(c) { return ' ' + c.dataset.label + ': ' + (+c.raw).toFixed(1) + '%'; } } } },
       scales: {
         x: { min: 0, max: 100, border: { display: false }, ticks: { maxTicksLimit: 6, callback: function(v) { return v + '%'; } } },
-        y: { grid: { display: false }, border: { display: false }, ticks: { font: { weight: '600' } } }
+        y: { grid: { display: false }, border: { display: false }, ticks: { font: { weight: '600' }, callback: function(v) { var n = this.getLabelForValue(v), max = window.innerWidth < 600 ? 14 : 28; return n.length > max ? n.slice(0, max - 1) + '…' : n; } } }
       }
     }
   });

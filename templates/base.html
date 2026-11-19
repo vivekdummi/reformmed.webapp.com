@@ -126,7 +126,7 @@
       position:sticky;top:0;z-index:100;background:var(--header-bg);
       border-bottom:1px solid var(--border);backdrop-filter:saturate(160%) blur(12px);-webkit-backdrop-filter:saturate(160%) blur(12px);
     }
-    .appbar-row{height:60px;display:flex;align-items:center;gap:12px;padding:0 16px;max-width:1600px;margin:0 auto;}
+    .appbar-row{height:60px;display:flex;align-items:center;gap:12px;padding:0 16px;margin:0 auto;}
     .logo-brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);white-space:nowrap;min-width:0;}
     .logo-icon{width:38px;height:38px;flex-shrink:0;object-fit:contain;}
     .brand{font-size:17px;font-weight:700;color:var(--text);letter-spacing:-.2px;line-height:1.1;display:flex;flex-direction:column;}
@@ -219,7 +219,7 @@
     }
 
     /* ── Primary navigation tabs (Google tabs) ── */
-    .navtabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;max-width:1600px;margin:0 auto;padding:0 8px;}
+    .navtabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin:0 auto;padding:0 8px;}
     .navtabs::-webkit-scrollbar{display:none;}
     .navtab{
       position:relative;display:inline-flex;align-items:center;gap:8px;height:48px;padding:0 16px;
@@ -237,8 +237,13 @@
 
     /* ── Content ── */
     #main{min-height:calc(100vh - 109px);}
-    #content{padding:24px;max-width:1600px;margin:0 auto;}
+    #content{padding:24px;margin:0 auto;}
     @media(max-width:768px){ #content { padding:16px; } }
+    /* Let grid/flex cells shrink below their content width. Without this a
+       Chart.js canvas keeps its old pixel width when the window narrows, holds
+       its 1fr column open, and the page gets clipped instead of reflowing. */
+    #content [class*="grid"] > *, .panel, .card{min-width:0;}
+    #content canvas{max-width:100%;}
 
     /* Flash messages */
     .flash-messages{margin-bottom:16px;}
@@ -313,8 +318,8 @@
     .progress-fill.blue{background:var(--accent);}
     .mono{font-family:var(--mono);}
     .text-muted{color:var(--text-muted);}
-    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-    .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+    .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+    .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;}
     @media(max-width:700px){.grid-2,.grid-3{grid-template-columns:1fr;}}
     .mt-1{margin-top:8px;}.mt-2{margin-top:14px;}.mt-3{margin-top:20px;}.mb-2{margin-bottom:14px;}
     .flex{display:flex;}.items-center{align-items:center;}.gap-2{gap:8px;}
@@ -362,7 +367,7 @@
     .k-ocean{--kpi-g:var(--g-ocean);} .k-violet{--kpi-g:var(--g-violet);} .k-sunset{--kpi-g:var(--g-sunset);}
     .k-mint{--kpi-g:var(--g-mint);} .k-pink{--kpi-g:var(--g-pink);} .k-red{--kpi-g:linear-gradient(135deg,#ff8a8a,#e5484d);}
     
-    .ov-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px;}
+    .ov-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px;margin-bottom:16px;}
     @media(max-width:1100px){.ov-grid{grid-template-columns:1fr;}}
     .panel{background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:18px 20px;box-shadow:var(--shadow-1);min-width:0;}
     .panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
@@ -399,6 +404,33 @@
     }
     .recipient-picker-empty { font-size:13px; color:var(--text-muted); }
     .recipient-picker-empty a { color:var(--accent); }
+      /* ── Phone layout ── */
+    @media(max-width:600px){
+      .appbar-row{gap:6px;padding:0 10px;}
+      .logo-brand{flex:1 1 auto;overflow:hidden;gap:8px;}
+      .logo-icon{width:32px;height:32px;}
+      .brand{min-width:0;overflow:hidden;font-size:15px;}
+      .brand > span{overflow:hidden;text-overflow:ellipsis;}
+      .appbar-spacer{display:none;}
+      /* Tabs: tighter, with a fade on the right so it is obvious they scroll */
+      .navtabs{padding:0 4px;-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent);}
+      .navtab{padding:0 12px;gap:6px;height:44px;font-size:13px;}
+      .navtab svg{width:16px;height:16px;}
+      #content{padding:14px 12px;}
+      .page-header{margin-bottom:16px;}
+      .page-header h1{font-size:22px;}
+      .page-header > div:last-child{flex-wrap:wrap;}
+      /* KPI cards: let labels wrap instead of being cut off */
+      .kpi{padding:12px 12px 14px;border-radius:14px;}
+      .kpi-top{align-items:flex-start;margin-bottom:8px;}
+      .kpi-label{white-space:normal;line-height:1.25;font-size:12px;}
+      .kpi-icon{width:30px;height:30px;border-radius:10px;}
+      .kpi-icon svg{width:16px;height:16px;}
+      .kpi-value{font-size:24px;}
+      .kpi-sub{white-space:normal;}
+      .panel{padding:14px;border-radius:14px;}
+      .modal{padding:18px;border-radius:20px;}
+    }
   </style>
   {% block extra_css %}{% endblock %}
 </head>

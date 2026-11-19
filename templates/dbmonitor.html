@@ -146,7 +146,7 @@
 {% block content %}
 <div class="page-header">
   <div><h1>DB Monitor</h1><p>Live data-flow health for external PostgreSQL feeds — updates every 10s · last check <span id="dbm-last-check">—</span></p></div>
-  <div style="display:flex;gap:10px;">
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
     {% if current_user.is_admin %}
     <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-add-conn').classList.add('open')">+ Connection</button>
     <button class="btn btn-ghost btn-sm" onclick="openGroupModal()">+ Hospital Group</button>
