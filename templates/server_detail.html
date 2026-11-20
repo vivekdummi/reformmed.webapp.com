@@ -212,6 +212,97 @@
 .pm2-restarts.many{color:var(--yellow);font-weight:700;}
 .pm2-sum{font-size:12px;font-weight:700;}
 .pm2-empty{font-size:13px;color:var(--text-muted);margin:0;}
+/* ── System Performance Analytics ── */
+.an-section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:6px 0 12px;}
+.an-title{font-family:var(--font-head);font-size:18px;font-weight:800;margin:0;}
+.an-subtitle{display:block;font-size:12px;color:var(--text-muted);margin-top:2px;}
+.an-global{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.an-global-lbl{font-size:12px;color:var(--text-muted);font-weight:600;}
+.an-custom{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.an-custom input{padding:5px 8px;font-size:12px;height:30px;min-width:0;width:178px;}
+.an-custom span{color:var(--text-muted);font-size:12px;}
+.an-section-head [hidden]{display:none !important;}
+.an-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px;}
+.an-grid>.an-wide{grid-column:1 / -1;}
+@media(max-width:1250px){.an-grid{grid-template-columns:minmax(0,1fr);}}
+.an-card{container-type:inline-size;margin:0;}
+.an-head{flex-wrap:wrap;gap:8px;}
+.an-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.an-range{display:inline-flex;padding:2px;border-radius:9px;background:var(--bg3);border:1px solid var(--border);}
+.an-range-btn{border:0;background:transparent;color:var(--text-muted);font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:7px;cursor:pointer;font-family:inherit;}
+.an-range-btn:hover{color:var(--text);}
+.an-range-btn.active{background:var(--bg2);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.12);}
+.an-icon-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:14px;}
+.an-icon-btn:hover{color:var(--text);border-color:var(--border-strong);}
+.an-icon-btn svg{width:14px;height:14px;}
+.an-select{height:30px;padding:0 8px;font-size:12px;border-radius:8px;max-width:180px;}
+.an-body{display:grid;grid-template-columns:230px minmax(0,1fr);gap:18px;align-items:stretch;}
+.an-cores .an-body{grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
+@container (max-width:640px){.an-body,.an-cores .an-body{grid-template-columns:minmax(0,1fr);}}
+.an-live{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:14px;background:var(--bg3);min-width:0;}
+.an-gauge{position:relative;width:100%;max-width:210px;height:118px;}
+.an-gauge-center{position:absolute;left:0;right:0;bottom:2px;text-align:center;pointer-events:none;}
+.an-now{font-family:var(--font-head);font-size:30px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;}
+.an-now-sub{font-size:11px;color:var(--text-muted);margin-top:3px;}
+.an-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:99px;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;
+  color:var(--text-muted);background:color-mix(in srgb,currentColor 14%,transparent);}
+.an-pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;}
+.an-pill.solid{background:currentColor;}
+.an-pill.solid>span{color:#fff;}
+.an-pill.solid::before{background:#fff;}
+.an-subs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%;}
+.an-subs>div{text-align:center;min-width:0;}
+.an-subs span{display:block;font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
+.an-subs b{display:block;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.an-zones{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;font-size:10.5px;color:var(--text-muted);}
+.an-zones i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;}
+.an-trend{display:flex;flex-direction:column;min-width:0;}
+.an-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:10px;}
+.an-stats>div{padding:8px 12px;border-radius:12px;background:var(--bg3);min-width:0;}
+.an-stat-lbl{display:block;font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.an-stat-val{display:block;font-family:var(--font-head);font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.an-stat-at{display:block;font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.an-chart{position:relative;height:190px;}
+.an-chart-sm{height:150px;}
+.an-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-muted);}
+.an-empty[hidden]{display:none;}
+.an-foot{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);margin-top:8px;}
+.an-key{display:inline-flex;align-items:center;gap:6px;}
+.an-key i{display:inline-block;width:14px;height:4px;border-radius:2px;}
+.an-key i.band{height:10px;width:10px;border-radius:3px;}
+.an-net-now{display:flex;align-items:center;gap:12px;width:100%;padding:6px 4px;}
+.an-net-arrow{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;flex-shrink:0;}
+.an-net-arrow.down{background:var(--g-ocean);}
+.an-net-arrow.up{background:var(--g-sunset);}
+.an-net-now .an-now{font-size:24px;}
+.an-cores-live{display:flex;flex-direction:column;gap:10px;min-width:0;}
+.an-cores-live .an-stats{margin:0;}
+.an-cores-bars{position:relative;height:190px;}
+.an-extra{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);}
+@container (max-width:760px){.an-extra{grid-template-columns:minmax(0,1fr);}}
+.an-sub-title{font-size:13px;font-weight:700;}
+.an-io-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.an-io-now{font-size:12px;color:var(--text-muted);}
+.an-io-now b{color:var(--text);font-variant-numeric:tabular-nums;}
+.an-part-wrap{overflow-x:auto;margin-top:8px;}
+.an-part-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.an-part-table th{text-align:left;font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;padding:6px 8px;border-bottom:1px solid var(--border);white-space:nowrap;}
+.an-part-table td{padding:7px 8px;border-bottom:1px solid var(--border);white-space:nowrap;font-variant-numeric:tabular-nums;}
+.an-part-table tbody tr{cursor:pointer;}
+.an-part-table tbody tr:hover{background:var(--bg3);}
+.an-part-table tbody tr.sel{background:color-mix(in srgb,var(--accent) 10%,transparent);}
+.an-part-table .mono{font-family:var(--mono);font-size:12px;}
+.an-part-bar{display:flex;align-items:center;gap:8px;min-width:120px;}
+.an-part-bar>div{flex:1;height:6px;border-radius:99px;background:var(--chart-track);overflow:hidden;}
+.an-part-bar>div>i{display:block;height:100%;border-radius:99px;}
+.an-part-bar b{font-size:12px;min-width:44px;text-align:right;}
+/* full-screen card */
+.an-card.an-full{position:fixed;inset:12px;z-index:1000;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.45);}
+.an-card.an-full .an-chart{height:min(52vh,520px);}
+.an-card.an-full .an-cores-bars{height:min(40vh,420px);}
+body.an-noscroll{overflow:hidden;}
+.an-backdrop{position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.5);}
+.an-backdrop[hidden]{display:none;}
 /* ── Online / Offline timeline ── */
 .uptime-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px;}
 @media(max-width:700px){.uptime-stats{grid-template-columns:repeat(2,minmax(0,1fr));}}
@@ -331,38 +422,6 @@ function toggleAlerts() {
   </div>
 </div>
 
-<!-- ═══ History range filter ═══ -->
-<div class="history-bar" id="history-bar">
-  <div class="history-bar-header">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-    <span class="history-bar-title">Historical View</span>
-    <span class="history-bar-title-sub" id="hist-status">Showing live data — last 60 readings</span>
-  </div>
-  <div class="history-bar-body">
-    <div class="history-bar-row">
-      <div class="history-presets" id="hist-presets">
-        <button type="button" class="hist-preset-btn" data-mins="60">Last 1h</button>
-        <button type="button" class="hist-preset-btn" data-mins="360">Last 6h</button>
-        <button type="button" class="hist-preset-btn" data-mins="1440">Last 24h</button>
-        <button type="button" class="hist-preset-btn" data-mins="10080">Last 7d</button>
-      </div>
-      <div class="history-divider"></div>
-      <div class="history-custom-range">
-        <div class="history-field">
-          <label>From</label>
-          <input type="datetime-local" id="hist-from">
-        </div>
-        <div class="history-field">
-          <label>To</label>
-          <input type="datetime-local" id="hist-to">
-        </div>
-        <button type="button" class="btn btn-primary btn-sm" onclick="loadHistory()">View Range</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="hist-live-btn" onclick="backToLive()" style="display:none;">← Back to Live</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- ═══════════════════════════════════════════════════════════
      ROW 1 — Stat cards
      ═══════════════════════════════════════════════════════════ -->
@@ -471,128 +530,150 @@ function toggleAlerts() {
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
-     ROW 2 — CPU area / RAM donut / Swap donut / Disk donut
+     SYSTEM PERFORMANCE ANALYTICS — one card per metric: live gauge +
+     status, trend (1H–30D or a custom range), avg / peak / lowest, CSV.
+     Rendered by the anCard() code in extra_js.
      ═══════════════════════════════════════════════════════════ -->
-<div class="dash-grid-4">
-
-  <div class="dash-card">
-    <div class="dash-card-header">
-      <span class="dash-card-title">CPU Usage %</span>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span class="dash-card-val" id="cpuarea-val">{{ '%.1f'%latest.cpu_percent if latest and latest.cpu_percent else '0.0' }}%</span>
-        <button type="button" class="chart-expand-btn" aria-label="Expand chart" onclick="openChartModal('cpu')" title="Expand">⤢</button>
-      </div>
+{% macro an_tools(key, select_label=None) %}
+  <div class="an-tools">
+    {% if select_label %}<select class="an-select" data-f="select" aria-label="{{ select_label }}"></select>{% endif %}
+    <div class="an-range" role="group" aria-label="Time range">
+      {%- for h, l in [(1,'1H'),(6,'6H'),(24,'24H'),(168,'7D'),(720,'30D')] -%}
+      <button type="button" class="an-range-btn{% if h == 1 %} active{% endif %}" data-hours="{{ h }}">{{ l }}</button>
+      {%- endfor -%}
     </div>
-    <div style="height:150px;position:relative;"><canvas id="chart-cpu-area"></canvas></div>
+    <button type="button" class="an-icon-btn" data-act="csv" title="Download CSV for this range" aria-label="Download CSV">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+    </button>
+    <button type="button" class="an-icon-btn" data-act="expand" title="Full screen (Esc to close)" aria-label="Full screen">⤢</button>
   </div>
+{% endmacro %}
 
-  <div class="dash-card">
-    <div class="dash-card-header">
-      <span class="dash-card-title">RAM Usage</span>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span class="dash-card-val">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '0.0' }}%</span>
-        <button type="button" class="chart-expand-btn" aria-label="Expand chart" onclick="openChartModal('ram')" title="Expand">⤢</button>
-      </div>
+{% macro an_trend(empty='No data in this range.') %}
+    <div class="an-trend">
+      <div class="an-stats" data-f="stats"></div>
+      <div class="an-chart"><canvas data-f="chart"></canvas><div class="an-empty" data-f="empty" hidden>{{ empty }}</div></div>
+      <div class="an-foot"><span data-f="legend" style="display:contents;"></span><span class="history-status" data-f="status"></span></div>
     </div>
-    <div class="donut-row">
-      <div style="height:130px;width:130px;position:relative;flex-shrink:0;"><canvas id="chart-ram-donut"></canvas><div class="donut-center" id="ram-donut-center">{{ '%.1f'%latest.ram_percent if latest and latest.ram_percent else '0.0' }}%</div></div>
-      <div class="donut-legend">
-        <div class="donut-legend-item"><span class="dot" style="background:var(--g-violet);"></span>Used <b id="ram-legend-used">{{ '%.1f'%latest.ram_used_gb if latest and latest.ram_used_gb else '0' }} GB</b></div>
-        <div class="donut-legend-item"><span class="dot" style="background:var(--chart-track);"></span>Free <b id="ram-legend-free">{{ '%.1f'%((latest.ram_total_gb or 0) - (latest.ram_used_gb or 0)) if latest else '0' }} GB</b></div>
-        <div class="donut-legend-item total">Total <b>{{ '%.1f'%latest.ram_total_gb if latest and latest.ram_total_gb else '0' }} GB</b></div>
+{% endmacro %}
+
+{% macro gauge_card(key, title, subs, select_label=None, wide=False, empty='No data in this range.') %}
+<div class="dash-card an-card{% if wide %} an-wide{% endif %}" id="an-{{ key }}">
+  <div class="dash-card-header an-head">
+    <span class="dash-card-title">{{ title }}</span>
+    {{ an_tools(key, select_label) }}
+  </div>
+  <div class="an-body">
+    <div class="an-live">
+      <div class="an-gauge"><canvas data-f="gauge"></canvas>
+        <div class="an-gauge-center"><div class="an-now" data-f="now">—</div><div class="an-now-sub" data-f="nowsub"></div></div>
       </div>
+      <div class="an-pill" data-f="pill"><span>—</span></div>
+      <div class="an-subs">{% for label, f in subs %}<div><span>{{ label }}</span><b data-f="{{ f }}">—</b></div>{% endfor %}</div>
+      <div class="an-zones" data-f="zones"></div>
+    </div>
+    {{ an_trend(empty) }}
+  </div>
+  {% if caller %}{{ caller() }}{% endif %}
+</div>
+{% endmacro %}
+
+<div class="an-section-head">
+  <div>
+    <h2 class="an-title">System Performance Analytics</h2>
+    <span class="an-subtitle" id="an-mode">Gauges update live · trends refresh automatically</span>
+  </div>
+  <div class="an-global">
+    <span class="an-global-lbl">All charts</span>
+    <div class="an-range" id="an-global-range" role="group" aria-label="Time range for all charts">
+      {%- for h, l in [(1,'1H'),(6,'6H'),(24,'24H'),(168,'7D'),(720,'30D')] -%}
+      <button type="button" class="an-range-btn{% if h == 1 %} active{% endif %}" data-hours="{{ h }}">{{ l }}</button>
+      {%- endfor -%}
+    </div>
+    <div class="an-custom">
+      <input type="datetime-local" id="an-from" aria-label="From">
+      <span>→</span>
+      <input type="datetime-local" id="an-to" aria-label="To">
+      <button type="button" class="btn btn-primary btn-sm" id="an-apply">View range</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="an-live-btn" hidden>← Back to live</button>
     </div>
   </div>
-
-  <div class="dash-card">
-    <div class="dash-card-header">
-      <span class="dash-card-title">Swap Usage</span>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span class="dash-card-val" style="font-size:16px;">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</span>
-        <button type="button" class="chart-expand-btn" aria-label="Expand chart" onclick="openChartModal('swap')" title="Expand">⤢</button>
-      </div>
-    </div>
-    <div class="donut-row">
-      <div style="height:130px;width:130px;position:relative;flex-shrink:0;"><canvas id="chart-swap-donut"></canvas><div class="donut-center" id="swap-donut-center">{{ '%.1f'%latest.swap_percent if latest and latest.swap_percent else '0.0' }}%</div></div>
-      <div class="donut-legend">
-        <div class="donut-legend-item"><span class="dot" style="background:var(--g-mint);"></span>Used <b id="swap-legend-used">{{ '%.1f'%latest.swap_used_gb if latest and latest.swap_used_gb else '0' }} GB</b></div>
-        <div class="donut-legend-item"><span class="dot" style="background:var(--chart-track);"></span>Free <b id="swap-legend-free">{{ '%.1f'%((latest.swap_total_gb or 0) - (latest.swap_used_gb or 0)) if latest else '0' }} GB</b></div>
-        <div class="donut-legend-item total">Total <b>{{ '%.1f'%latest.swap_total_gb if latest and latest.swap_total_gb else '0' }} GB</b></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="dash-card">
-    <div class="dash-card-header">
-      <span class="dash-card-title">Disk Usage</span>
-      <div style="display:flex;align-items:center;gap:8px;">
-        {% if disk_primary %}<span class="dash-card-val" style="font-size:16px;">{{ '%.1f'%(disk_primary.percent|float) }}%</span>{% endif %}
-        <button type="button" class="chart-expand-btn" aria-label="Expand chart" onclick="openChartModal('disk')" title="Expand">⤢</button>
-      </div>
-    </div>
-    {% if disk_primary %}
-    {% set d_used = disk_primary.used_gb if disk_primary.used_gb is defined else 0 %}
-    {% set d_total = disk_primary.total_gb if disk_primary.total_gb is defined else 0 %}
-    {% set d_free = disk_primary.free_gb if disk_primary.free_gb is defined else (d_total - d_used) %}
-    <div class="donut-row">
-      <div style="height:130px;width:130px;position:relative;flex-shrink:0;"><canvas id="chart-disk-donut"></canvas><div class="donut-center" id="disk-donut-center">{{ '%.1f'%(disk_primary.percent|float) }}%</div></div>
-      <div class="donut-legend">
-        <div class="donut-legend-item"><span class="dot" style="background:var(--g-sunset);"></span>Used <b>{{ '%.1f'%d_used }} GB</b></div>
-        <div class="donut-legend-item"><span class="dot" style="background:var(--chart-track);"></span>Free <b>{{ '%.1f'%d_free }} GB</b></div>
-        <div class="donut-legend-item total">Total <b>{{ '%.1f'%d_total }} GB</b></div>
-      </div>
-    </div>
-    {% else %}
-    <p style="font-size:13px;color:var(--text-muted);padding:20px;">No disk data.</p>
-    {% endif %}
-  </div>
-
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     ROW 3 — Net traffic bar / Per-core CPU / Temp gauge
-     ═══════════════════════════════════════════════════════════ -->
-<div class="dash-grid-3-eq">
+<div class="an-grid">
 
-  <div class="dash-card">
-    <div class="dash-card-header">
-      <span class="dash-card-title">Net Traffic (KB/s)</span>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div class="net-legend">
-          <span><i class="key-line" style="background:var(--g-sunset)"></i>Upload <b><span id="net-up-val">{{ last_net_sent }}</span> KB/s</b></span>
-          <span><i class="key-line" style="background:var(--g-ocean)"></i>Download <b><span id="net-down-val">{{ last_net_recv }}</span> KB/s</b></span>
-        </div>
-        <button type="button" class="chart-expand-btn" aria-label="Expand chart" onclick="openChartModal('net')" title="Expand">⤢</button>
+  {{ gauge_card('cpu',  'CPU Usage',     [('Frequency', 'freq'), ('Logical CPUs', 'cores'), ('Busiest core', 'busiest')]) }}
+  {{ gauge_card('ram',  'RAM Usage',     [('Used', 'used'), ('Free', 'free'), ('Total', 'total')]) }}
+  {{ gauge_card('swap', 'Swap Usage',    [('Used', 'used'), ('Free', 'free'), ('Total', 'total')]) }}
+  {{ gauge_card('temp', 'CPU Temperature', [('Warning at', 'warn'), ('Critical at', 'crit'), ('Headroom', 'head')], empty='No temperature readings in this range.') }}
+
+  {% call gauge_card('disk', 'Disk Usage', [('Used', 'used'), ('Free', 'free'), ('Total', 'total')], select_label='Partition', wide=True) %}
+  <div class="an-extra">
+    <div>
+      <div class="an-io-head">
+        <span class="an-sub-title">Read / Write speed</span>
+        <span class="an-io-now">Now: read <b data-f="io-read">—</b> · write <b data-f="io-write">—</b></span>
+      </div>
+      <div class="an-stats" data-f="iostats"></div>
+      <div class="an-chart an-chart-sm"><canvas data-f="iochart"></canvas><div class="an-empty" data-f="ioempty" hidden>No disk I/O data in this range.</div></div>
+      <div class="an-foot">
+        <span class="an-key"><i style="background:var(--g-mint)"></i>Read</span>
+        <span class="an-key"><i style="background:var(--g-sunset)"></i>Write</span>
+        <span class="history-status" data-f="iostatus"></span>
       </div>
     </div>
-    <div style="height:150px;position:relative;"><canvas id="chart-net-bar"></canvas></div>
+    <div>
+      <span class="an-sub-title">Partitions</span>
+      <div class="an-part-wrap">
+        <table class="an-part-table">
+          <thead><tr><th>Mount</th><th>Type</th><th>Total</th><th>Used</th><th>Free</th><th>Usage</th></tr></thead>
+          <tbody data-f="parts"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endcall %}
+
+  <div class="dash-card an-card an-wide" id="an-net">
+    <div class="dash-card-header an-head">
+      <span class="dash-card-title">Net Traffic</span>
+      {{ an_tools('net') }}
+    </div>
+    <div class="an-body">
+      <div class="an-live">
+        <div class="an-pill" data-f="pill"><span>—</span></div>
+        <div class="an-net-now"><span class="an-net-arrow down">↓</span><div><div class="an-now" data-f="down">—</div><div class="an-now-sub">Download</div></div></div>
+        <div class="an-net-now"><span class="an-net-arrow up">↑</span><div><div class="an-now" data-f="up">—</div><div class="an-now-sub">Upload</div></div></div>
+        <div class="an-subs" style="grid-template-columns:repeat(2,minmax(0,1fr));">
+          <div><span>Packets ↓/s</span><b data-f="pk-down">—</b></div>
+          <div><span>Packets ↑/s</span><b data-f="pk-up">—</b></div>
+        </div>
+      </div>
+      {{ an_trend('No network data in this range.') }}
+    </div>
   </div>
 
-  <div class="dash-card">
-    <div class="dash-card-header">
-      <span class="dash-card-title">CPU per core (now)</span>
-      <button type="button" class="chart-expand-btn" aria-label="Expand chart" onclick="openChartModal('cores')" title="Expand">⤢</button>
+  <div class="dash-card an-card an-wide an-cores" id="an-core">
+    <div class="dash-card-header an-head">
+      <span class="dash-card-title">CPU Cores</span>
+      {{ an_tools('core', 'Core') }}
     </div>
     {% if chart_cores %}
-    <div style="height:150px;position:relative;"><canvas id="chart-cores"></canvas></div>
+    <div class="an-body">
+      <div class="an-cores-live">
+        <div class="an-stats" data-f="livestats"></div>
+        <div class="an-cores-bars"><canvas data-f="bars"></canvas></div>
+        <div class="an-zones" data-f="zones"></div>
+      </div>
+      {{ an_trend() }}
+    </div>
     {% else %}
-    <p style="font-size:12px;color:var(--text-muted);padding:20px;">Per-core data not reported by this agent yet.</p>
+    <p style="font-size:13px;color:var(--text-muted);margin:0;">Per-core data not reported by this agent yet.</p>
     {% endif %}
   </div>
 
-  <div class="dash-card">
-    <div class="dash-card-header">
-      <span class="dash-card-title">Temperature (°C)</span>
-      <button type="button" class="chart-expand-btn" aria-label="Expand chart" onclick="openChartModal('temp')" title="Expand">⤢</button>
-    </div>
-    <div class="gauge-wrap">
-      <div style="height:110px;width:100%;position:relative;"><canvas id="chart-temp-gauge"></canvas></div>
-      <div class="gauge-val" id="gauge-temp-val">{% if latest and latest.cpu_temp %}{{ '%.0f'%latest.cpu_temp }}°C{% else %}—{% endif %}</div>
-      <div class="gauge-status" id="gauge-temp-status">Normal</div>
-    </div>
-  </div>
-
 </div>
+<div class="an-backdrop" id="an-backdrop" hidden></div>
 
 <!-- ═══════════════════════════════════════════════════════════
      ROW 4 — System overview rings / Recent alerts / Process status
@@ -800,46 +881,6 @@ function toggleAlerts() {
   {% endif %}
 </div>
 
-<!-- ═══ Chart expand modal ═══ -->
-<div class="modal-backdrop" id="chart-modal-backdrop" onclick="if(event.target===this) closeChartModal()">
-  <div class="modal" style="width:900px;">
-    <div class="modal-title" id="chart-modal-title" style="display:flex;align-items:center;justify-content:space-between;">
-      <span id="chart-modal-title-text">Chart</span>
-      <button type="button" class="icon-btn" onclick="closeChartModal()" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    </div>
-    <div id="chart-modal-filter" class="history-bar-row" style="margin-bottom:14px;display:none;">
-      <div class="history-presets" id="modal-hist-presets">
-        <button type="button" class="hist-preset-btn" data-mins="60">Last 1h</button>
-        <button type="button" class="hist-preset-btn" data-mins="360">Last 6h</button>
-        <button type="button" class="hist-preset-btn" data-mins="1440">Last 24h</button>
-        <button type="button" class="hist-preset-btn" data-mins="10080">Last 7d</button>
-      </div>
-      <div class="history-divider"></div>
-      <div class="history-custom-range">
-        <div class="history-field"><label>From</label><input type="datetime-local" id="modal-hist-from"></div>
-        <div class="history-field"><label>To</label><input type="datetime-local" id="modal-hist-to"></div>
-        <button type="button" class="btn btn-primary btn-sm" onclick="loadModalHistory()">View Range</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="modal-hist-live-btn" onclick="modalBackToLive()" style="display:none;">← Back to Live</button>
-      </div>
-      <span class="history-status" id="modal-hist-status"></span>
-    </div>
-    <div id="chart-modal-note" style="font-size:13px;color:var(--text-muted);margin-bottom:12px;display:none;"></div>
-    <div id="chart-modal-legend" class="net-legend" style="flex-direction:row;gap:16px;justify-content:flex-start;margin-bottom:10px;display:none;"></div>
-    <div id="chart-modal-donut-wrap" class="donut-row" style="display:none;justify-content:center;">
-      <div style="height:260px;width:260px;position:relative;flex-shrink:0;"><canvas id="chart-modal-donut"></canvas><div class="donut-center" id="chart-modal-donut-center" style="font-size:32px;"></div></div>
-      <div class="donut-legend" id="chart-modal-donut-legend" style="font-size:14px;"></div>
-    </div>
-    <div id="chart-modal-gauge-wrap" class="gauge-wrap" style="display:none;">
-      <div style="height:220px;width:100%;position:relative;"><canvas id="chart-modal-gauge"></canvas></div>
-      <div class="gauge-val" id="chart-modal-gauge-val" style="font-size:34px;"></div>
-      <div class="gauge-status" id="chart-modal-gauge-status" style="font-size:14px;"></div>
-    </div>
-    <div id="chart-modal-canvas-wrap" style="height:360px;position:relative;">
-      <canvas id="chart-modal-canvas"></canvas>
-    </div>
-  </div>
-</div>
-
 {% endblock %}
 
 {% block extra_js %}
@@ -887,27 +928,6 @@ var gpuCharts = {};  // { [gpuIndex]: { ring, area, accent } }
 
 // ── New dashboard widget helpers: donut, ring, gauge-needle, bar, multi-line ──
 
-// Used/free meter as a ring. Hover shows GB; the centre label shows %.
-function makeDonut(canvasId, usedVal, totalVal, colorVar) {
-  var free = Math.max(0, (totalVal || 0) - (usedVal || 0));
-  return RM.chart(canvasId, {
-    type: 'doughnut',
-    data: { labels: ['Used', 'Free'], datasets: [{ data: [usedVal || 0, free], rm: { bg: [colorVar, M.track] }, borderWidth: 0, borderRadius: 99, spacing: 3 }] },
-    options: {
-      responsive: true, maintainAspectRatio: false, cutout: '76%', animation: false,
-      plugins: { legend: { display: false },
-        tooltip: { callbacks: { label: function(c) { return ' ' + c.label + ': ' + (+c.raw).toFixed(1) + ' GB'; } } } }
-    }
-  });
-}
-
-function updateDonut(chart, usedVal, totalVal) {
-  if (!chart) return;
-  var free = Math.max(0, (totalVal || 0) - (usedVal || 0));
-  chart.data.datasets[0].data = [usedVal || 0, free];
-  chart.update('none');
-}
-
 function makeRing(canvasId, pct, colorVar) {
   return RM.chart(canvasId, {
     type: 'doughnut',
@@ -927,68 +947,6 @@ function updateRing(chart, pct, labelId) {
   if (labelId) setText(labelId, (pct || 0).toFixed(0) + '%');
 }
 
-// Upload vs download over time — two lines on one shared KB/s axis.
-function makeNetBar(canvasId, sentArr, recvArr, big) {
-  return RM.chart(canvasId, {
-    type: 'line',
-    data: {
-      labels: labels.slice(),
-      datasets: [
-        { label: 'Upload',   data: sentArr.slice(), rm: { line: M.up,   fill: 'gradient' }, fill: 'origin', cubicInterpolationMode: 'monotone', borderWidth: 2.5 },
-        { label: 'Download', data: recvArr.slice(), rm: { line: M.down, fill: 'gradient' }, fill: 'origin', cubicInterpolationMode: 'monotone', borderWidth: 2.5 },
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false, animation: false,
-      interaction: { intersect: false, mode: 'index' },
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: function(c) { return ' ' + c.dataset.label + ': ' + (+c.raw || 0).toFixed(1) + ' KB/s'; } } },
-      },
-      scales: {
-        x: { display: !!big, grid: { display: false }, ticks: { maxTicksLimit: 8, autoSkip: true, maxRotation: 0 } },
-        y: { min: 0, grace: '10%', border: { display: false }, ticks: { maxTicksLimit: 4 } }
-      }
-    }
-  });
-}
-
-// Current usage of each core as one bar per core. One series → one colour;
-// readable for 4 cores or 64, unlike a line per core.
-function makeCoresChart(canvasId, coresNow) {
-  if (!coresNow || !coresNow.length) return null;
-  return RM.chart(canvasId, {
-    type: 'bar',
-    data: {
-      labels: coresNow.map(function(_, i) { return 'C' + i; }),
-      datasets: [
-        { label: 'Core usage', data: coresNow.slice(), rm: { bg: M.cpu }, borderRadius: 99, borderSkipped: false,
-          maxBarThickness: 22, categoryPercentage: 0.8, barPercentage: 0.9, grouped: false, order: 1 },
-        { label: 'track', data: coresNow.map(function() { return 100; }), rm: { bg: M.track }, borderRadius: 99, borderSkipped: false,
-          maxBarThickness: 22, categoryPercentage: 0.8, barPercentage: 0.9, grouped: false, order: 2 }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false, animation: false,
-      interaction: { intersect: false, mode: 'index' },
-      plugins: {
-        legend: { display: false },
-        tooltip: { filter: function(item) { return item.datasetIndex === 0; },
-                   callbacks: { title: function(items) { return 'Core ' + items[0].dataIndex; },
-                                label: function(c) { return ' ' + pct(+c.raw || 0); } } },
-      },
-      scales: {
-        x: { grid: { display: false }, border: { display: false }, ticks: { autoSkip: true, maxRotation: 0 } },
-        y: { min: 0, max: 100, border: { display: false }, grid: { display: false }, ticks: { maxTicksLimit: 3, callback: function(v) { return v + '%'; } } }
-      }
-    }
-  });
-}
-
-function lastValues(arrs) {
-  return (arrs || []).map(function(a) { return a && a.length ? (+a[a.length - 1] || 0) : 0; });
-}
-
 function makeSparkline(canvasId, dataArr, colorVar) {
   return RM.chart(canvasId, {
     type: 'line',
@@ -1001,43 +959,23 @@ function makeSparkline(canvasId, dataArr, colorVar) {
   });
 }
 
-// Draws a needle on top of a semicircle gauge doughnut. chart.$gaugeValue
-// (0-100) must be set before calling chart.update().
-var gaugeNeedlePlugin = {
-  id: 'gaugeNeedle',
-  afterDatasetsDraw: function(chart) {
-    var val = chart.$gaugeValue;
-    if (val === undefined) return;
-    var meta = chart.getDatasetMeta(0);
-    var arc = meta && meta.data && meta.data[0];
-    if (!arc) return;
-    var ctx = chart.ctx;
-    var cx = arc.x, cy = arc.y;
-    var r = arc.outerRadius * 0.72;
-    var clamped = Math.min(Math.max(val, 0), 100);
-    var angle = Math.PI + (clamped / 100) * Math.PI;  // sweeps west -> north -> east
-    var x2 = cx + Math.cos(angle) * r;
-    var y2 = cy + Math.sin(angle) * r;
-    ctx.save();
-    ctx.strokeStyle = RM.css('--text');
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-    ctx.fillStyle = RM.css('--text');
-    ctx.fill();
-    ctx.restore();
-  }
-};
-
+// Status zones per metric come from ANALYTICS_THRESHOLDS in blueprints/servers.py.
+var AN_THR = {{ analytics_thresholds | tojson }};
+var AN_LEVELS = [
+  { text: 'Normal',    color: '--green' },
+  { text: 'Warning',   color: '--yellow' },
+  { text: 'Critical',  color: '--red' },
+  { text: 'Very High', color: '--red', solid: true }
+];
+function anLevel(metric, v) {
+  var thr = AN_THR[metric] || [], i = 0;
+  while (i < thr.length && v >= thr[i]) i++;
+  var L = AN_LEVELS[i];
+  return { text: (metric === 'core' && i === 3) ? 'Overloaded' : L.text, color: L.color, solid: !!L.solid, idx: i };
+}
 function tempStatusLabel(t) {
-  if (t >= 80) return { text: 'Critical', color: 'var(--red)' };
-  if (t >= 65) return { text: 'Warning',  color: 'var(--yellow)' };
-  return { text: 'Normal', color: 'var(--green)' };
+  var L = anLevel('temp', t);
+  return { text: L.text, color: 'var(' + L.color + ')' };
 }
 
 function pickPrimaryDisk(disks) {
@@ -1047,107 +985,11 @@ function pickPrimaryDisk(disks) {
 }
 
 
-// Single-series area chart (CPU %, GPU %). Colours come from the theme via
-// `rm`, the fill is a soft gradient of the line colour (RM.gradient).
-function makeChart(canvasId, dataArr, colorVar, yMax, big, seriesLabel) {
-  return RM.chart(canvasId, {
-    type: 'line',
-    data: {
-      labels: labels.slice(),   // copy so base labels array isn't shared
-      datasets: [{
-        label: seriesLabel || 'CPU',
-        data: dataArr.slice(),
-        rm: { line: colorVar, fill: 'gradient' },
-        borderWidth: 2.5,
-        // 'monotone' gives a smooth flowing curve like the reference charts
-        // without the overshoot/undershoot a plain tension curve can cause
-        // on percentage data (e.g. dipping below 0 or above 100 near spikes).
-        cubicInterpolationMode: 'monotone',
-        tension: 0.4,
-        fill: true,
-        borderWidth: 2,
-        borderCapStyle: 'round',
-        borderJoinStyle: 'round',
-        // Every point is invisible except the most recent one, which gets a
-        // small solid marker — the "current value" dot look from the
-        // reference dashboard, without cluttering 60 points with dots.
-        pointRadius: function(context) {
-          var arr = context.dataset.data;
-          return context.dataIndex === arr.length - 1 ? 4 : 0;
-        },
-        pointBorderWidth: 2,
-        pointHoverRadius: 5,
-        pointHitRadius: 8,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      interaction: { intersect: false, mode: 'index' },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          displayColors: false,
-          callbacks: { label: function(c) { return ' ' + c.dataset.label + ': ' + pct(+c.raw || 0); } },
-        },
-      },
-      scales: {
-        x: { display: !!big, grid: { display: false }, ticks: { maxTicksLimit: 8, autoSkip: true, maxRotation: 0 } },
-        y: {
-          min: 0,
-          max: yMax || undefined,
-          border: { display: false },
-          ticks: { maxTicksLimit: 4, callback: function(v) { return v + '%'; } }
-        }
-      }
-    }
-  });
-}
-
 // ── Init new dashboard widgets ──
 var charts = {};
 
-// CPU area chart + tiny temperature sparkline in the stat card
-charts.cpuArea   = makeChart('chart-cpu-area', cpuData, M.cpu, 100);
+// Tiny temperature sparkline in the stat card
 charts.tempSpark = makeSparkline('stat-temp-spark', tempData, M.temp);
-
-// RAM / Swap / Disk donuts (values in GB — only the ratio matters)
-charts.ramDonut  = makeDonut('chart-ram-donut',  {{ (latest.ram_used_gb or 0) if latest else 0 }},  {{ (latest.ram_total_gb or 0) if latest else 0 }},  M.ram);
-charts.swapDonut = makeDonut('chart-swap-donut', {{ (latest.swap_used_gb or 0) if latest else 0 }}, {{ (latest.swap_total_gb or 0) if latest else 0 }}, M.swap);
-{% if disk_primary %}
-charts.diskDonut = makeDonut(
-  'chart-disk-donut',
-  {{ (disk_primary.used_gb if disk_primary.used_gb is defined else 0) }},
-  {{ (disk_primary.total_gb if disk_primary.total_gb is defined else 0) }},
-  M.disk
-);
-{% endif %}
-
-// Net traffic: upload / download lines (KB/s)
-charts.netBar = makeNetBar('chart-net-bar', sentData, recvData);
-
-// Per-core CPU multi-line chart (real data from cpu_per_core — replaces the
-// "Load Average" widget from the reference image, since this agent doesn't
-// collect Unix load averages)
-var coresData = {{ chart_cores | tojson }};
-charts.cores = makeCoresChart('chart-cores', lastValues(coresData));
-
-// Temperature gauge (semicircle zones + needle)
-// Heat scale 0–100 °C: green → yellow → red; the needle marks the reading.
-function gaugeDataset() { return { data: [100], rm: { bg: 'g:heat', mode: 'h' }, borderWidth: 0, borderRadius: 99 }; }
-charts.tempGauge = RM.chart('chart-temp-gauge', {
-  type: 'doughnut',
-  data: { datasets: [gaugeDataset()] },
-  options: {
-    responsive: true, maintainAspectRatio: false, animation: false,
-    rotation: -90, circumference: 180, cutout: '75%',
-    plugins: { legend: { display: false }, tooltip: { enabled: false } }
-  },
-  plugins: [gaugeNeedlePlugin]
-});
-charts.tempGauge.$gaugeValue = {{ (latest.cpu_temp or 0) if latest else 0 }};
-charts.tempGauge.update();
 
 // System Overview rings
 charts.ringCpu  = makeRing('ring-cpu',  {{ (latest.cpu_percent or 0) if latest else 0 }},  M.cpu);
@@ -1305,7 +1147,6 @@ function escapeHtml(s) {
 
 // ── Main poll ──
 async function pollLive() {
-  if (typeof histBaseState !== 'undefined' && histBaseState) return;  // browsing history — don't overwrite it
   try {
     var r = await fetch('/servers/' + TABLE + '/live');
     if (!r.ok) return;
@@ -1360,105 +1201,17 @@ async function pollLive() {
     var tsEl = document.getElementById('stat-temp-status');
     if (tsEl) { tsEl.textContent = ts.text; tsEl.style.color = ts.color; }
 
-    // ── CPU area chart + header value ──
-    setText('cpuarea-val', cpu.toFixed(1) + '%');
-    if (fresh) {
-      pushPoint(charts.cpuArea, cpu, now);
-      pushPoint(charts.tempSpark, temp, now);
-      if (modalIsLiveFor('cpu')) pushPoint(modalChart, cpu, now);
-    }
+    // ── Temperature sparkline (stat card) ──
+    if (fresh) pushPoint(charts.tempSpark, temp, now);
 
-    // ── RAM donut ──
-    if (d.ram_used_gb != null && d.ram_total_gb != null) {
-      var ramUsed = Number(d.ram_used_gb), ramTotal = Number(d.ram_total_gb);
-      updateDonut(charts.ramDonut, ramUsed, ramTotal);
-      setText('ram-donut-center', ram.toFixed(1) + '%');
-      setText('ram-legend-used', ramUsed.toFixed(1) + ' GB');
-      setText('ram-legend-free', Math.max(0, ramTotal - ramUsed).toFixed(1) + ' GB');
-      if (modalIsLiveFor('ram')) {
-        updateDonut(modalChart, ramUsed, ramTotal);
-        setText('chart-modal-donut-center', ram.toFixed(1) + '%');
-        renderModalDonutLegend(M.ram, ramUsed, ramTotal);
-      }
-    }
-
-    // ── Swap donut ──
-    if (d.swap_used_gb != null && d.swap_total_gb != null) {
-      var swapUsed = Number(d.swap_used_gb), swapTotal = Number(d.swap_total_gb);
-      updateDonut(charts.swapDonut, swapUsed, swapTotal);
-      setText('swap-donut-center', swap.toFixed(1) + '%');
-      setText('swap-legend-used', swapUsed.toFixed(1) + ' GB');
-      setText('swap-legend-free', Math.max(0, swapTotal - swapUsed).toFixed(1) + ' GB');
-      if (modalIsLiveFor('swap')) {
-        updateDonut(modalChart, swapUsed, swapTotal);
-        setText('chart-modal-donut-center', swap.toFixed(1) + '%');
-        renderModalDonutLegend(M.swap, swapUsed, swapTotal);
-      }
-    }
-
-    // ── Net traffic ──
-    setText('net-up-val', sent);
-    setText('net-down-val', recv);
-    if (fresh && charts.netBar) {
-      charts.netBar.data.labels.push(now); charts.netBar.data.labels.shift();
-      charts.netBar.data.datasets[0].data.push(sent); charts.netBar.data.datasets[0].data.shift();
-      charts.netBar.data.datasets[1].data.push(recv); charts.netBar.data.datasets[1].data.shift();
-      charts.netBar.update('none');
-    }
-    if (fresh && modalIsLiveFor('net')) {
-      modalChart.data.labels.push(now); modalChart.data.labels.shift();
-      modalChart.data.datasets[0].data.push(sent); modalChart.data.datasets[0].data.shift();
-      modalChart.data.datasets[1].data.push(recv); modalChart.data.datasets[1].data.shift();
-      modalChart.update('none');
-    }
-
-    // ── Disk donut (re-picks the primary partition from live data) ──
+    // ── Disk ring in System Overview (primary partition) ──
     if (d.disk_partitions) {
       var primary = pickPrimaryDisk(d.disk_partitions);
-      if (primary && charts.diskDonut) {
-        var dpct  = parseFloat(primary.percent || 0);
-        var used  = primary.used_gb  !== undefined ? parseFloat(primary.used_gb)  : 0;
-        var total = primary.total_gb !== undefined ? parseFloat(primary.total_gb) : 0;
-        updateDonut(charts.diskDonut, used, total);
-        setText('disk-donut-center', dpct.toFixed(1) + '%');
-        setText('ring-disk-val', dpct.toFixed(0) + '%');
-        updateRing(charts.ringDisk, dpct);
-        if (modalIsLiveFor('disk')) {
-          updateDonut(modalChart, used, total);
-          setText('chart-modal-donut-center', dpct.toFixed(1) + '%');
-          renderModalDonutLegend(M.disk, used, total);
-        }
-      }
+      if (primary) updateRing(charts.ringDisk, parseFloat(primary.percent || 0), 'ring-disk-val');
     }
 
-    // ── Per-core CPU chart ──
-    if (d.cpu_per_core && Array.isArray(d.cpu_per_core) && charts.cores) {
-      var coresNow = d.cpu_per_core.map(function(v) { return +v || 0; });
-      [charts.cores, modalIsLiveFor('cores') ? modalChart : null].forEach(function(c) {
-        if (!c) return;
-        c.data.labels = coresNow.map(function(_, i) { return 'C' + i; });
-        c.data.datasets[0].data = coresNow.slice();
-        if (c.data.datasets[1]) c.data.datasets[1].data = coresNow.map(function() { return 100; });
-        c.update('none');
-      });
-    }
-
-    // ── Temperature gauge ──
-    if (charts.tempGauge) {
-      charts.tempGauge.$gaugeValue = temp;
-      charts.tempGauge.update('none');
-    }
-    setText('gauge-temp-val', temp ? temp.toFixed(0) + '°C' : '—');
-    if (modalIsLiveFor('temp')) {
-      modalChart.$gaugeValue = temp;
-      modalChart.update('none');
-      var mgv = document.getElementById('chart-modal-gauge-val');
-      var mgs = document.getElementById('chart-modal-gauge-status');
-      if (mgv) { mgv.textContent = temp ? temp.toFixed(0) + '°C' : '—'; }
-      if (mgs) { mgs.textContent = ts.text; mgs.style.color = ts.color; }
-    }
-    var gsEl = document.getElementById('gauge-temp-status');
-    if (gsEl) { gsEl.textContent = ts.text; gsEl.style.color = ts.color; }
+    // ── Analytics cards (live gauges / current values) ──
+    anLive(d);
 
     // ── System Overview rings (CPU / RAM / Swap) ──
     updateRing(charts.ringCpu,  cpu,  'ring-cpu-val');
@@ -1564,351 +1317,8 @@ function updateLiveRate(status) {
   liveMs = want;
   liveInterval.stop();
   liveInterval = RM.poll(pollLive, liveMs);
-  if (!histBaseState) liveInterval.start(false);
+  liveInterval.start(false);
 }
-
-// ── History range filter ─────────────────────────────────────────────────
-// Lets the person pick an older date/time window and see it charted instead
-// of the live last-60-readings view. Swaps chart data in place (same Chart.js
-// instances) rather than rebuilding charts, and pauses live polling while
-// browsing so the fetched history doesn't get overwritten mid-view.
-var histBaseState = null;  // snapshot of live-mode chart data, for "Back to Live"
-
-// Snapshot what the charts currently show (they've been ticking since page
-// load), not the page-load seed arrays.
-function snapshotLiveState() {
-  var c = charts.cpuArea, n = charts.netBar;
-  return {
-    labels:    c ? c.data.labels.slice() : labels.slice(),
-    cpu:       c ? c.data.datasets[0].data.slice() : cpuData.slice(),
-    netLabels: n ? n.data.labels.slice() : labels.slice(),
-    sent:      n ? n.data.datasets[0].data.slice() : sentData.slice(),
-    recv:      n ? n.data.datasets[1].data.slice() : recvData.slice(),
-  };
-}
-
-// datetime-local values are browser-local wall time; send them as an absolute
-// ISO instant so the server doesn't have to guess the viewer's timezone.
-function localInputToIso(v) {
-  var t = new Date(v);
-  return isNaN(t) ? v : t.toISOString();
-}
-
-function setChartData(chart, lbls, data) {
-  if (!chart) return;
-  chart.data.labels = lbls;
-  chart.data.datasets[0].data = data;
-  chart.update('none');
-}
-
-function setNetBarData(chart, lbls, sentArr, recvArr) {
-  if (!chart) return;
-  chart.data.labels = lbls;
-  chart.data.datasets[0].data = sentArr;
-  chart.data.datasets[1].data = recvArr;
-  chart.update('none');
-}
-
-function fmtHistLabel(iso) {
-  // "2026-08-21T10:30:00" -> "08-21 10:30"
-  var t = String(iso).replace('T', ' ');
-  return t.length >= 16 ? t.slice(5, 16) : t;
-}
-
-async function loadHistory() {
-  var fromEl  = document.getElementById('hist-from');
-  var toEl    = document.getElementById('hist-to');
-  var status  = document.getElementById('hist-status');
-  var liveBtn = document.getElementById('hist-live-btn');
-
-  if (!fromEl.value || !toEl.value) {
-    status.textContent = 'Pick both a From and To date/time.';
-    status.className = 'history-bar-title-sub history-status warn';
-    return;
-  }
-
-  status.textContent = 'Loading…';
-  status.className = 'history-bar-title-sub history-status';
-
-  try {
-    var url = '/servers/' + TABLE + '/history' +
-      '?start=' + encodeURIComponent(localInputToIso(fromEl.value)) +
-      '&end='   + encodeURIComponent(localInputToIso(toEl.value));
-    var r = await fetch(url);
-    var d = await r.json();
-
-    if (d.error) {
-      status.textContent = d.error;
-      status.className = 'history-bar-title-sub history-status err';
-      return;
-    }
-    if (!d.count) {
-      status.textContent = 'No data in that range.';
-      status.className = 'history-bar-title-sub history-status warn';
-      return;
-    }
-
-    // Snapshot live data + pause polling the first time we enter history mode
-    if (!histBaseState) {
-      histBaseState = snapshotLiveState();
-      liveInterval.stop();
-    }
-
-    var lbls = d.labels.map(fmtHistLabel);
-    setChartData(charts.cpuArea, lbls, d.cpu);
-    setNetBarData(charts.netBar, lbls, d.net_sent, d.net_recv);
-
-    status.textContent = d.count + ' points loaded for that range.';
-    status.className = 'history-bar-title-sub history-status ok';
-    liveBtn.style.display = '';
-  } catch (e) {
-    status.textContent = 'Failed to load history.';
-    status.className = 'history-bar-title-sub history-status err';
-  }
-}
-
-function backToLive() {
-  if (!histBaseState) return;
-  setChartData(charts.cpuArea, histBaseState.labels, histBaseState.cpu);
-  setNetBarData(charts.netBar, histBaseState.netLabels, histBaseState.sent, histBaseState.recv);
-  histBaseState = null;
-
-  document.getElementById('hist-live-btn').style.display = 'none';
-  var status = document.getElementById('hist-status');
-  status.textContent = 'Showing live data — last 60 readings';
-  status.className = 'history-bar-title-sub';
-  document.querySelectorAll('#hist-presets .hist-preset-btn').forEach(function(b){ b.classList.remove('active'); });
-
-  liveInterval.start();
-}
-
-// ── Quick-range presets ──
-function toLocalInputValue(d) {
-  var pad = function(n) { return String(n).padStart(2, '0'); };
-  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
-    'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-}
-
-document.querySelectorAll('#hist-presets .hist-preset-btn').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('#hist-presets .hist-preset-btn').forEach(function(b) { b.classList.remove('active'); });
-    btn.classList.add('active');
-    var mins = parseInt(btn.dataset.mins, 10);
-    var now  = new Date();
-    var from = new Date(now.getTime() - mins * 60000);
-    document.getElementById('hist-from').value = toLocalInputValue(from);
-    document.getElementById('hist-to').value   = toLocalInputValue(now);
-    loadHistory();
-  });
-});
-
-// ── Chart expand modal ───────────────────────────────────────────────────
-// Click the ⤢ button on any dashboard card to see a bigger version. Time
-// series charts (CPU / Net / Per-core) get the same From/To + preset filter
-// as the main page; donut/gauge widgets are point-in-time snapshots, so the
-// modal shows a larger read-only view with a short note instead.
-var modalChart = null;
-var modalKind  = null;
-var modalHistBase = null;
-
-// The modal defaults to LIVE — it only freezes on a fixed range once you
-// actually apply a preset/From-To filter inside it (modalHistBase gets set
-// at that point). Clicking "Back to Live" clears modalHistBase and this
-// resumes ticking again, same as the small card behind it.
-function modalIsLiveFor(kind) {
-  return !!modalChart && modalKind === kind && !modalHistBase;
-}
-
-function renderModalDonutLegend(colorVar, used, total) {
-  var legendEl = document.getElementById('chart-modal-donut-legend');
-  if (!legendEl) return;
-  var free = Math.max(0, (total || 0) - (used || 0));
-  legendEl.innerHTML =
-    '<div class="donut-legend-item"><span class="dot" style="background:' + RM.cssBg(colorVar) + ';"></span>Used <b>' + (used || 0).toFixed(1) + ' GB</b></div>' +
-    '<div class="donut-legend-item"><span class="dot" style="background:var(--chart-track);"></span>Free <b>' + free.toFixed(1) + ' GB</b></div>' +
-    '<div class="donut-legend-item total">Total <b>' + (total || 0).toFixed(1) + ' GB</b></div>';
-}
-
-function closeChartModal() {
-  document.getElementById('chart-modal-backdrop').classList.remove('open');
-  if (modalChart) { modalChart.destroy(); modalChart = null; }
-  modalKind = null;
-  modalHistBase = null;
-}
-
-function openChartModal(kind) {
-  modalKind = kind;
-  modalHistBase = null;
-
-  var titleEl    = document.getElementById('chart-modal-title-text');
-  var filterEl   = document.getElementById('chart-modal-filter');
-  var noteEl     = document.getElementById('chart-modal-note');
-  var donutWrap  = document.getElementById('chart-modal-donut-wrap');
-  var gaugeWrap  = document.getElementById('chart-modal-gauge-wrap');
-  var canvasWrap = document.getElementById('chart-modal-canvas-wrap');
-
-  var legendEl = document.getElementById('chart-modal-legend');
-  filterEl.style.display   = 'none';
-  noteEl.style.display     = 'none';
-  legendEl.style.display   = 'none';
-  donutWrap.style.display  = 'none';
-  gaugeWrap.style.display  = 'none';
-  canvasWrap.style.display = 'none';
-  document.getElementById('modal-hist-live-btn').style.display = 'none';
-  document.getElementById('modal-hist-status').textContent = '';
-  document.querySelectorAll('#modal-hist-presets .hist-preset-btn').forEach(function(b) { b.classList.remove('active'); });
-
-  if (modalChart) { modalChart.destroy(); modalChart = null; }
-  // Open first so the canvas has its real size when Chart.js measures it.
-  document.getElementById('chart-modal-backdrop').classList.add('open');
-
-  if (kind === 'cpu') {
-    titleEl.textContent = 'CPU Usage %';
-    filterEl.style.display = 'flex';
-    canvasWrap.style.display = 'block';
-    modalChart = makeChart('chart-modal-canvas', charts.cpuArea ? charts.cpuArea.data.datasets[0].data : [], M.cpu, 100, true);
-    if (charts.cpuArea) { modalChart.data.labels = charts.cpuArea.data.labels.slice(); modalChart.update(); }
-
-  } else if (kind === 'net') {
-    titleEl.textContent = 'Net Traffic (KB/s)';
-    filterEl.style.display = 'flex';
-    canvasWrap.style.display = 'block';
-    if (charts.netBar) {
-      modalChart = makeNetBar('chart-modal-canvas', charts.netBar.data.datasets[0].data, charts.netBar.data.datasets[1].data, true);
-      legendEl.innerHTML = '<span><i class="key-line" style="background:var(--g-sunset)"></i>Upload</span>' +
-                           '<span><i class="key-line" style="background:var(--g-ocean)"></i>Download</span>';
-      legendEl.style.display = 'flex';
-      modalChart.data.labels = charts.netBar.data.labels.slice();
-      modalChart.update();
-    }
-
-  } else if (kind === 'cores') {
-    titleEl.textContent = 'CPU per core (now)';
-    noteEl.textContent = 'Current usage of each core, updating live. Historical range filtering isn\'t available for per-core data.';
-    noteEl.style.display = 'block';
-    canvasWrap.style.display = 'block';
-    if (charts.cores) {
-      modalChart = makeCoresChart('chart-modal-canvas', charts.cores.data.datasets[0].data);
-    }
-
-  } else if (kind === 'ram' || kind === 'swap' || kind === 'disk') {
-    var cfg = {
-      ram:  { title: 'RAM Usage',  chart: charts.ramDonut,  color: M.ram },
-      swap: { title: 'Swap Usage', chart: charts.swapDonut, color: M.swap },
-      disk: { title: 'Disk Usage', chart: charts.diskDonut, color: M.disk },
-    }[kind];
-    titleEl.textContent = cfg.title;
-    noteEl.textContent = 'This is a point-in-time snapshot — historical range filtering doesn\'t apply to a current usage breakdown.';
-    noteEl.style.display = 'block';
-    donutWrap.style.display = 'flex';
-    if (cfg.chart) {
-      var data = cfg.chart.data.datasets[0].data;
-      var total = (data[0] || 0) + (data[1] || 0);
-      modalChart = makeDonut('chart-modal-donut', data[0] || 0, total, cfg.color);
-      var upct = total > 0 ? (data[0] / total * 100) : 0;
-      document.getElementById('chart-modal-donut-center').textContent = upct.toFixed(1) + '%';
-      renderModalDonutLegend(cfg.color, data[0] || 0, total);
-    }
-
-  } else if (kind === 'temp') {
-    titleEl.textContent = 'Temperature (°C)';
-    noteEl.textContent = 'This is a point-in-time snapshot — historical range filtering doesn\'t apply to a gauge reading.';
-    noteEl.style.display = 'block';
-    gaugeWrap.style.display = 'flex';
-    var val = charts.tempGauge ? charts.tempGauge.$gaugeValue : 0;
-    modalChart = RM.chart('chart-modal-gauge', {
-      type: 'doughnut',
-      data: { datasets: [gaugeDataset()] },
-      options: {
-        responsive: true, maintainAspectRatio: false, animation: false,
-        rotation: -90, circumference: 180, cutout: '75%',
-        plugins: { legend: { display: false }, tooltip: { enabled: false } }
-      },
-      plugins: [gaugeNeedlePlugin]
-    });
-    modalChart.$gaugeValue = val;
-    modalChart.update();
-    var ts = tempStatusLabel(val);
-    var gv = document.getElementById('chart-modal-gauge-val');
-    var gs = document.getElementById('chart-modal-gauge-status');
-    gv.textContent = val.toFixed(0) + '°C';
-    gs.textContent = ts.text; gs.style.color = ts.color;
-  }
-}
-
-async function loadModalHistory() {
-  var fromEl  = document.getElementById('modal-hist-from');
-  var toEl    = document.getElementById('modal-hist-to');
-  var status  = document.getElementById('modal-hist-status');
-  var liveBtn = document.getElementById('modal-hist-live-btn');
-  if (!modalChart) return;
-
-  if (!fromEl.value || !toEl.value) {
-    status.textContent = 'Pick both a From and To date/time.';
-    status.className = 'history-status warn';
-    return;
-  }
-  status.textContent = 'Loading…';
-  status.className = 'history-status';
-
-  try {
-    var url = '/servers/' + TABLE + '/history' +
-      '?start=' + encodeURIComponent(localInputToIso(fromEl.value)) +
-      '&end='   + encodeURIComponent(localInputToIso(toEl.value));
-    var r = await fetch(url);
-    var d = await r.json();
-
-    if (d.error) { status.textContent = d.error; status.className = 'history-status err'; return; }
-    if (!d.count) { status.textContent = 'No data in that range.'; status.className = 'history-status warn'; return; }
-
-    if (!modalHistBase) {
-      modalHistBase = { labels: modalChart.data.labels.slice(), a: modalChart.data.datasets[0].data.slice() };
-      if (modalKind === 'net') modalHistBase.b = modalChart.data.datasets[1].data.slice();
-    }
-
-    var lbls = d.labels.map(fmtHistLabel);
-    modalChart.data.labels = lbls;
-    if (modalKind === 'cpu') {
-      modalChart.data.datasets[0].data = d.cpu;
-    } else if (modalKind === 'net') {
-      modalChart.data.datasets[0].data = d.net_sent;
-      modalChart.data.datasets[1].data = d.net_recv;
-    }
-    modalChart.update('none');
-
-    status.textContent = d.count + ' points loaded for that range.';
-    status.className = 'history-status ok';
-    liveBtn.style.display = '';
-  } catch (e) {
-    status.textContent = 'Failed to load history.';
-    status.className = 'history-status err';
-  }
-}
-
-function modalBackToLive() {
-  if (!modalHistBase || !modalChart) return;
-  modalChart.data.labels = modalHistBase.labels;
-  modalChart.data.datasets[0].data = modalHistBase.a;
-  if (modalKind === 'net' && modalHistBase.b) modalChart.data.datasets[1].data = modalHistBase.b;
-  modalChart.update('none');
-  modalHistBase = null;
-  document.getElementById('modal-hist-live-btn').style.display = 'none';
-  document.getElementById('modal-hist-status').textContent = '';
-  document.querySelectorAll('#modal-hist-presets .hist-preset-btn').forEach(function(b) { b.classList.remove('active'); });
-}
-
-document.querySelectorAll('#modal-hist-presets .hist-preset-btn').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('#modal-hist-presets .hist-preset-btn').forEach(function(b) { b.classList.remove('active'); });
-    btn.classList.add('active');
-    var mins = parseInt(btn.dataset.mins, 10);
-    var now  = new Date();
-    var from = new Date(now.getTime() - mins * 60000);
-    document.getElementById('modal-hist-from').value = toLocalInputValue(from);
-    document.getElementById('modal-hist-to').value   = toLocalInputValue(now);
-    loadModalHistory();
-  });
-});
 
 // ── Alert History pagination — 10 per page ───────────────────────────────
 var alertHistState = { offset: 0, limit: 10, total: {{ alert_total or 0 }} };
@@ -2125,8 +1535,693 @@ document.querySelectorAll('#uptime-presets .hist-preset-btn').forEach(function(b
     loadUptime();
   });
 });
+// ─────────────────────────────────────────────
+//  System Performance Analytics
+//  One card per metric: live gauge + status (fed by pollLive → anLive),
+//  trend + avg/peak/lowest from /metric-history (1H–30D or a custom range).
+// ─────────────────────────────────────────────
+var AN = {};            // key → card state
+var AN_FULL = null;     // card currently shown full screen
+
+function anFmt(v, unit, dp) {
+  if (v == null || isNaN(v)) return '—';
+  return (+v).toFixed(dp == null ? 1 : dp) + unit;
+}
+function fmtKBs(kb) {
+  if (kb == null || isNaN(kb)) return '—';
+  kb = +kb;
+  if (kb >= 1048576) return (kb / 1048576).toFixed(2) + ' GB/s';
+  if (kb >= 1024) return (kb / 1024).toFixed(kb >= 10240 ? 1 : 2) + ' MB/s';
+  return kb.toFixed(kb >= 100 ? 0 : 1) + ' KB/s';
+}
+function fmtMBs(mb) {
+  if (mb == null || isNaN(mb)) return '—';
+  mb = +mb;
+  if (mb >= 1024) return (mb / 1024).toFixed(2) + ' GB/s';
+  if (mb >= 1) return mb.toFixed(mb >= 100 ? 0 : 1) + ' MB/s';
+  return (mb * 1024).toFixed(0) + ' KB/s';
+}
+function fmtSize(bytes) {
+  if (bytes == null || isNaN(bytes)) return '—';
+  var u = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'], i = 0;
+  bytes = +bytes;
+  while (bytes >= 1024 && i < u.length - 1) { bytes /= 1024; i++; }
+  return bytes.toFixed(i < 2 ? 0 : bytes >= 100 ? 0 : 1) + ' ' + u[i];
+}
+function fmtGB(gb) {
+  if (gb == null || isNaN(gb)) return '—';
+  return +gb >= 1024 ? (gb / 1024).toFixed(2) + ' TB' : (+gb).toFixed(1) + ' GB';
+}
+function localInputToIso(v) {
+  var t = new Date(v);
+  return isNaN(t) ? v : t.toISOString();
+}
+function toLocalInputValue(d) {
+  var pad = function(n) { return String(n).padStart(2, '0'); };
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+    'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+// ── Status zones ──
+function anZonesHtml(metric, unit) {
+  var thr = AN_THR[metric] || [], out = [];
+  for (var i = 0; i <= thr.length; i++) {
+    var L = AN_LEVELS[i];
+    var txt = (metric === 'core' && i === 3) ? 'Overloaded' : L.text;
+    var range = i === 0 ? '< ' + thr[0] : i === thr.length ? '≥ ' + thr[i - 1] : thr[i - 1] + '–' + thr[i];
+    out.push('<span title="' + txt + '"><i style="background:var(' + L.color + ')' +
+      (L.solid ? ';outline:2px solid color-mix(in srgb,var(--red) 35%,transparent)' : '') + '"></i>' +
+      txt + ' ' + range + unit + '</span>');
+  }
+  return out.join('');
+}
+function anPill(el, L, text) {
+  if (!el) return;
+  el.className = 'an-pill' + (L && L.solid ? ' solid' : '');
+  el.style.color = L ? 'var(' + L.color + ')' : 'var(--text-muted)';
+  el.innerHTML = '<span>' + escHtml(text || (L ? L.text : '—')) + '</span>';
+}
+function anSet(c, name, text) { var el = c.f(name); if (el) el.textContent = text; }
+function anNow(c, text, L, sub) {
+  var el = c.f('now');
+  if (el) el.textContent = text;
+  if (sub !== undefined) anSet(c, 'nowsub', sub);
+}
+
+// ── Gauge: half ring in the metric's own colour (same look as the old
+// donuts); the status shows in the pill below it, not in the ring. ──
+function anMakeGauge(canvas, color, max, mode) {
+  var g = RM.chart(canvas, {
+    type: 'doughnut',
+    data: { datasets: [{ data: [0, max], rm: { bg: [color, M.track], mode: mode || 'arc' },
+                         borderWidth: 0, borderRadius: 99, spacing: 2 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      rotation: -90, circumference: 180, cutout: '76%',
+      plugins: { legend: { display: false }, tooltip: { enabled: false } }
+    }
+  });
+  if (g) g.$max = max;
+  return g;
+}
+function anSetGauge(g, v) {
+  if (!g) return;
+  var f = Math.min(Math.max(+v || 0, 0), g.$max);
+  g.data.datasets[0].data = [f, g.$max - f];
+  g.update('none');
+}
+
+// Faint dashed lines at the warning / critical levels, for reference.
+var anThresholdPlugin = {
+  id: 'anThresholds',
+  beforeDatasetsDraw: function(ch) {
+    var metric = ch.$metric;
+    if (!metric) return;
+    var a = ch.chartArea, y = ch.scales.y, cx = ch.ctx, unit = ch.$tick || '';
+    var col = RM.css('--text-muted');
+    (AN_THR[metric] || []).forEach(function(t) {
+      if (t < y.min || t > y.max) return;
+      var py = y.getPixelForValue(t);
+      cx.save();
+      cx.strokeStyle = RM.alpha(col, .45); cx.lineWidth = 1; cx.setLineDash([4, 4]);
+      cx.beginPath(); cx.moveTo(a.left, py); cx.lineTo(a.right, py); cx.stroke();
+      cx.setLineDash([]); cx.fillStyle = col; cx.font = '600 10px Inter, system-ui, sans-serif';
+      cx.textAlign = 'right'; cx.textBaseline = 'bottom';
+      cx.fillText(t + unit, a.right - 2, py - 2);
+      cx.restore();
+    });
+  }
+};
+
+// ── Level trend: area chart in the metric's colour (like the old CPU
+// chart), with a dot on the peak. Min/max per point show in the tooltip. ──
+function anMakeLevelTrend(canvas, metric, unit, yOpts, color) {
+  var tick = unit === '°C' ? '°' : unit;
+  var peakR = function(ctx) { return ctx.dataIndex === ctx.chart.$peakIdx ? 4 : 0; };
+  var ch = RM.chart(canvas, {
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label: 'Max', data: [], rm: { line: color }, borderWidth: 0, fill: false, order: 2,
+        pointRadius: peakR, pointHoverRadius: peakR, pointBorderWidth: 2 },
+      { label: 'Min', data: [], borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: false, order: 3 },
+      { label: 'Average', data: [], rm: { line: color, fill: 'gradient' }, fill: 'origin',
+        borderWidth: 2.5, cubicInterpolationMode: 'monotone', order: 1 }
+    ] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false, spanGaps: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          filter: function(i) { return i.raw != null; },
+          itemSort: function(a, b) { return b.raw - a.raw; },
+          callbacks: { label: function(c) { return ' ' + c.dataset.label + ': ' + (+c.raw).toFixed(1) + unit; } }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 6, autoSkip: true, maxRotation: 0 } },
+        y: Object.assign({ border: { display: false },
+             ticks: { maxTicksLimit: 5, callback: function(v) { return v + tick; } } }, yOpts || {})
+      }
+    },
+    plugins: [anThresholdPlugin]
+  });
+  if (ch) { ch.$metric = metric; ch.$tick = tick; }
+  return ch;
+}
+function anLevelLegend(color) {
+  var bg = RM.cssBg(color);
+  return '<span class="an-key"><i style="background:' + bg + '"></i>Average</span>' +
+    '<span class="an-key"><i class="band" style="background:' + bg + ';border-radius:50%;width:8px;height:8px"></i>Peak</span>' +
+    '<span class="an-key"><i style="background:none;border-top:1px dashed var(--text-muted);height:0"></i>Warning / critical level</span>';
+}
+
+// ── Rate trend (net / disk I/O): two series on one axis ──
+function anMakeRateTrend(canvas, lines, fmt) {
+  return RM.chart(canvas, {
+    type: 'line',
+    data: { labels: [], datasets: lines.map(function(l) {
+      return { label: l.label, data: [], rm: { line: l.color, fill: 'gradient' }, fill: 'origin',
+               cubicInterpolationMode: 'monotone', borderWidth: 2.2 };
+    }) },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false, spanGaps: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          filter: function(i) { return i.raw != null; },
+          callbacks: { label: function(c) { return ' ' + c.dataset.label + ': ' + fmt(c.raw); } }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 6, autoSkip: true, maxRotation: 0 } },
+        y: { min: 0, grace: '10%', border: { display: false },
+             ticks: { maxTicksLimit: 5, callback: function(v) { return fmt(v); } } }
+      }
+    }
+  });
+}
+
+function anStatsHtml(items) {
+  return items.map(function(s) {
+    return '<div><span class="an-stat-lbl">' + escHtml(s.label) + '</span>' +
+      '<span class="an-stat-val"' + (s.color ? ' style="color:' + s.color + '"' : '') + '>' + escHtml(s.value) + '</span>' +
+      '<span class="an-stat-at">' + escHtml(s.sub || '') + '</span></div>';
+  }).join('');
+}
+function anWithDate(d) { return (d.window_end - d.window_start) > 86400 * 1.01; }
+function anLabels(d) {
+  var wd = anWithDate(d);
+  return (d.points || []).map(function(p) { return fmtTs(p.t, wd); });
+}
+
+// ── Card factory ──
+function anCard(key, cfg) {
+  var el = document.getElementById('an-' + key);
+  if (!el) return null;
+  var c = { key: key, el: el, cfg: cfg, metric: cfg.metric || key, zone: cfg.zone || cfg.metric || key,
+            hours: 1, range: null, seq: 0, loadedAt: 0, data: null };
+  c.f = function(n) { return el.querySelector('[data-f="' + n + '"]'); };
+  if (!c.f('chart')) {   // card without data (e.g. no per-core reporting)
+    var tools = el.querySelector('.an-tools');
+    if (tools) tools.style.display = 'none';
+    return null;
+  }
+  el.querySelectorAll('.an-tools .an-range-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      anSetHours(c, parseInt(btn.dataset.hours, 10));
+      anLoad(c);
+      anSyncMode();
+    });
+  });
+  el.querySelector('[data-act="csv"]').addEventListener('click', function() {
+    window.location.href = anUrl(c) + '&format=csv';
+  });
+  el.querySelector('[data-act="expand"]').addEventListener('click', function() { anToggleFull(c); });
+  var zones = c.f('zones');
+  if (zones) zones.innerHTML = anZonesHtml(c.zone, cfg.unit === '°C' ? '°' : '%');
+  var legend = cfg.legend !== undefined ? cfg.legend : (cfg.color ? anLevelLegend(cfg.color) : '');
+  if (legend) c.f('legend').innerHTML = legend;
+  if (cfg.gaugeMax) c.gauge = anMakeGauge(c.f('gauge'), cfg.gaugeColor || cfg.color, cfg.gaugeMax, cfg.gaugeMode);
+  if (cfg.init) cfg.init(c);
+  AN[key] = c;
+  return c;
+}
+function anAll(fn) { Object.keys(AN).forEach(function(k) { fn(AN[k]); }); }
+function anSetHours(c, h) {
+  c.hours = h; c.range = null;
+  c.el.querySelectorAll('.an-tools .an-range-btn').forEach(function(b) {
+    b.classList.toggle('active', parseInt(b.dataset.hours, 10) === h);
+  });
+}
+function anSetRange(c, range) {
+  c.range = range;
+  c.el.querySelectorAll('.an-tools .an-range-btn').forEach(function(b) { b.classList.remove('active'); });
+}
+function anUrl(c, metric) {
+  var u = '/servers/' + TABLE + '/metric-history?metric=' + (metric || c.metric);
+  u += c.range ? '&start=' + encodeURIComponent(c.range.start) + '&end=' + encodeURIComponent(c.range.end)
+               : '&hours=' + c.hours;
+  if (c.cfg.params) u += c.cfg.params(c);
+  return u;
+}
+async function anFetchJson(url) {
+  var r = await fetch(url);
+  var d = await r.json();
+  if (!r.ok || d.error) throw new Error(d.error || ('HTTP ' + r.status));
+  return d;
+}
+async function anLoad(c, quiet) {
+  var seq = ++c.seq, st = c.f('status');
+  if (st && !quiet) { st.classList.remove('err'); st.textContent = 'Loading…'; }
+  try {
+    var d = await anFetchJson(anUrl(c));
+    if (seq !== c.seq) return;
+    c.data = d; c.loadedAt = Date.now();
+    if (st) { st.classList.remove('err'); st.textContent = ''; }
+    c.cfg.render(c, d);
+  } catch (e) {
+    if (seq !== c.seq) return;
+    c.loadedAt = Date.now();   // don't hammer a failing endpoint
+    if (st) { st.classList.add('err'); st.textContent = /^HTTP/.test(e.message) ? 'Could not load history.' : e.message; }
+    console.error(c.key + ' history fetch failed', e);
+  }
+  if (c.cfg.afterLoad) c.cfg.afterLoad(c, quiet);
+}
+
+function anRenderLevel(c, d) {
+  var unit = c.cfg.unit || '%', pts = d.points || [];
+  if (!c.chart) c.chart = anMakeLevelTrend(c.f('chart'), c.zone, unit, c.cfg.y, c.cfg.color);
+  var ch = c.chart;
+  if (ch) {
+    ch.data.labels = anLabels(d);
+    ch.data.datasets[0].data = pts.map(function(p) { return p.max; });
+    ch.data.datasets[1].data = pts.map(function(p) { return p.min; });
+    ch.data.datasets[2].data = pts.map(function(p) { return p.avg; });
+    ch.$peakIdx = d.max ? pts.findIndex(function(p) { return p.t === d.max.t; }) : -1;
+    ch.update('none');
+  }
+  c.f('empty').hidden = !!d.samples;
+  var wd = anWithDate(d);
+  function col() { return null; }
+  var mx = d.max && d.max.value, mn = d.min && d.min.value;
+  var items = [
+    { label: 'Average', value: anFmt(d.avg, unit), color: col(d.avg), sub: d.samples ? d.samples.toLocaleString() + ' readings' : '' },
+    { label: 'Peak',    value: anFmt(mx, unit), color: col(mx), sub: d.max ? 'at ' + fmtTs(d.max.t, wd) : '' },
+    { label: 'Lowest',  value: anFmt(mn, unit), color: col(mn), sub: d.min ? 'at ' + fmtTs(d.min.t, wd) : '' }
+  ];
+  if (c.cfg.extraStats) items = items.concat(c.cfg.extraStats(c, d));
+  c.f('stats').innerHTML = anStatsHtml(items);
+}
+
+// o: {key, canvas, stats, empty, lines, fmt, total, labels[6]}
+function anRenderRate(c, d, o) {
+  var pts = d.points || [];
+  if (!c[o.key]) c[o.key] = anMakeRateTrend(o.canvas, o.lines, o.fmt);
+  var ch = c[o.key];
+  if (ch) {
+    ch.data.labels = anLabels(d);
+    ch.data.datasets[0].data = pts.map(function(p) { return p.a; });
+    ch.data.datasets[1].data = pts.map(function(p) { return p.b; });
+    ch.update('none');
+  }
+  o.empty.hidden = !!d.samples;
+  var wd = anWithDate(d), L = o.labels;
+  function at(p) { return p ? 'at ' + fmtTs(p.t, wd) : ''; }
+  o.stats.innerHTML = anStatsHtml([
+    { label: L[0], value: o.fmt(d.a_peak && d.a_peak.value), sub: at(d.a_peak) },
+    { label: L[1], value: o.fmt(d.a_avg) },
+    { label: L[2], value: d.samples ? o.total(d.a_total) : '—', sub: 'in this range' },
+    { label: L[3], value: o.fmt(d.b_peak && d.b_peak.value), sub: at(d.b_peak) },
+    { label: L[4], value: o.fmt(d.b_avg) },
+    { label: L[5], value: d.samples ? o.total(d.b_total) : '—', sub: 'in this range' }
+  ]);
+}
+
+// ── Full screen ──
+function anToggleFull(c) {
+  if (AN_FULL && AN_FULL !== c) anToggleFull(AN_FULL);
+  var on = !c.el.classList.contains('an-full');
+  c.el.classList.toggle('an-full', on);
+  document.getElementById('an-backdrop').hidden = !on;
+  document.body.classList.toggle('an-noscroll', on);
+  var btn = c.el.querySelector('[data-act="expand"]');
+  btn.textContent = on ? '✕' : '⤢';
+  btn.title = on ? 'Close full screen (Esc)' : 'Full screen (Esc to close)';
+  AN_FULL = on ? c : null;
+}
+document.getElementById('an-backdrop').addEventListener('click', function() { if (AN_FULL) anToggleFull(AN_FULL); });
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && AN_FULL) anToggleFull(AN_FULL); });
+
+// ── "All charts" range bar ──
+function anSyncMode() {
+  var mode = document.getElementById('an-mode');
+  var hours = null, same = true, custom = null;
+  anAll(function(c) {
+    if (c.range) custom = c.range;
+    var k = c.range ? 'r' : c.hours;
+    if (hours === null) hours = k; else if (hours !== k) same = false;
+  });
+  document.querySelectorAll('#an-global-range .an-range-btn').forEach(function(b) {
+    b.classList.toggle('active', same && parseInt(b.dataset.hours, 10) === hours);
+  });
+  document.getElementById('an-live-btn').hidden = !custom;
+  if (custom) {
+    mode.textContent = 'Custom range: ' + new Date(custom.start).toLocaleString() + ' → ' + new Date(custom.end).toLocaleString();
+    mode.className = 'an-subtitle';
+  } else {
+    mode.textContent = 'Gauges update live · trends refresh automatically';
+    mode.className = 'an-subtitle';
+  }
+}
+document.querySelectorAll('#an-global-range .an-range-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var h = parseInt(btn.dataset.hours, 10);
+    anAll(function(c) { anSetHours(c, h); anLoad(c); });
+    anSyncMode();
+  });
+});
+document.getElementById('an-apply').addEventListener('click', function() {
+  var from = document.getElementById('an-from').value, to = document.getElementById('an-to').value;
+  var mode = document.getElementById('an-mode');
+  if (!from || !to) { mode.textContent = 'Pick both a From and To date/time.'; mode.className = 'an-subtitle history-status warn'; return; }
+  var range = { start: localInputToIso(from), end: localInputToIso(to) };
+  if (new Date(range.end) <= new Date(range.start)) { mode.textContent = '"To" must be after "From".'; mode.className = 'an-subtitle history-status warn'; return; }
+  anAll(function(c) { anSetRange(c, range); anLoad(c); });
+  anSyncMode();
+});
+document.getElementById('an-live-btn').addEventListener('click', function() {
+  anAll(function(c) { anSetHours(c, 1); anLoad(c); });
+  anSyncMode();
+});
+(function() {   // sensible defaults for the custom range inputs: the last 24h
+  var now = new Date();
+  document.getElementById('an-from').value = toLocalInputValue(new Date(now.getTime() - 86400000));
+  document.getElementById('an-to').value = toLocalInputValue(now);
+})();
+
+// ── Live values from pollLive ──
+function anLive(d) {
+  anAll(function(c) {
+    if (!c.cfg.live) return;
+    try { c.cfg.live(c, d); } catch (e) { console.error(c.key + ' live update failed', e); }
+  });
+}
+function anRealParts(parts) {
+  return (Array.isArray(parts) ? parts : []).filter(function(p) { return p && (p.fstype || '') !== 'squashfs'; });
+}
+
+// ── The cards ──
+var AN_PCT_Y = { min: 0, max: 100 };
+
+anCard('cpu', {
+  unit: '%', gaugeMax: 100, y: AN_PCT_Y, color: M.cpu, render: anRenderLevel,
+  live: function(c, d) {
+    var v = +d.cpu_percent || 0, L = anLevel('cpu', v);
+    anSetGauge(c.gauge, v, L);
+    anNow(c, v.toFixed(1) + '%', L, 'overall');
+    anPill(c.f('pill'), L);
+    anSet(c, 'freq', d.cpu_freq_mhz ? (d.cpu_freq_mhz / 1000).toFixed(2) + ' GHz' : '—');
+    var cores = Array.isArray(d.cpu_per_core) ? d.cpu_per_core.map(function(x) { return +x || 0; }) : [];
+    anSet(c, 'cores', cores.length || '—');
+    if (cores.length) {
+      var hi = cores.indexOf(Math.max.apply(null, cores));
+      anSet(c, 'busiest', 'C' + hi + ' · ' + cores[hi].toFixed(0) + '%');
+    }
+  }
+});
+
+anCard('ram', {
+  unit: '%', gaugeMax: 100, y: AN_PCT_Y, color: M.ram, render: anRenderLevel,
+  live: function(c, d) {
+    var v = +d.ram_percent || 0, L = anLevel('ram', v);
+    var used = +d.ram_used_gb || 0, total = +d.ram_total_gb || 0;
+    anSetGauge(c.gauge, v, L);
+    anNow(c, v.toFixed(1) + '%', L, fmtGB(used) + ' / ' + fmtGB(total));
+    anPill(c.f('pill'), L);
+    anSet(c, 'used', fmtGB(used));
+    anSet(c, 'free', fmtGB(Math.max(0, total - used)));
+    anSet(c, 'total', fmtGB(total));
+  }
+});
+
+anCard('swap', {
+  unit: '%', gaugeMax: 100, y: AN_PCT_Y, color: M.swap, render: anRenderLevel,
+  live: function(c, d) {
+    var total = +d.swap_total_gb || 0, used = +d.swap_used_gb || 0;
+    if (!total) {
+      anSetGauge(c.gauge, 0, null);
+      anNow(c, '—', null, 'no swap configured');
+      anPill(c.f('pill'), null, 'No swap');
+      anSet(c, 'used', '—'); anSet(c, 'free', '—'); anSet(c, 'total', '0 GB');
+      return;
+    }
+    var v = +d.swap_percent || 0, L = anLevel('swap', v);
+    anSetGauge(c.gauge, v, L);
+    anNow(c, v.toFixed(1) + '%', L, fmtGB(used) + ' / ' + fmtGB(total));
+    anPill(c.f('pill'), L);
+    anSet(c, 'used', fmtGB(used));
+    anSet(c, 'free', fmtGB(Math.max(0, total - used)));
+    anSet(c, 'total', fmtGB(total));
+  }
+});
+
+anCard('temp', {
+  unit: '°C', gaugeMax: 100, y: { suggestedMin: 30, suggestedMax: 70, grace: '5%' },
+  color: M.temp, gaugeColor: 'g:heat', gaugeMode: 'h', render: anRenderLevel,
+  init: function(c) {
+    var thr = AN_THR.temp || [];
+    anSet(c, 'warn', thr[0] != null ? thr[0] + '°C' : '—');
+    anSet(c, 'crit', thr[1] != null ? thr[1] + '°C' : '—');
+  },
+  live: function(c, d) {
+    var v = +d.cpu_temp || 0;
+    if (!v) {
+      anSetGauge(c.gauge, 0, null);
+      anNow(c, '—', null, 'no sensor reported');
+      anPill(c.f('pill'), null, 'No sensor');
+      anSet(c, 'head', '—');
+      return;
+    }
+    var L = anLevel('temp', v), crit = (AN_THR.temp || [])[1];
+    anSetGauge(c.gauge, v, L);
+    anNow(c, v.toFixed(0) + '°C', L, 'CPU package');
+    anPill(c.f('pill'), L);
+    anSet(c, 'head', crit != null ? (crit - v > 0 ? (crit - v).toFixed(0) + '°C' : 'none') : '—');
+  }
+});
+
+// Disk: gauge + trend for the selected partition, read/write speed, partition table.
+var AN_DISKIO = {
+  lines: [{ label: 'Read', color: 'g:mint' }, { label: 'Write', color: 'g:sunset' }],
+  labels: ['Peak read', 'Avg read', 'Read total', 'Peak write', 'Avg write', 'Written']
+};
+anCard('disk', {
+  unit: '%', gaugeMax: 100, y: AN_PCT_Y, color: M.disk, render: anRenderLevel,
+  params: function(c) { return '&mount=' + encodeURIComponent(c.mount || '/'); },
+  init: function(c) {
+    c.mount = {{ (disk_primary.mountpoint if disk_primary else '/') | tojson }};
+    c.parts = [];
+    c.f('select').addEventListener('change', function() { anDiskSelect(c, this.value); });
+    c.f('parts').addEventListener('click', function(e) {
+      var tr = e.target.closest('tr[data-mount]');
+      if (tr) anDiskSelect(c, tr.dataset.mount);
+    });
+  },
+  extraStats: function(c, d) {
+    if (d.first == null || d.last == null) return [];
+    var ch = d.last - d.first;
+    return [{ label: 'Change', value: (ch >= 0 ? '+' : '') + ch.toFixed(1) + ' pts',
+              sub: 'over this range' }];
+  },
+  afterLoad: function(c, quiet) { anLoadDiskIo(c, quiet); },
+  live: function(c, d) {
+    if (d.disk_read_mbs !== undefined) {
+      anSet(c, 'io-read', fmtMBs(d.disk_read_mbs));
+      anSet(c, 'io-write', fmtMBs(d.disk_write_mbs));
+    }
+    if (!d.disk_partitions) return;
+    c.parts = anRealParts(d.disk_partitions);
+    var mounts = c.parts.map(function(p) { return p.mountpoint; });
+    if (mounts.length && mounts.indexOf(c.mount) < 0) c.mount = mounts[0];
+    var sel = c.f('select'), key = mounts.join('\n');
+    if (sel.dataset.key !== key) {
+      sel.innerHTML = mounts.map(function(m) { return '<option>' + escHtml(m) + '</option>'; }).join('');
+      sel.dataset.key = key;
+    }
+    sel.value = c.mount;
+    anDiskLive(c);
+  }
+});
+function anDiskSelect(c, mount) {
+  if (mount === c.mount) return;
+  c.mount = mount;
+  c.f('select').value = mount;
+  anDiskLive(c);
+  anLoad(c);
+}
+function anDiskLive(c) {
+  var p = c.parts.find(function(x) { return x.mountpoint === c.mount; });
+  if (p) {
+    var v = parseFloat(p.percent || 0), L = anLevel('disk', v);
+    var used = parseFloat(p.used_gb || 0), total = parseFloat(p.total_gb || 0);
+    var free = p.free_gb != null ? parseFloat(p.free_gb) : Math.max(0, total - used);
+    anSetGauge(c.gauge, v, L);
+    anNow(c, v.toFixed(1) + '%', L, c.mount);
+    anPill(c.f('pill'), L);
+    anSet(c, 'used', fmtGB(used)); anSet(c, 'free', fmtGB(free)); anSet(c, 'total', fmtGB(total));
+  }
+  c.f('parts').innerHTML = c.parts.map(function(x) {
+    var v = parseFloat(x.percent || 0), col = 'var(--g-sunset)';
+    var total = parseFloat(x.total_gb || 0), used = parseFloat(x.used_gb || 0);
+    var free = x.free_gb != null ? parseFloat(x.free_gb) : Math.max(0, total - used);
+    return '<tr data-mount="' + escHtml(x.mountpoint) + '"' + (x.mountpoint === c.mount ? ' class="sel"' : '') + ' title="Show this partition">' +
+      '<td class="mono">' + escHtml(x.mountpoint) + '</td>' +
+      '<td>' + escHtml(x.fstype || '—') + '</td>' +
+      '<td>' + fmtGB(total) + '</td><td>' + fmtGB(used) + '</td><td>' + fmtGB(free) + '</td>' +
+      '<td><div class="an-part-bar"><div><i style="width:' + Math.min(v, 100).toFixed(1) + '%;background:' + col + '"></i></div>' +
+      '<b>' + v.toFixed(1) + '%</b></div></td></tr>';
+  }).join('') || '<tr><td colspan="6" style="color:var(--text-muted)">No partitions reported.</td></tr>';
+}
+async function anLoadDiskIo(c, quiet) {
+  var seq = c.ioSeq = (c.ioSeq || 0) + 1, st = c.f('iostatus');
+  if (!quiet) { st.classList.remove('err'); st.textContent = 'Loading…'; }
+  try {
+    var d = await anFetchJson(anUrl(c, 'diskio'));
+    if (seq !== c.ioSeq) return;
+    st.textContent = '';
+    anRenderRate(c, d, { key: 'ioChart', canvas: c.f('iochart'), stats: c.f('iostats'), empty: c.f('ioempty'),
+      lines: AN_DISKIO.lines, labels: AN_DISKIO.labels, fmt: fmtMBs,
+      total: function(mb) { return fmtSize(mb * 1048576); } });
+  } catch (e) {
+    if (seq !== c.ioSeq) return;
+    st.classList.add('err'); st.textContent = 'Could not load disk I/O history.';
+    console.error('disk io history fetch failed', e);
+  }
+}
+
+// Network: live download/upload + dual-line trend.
+var AN_NET = {
+  lines: [{ label: 'Download', color: 'g:ocean' }, { label: 'Upload', color: M.up }],
+  labels: ['Peak ↓', 'Avg ↓', 'Received', 'Peak ↑', 'Avg ↑', 'Sent']
+};
+anCard('net', {
+  legend: '<span class="an-key"><i style="background:var(--g-ocean)"></i>Download</span>' +
+          '<span class="an-key"><i style="background:var(--g-sunset)"></i>Upload</span>',
+  render: function(c, d) {
+    anRenderRate(c, d, { key: 'chart', canvas: c.f('chart'), stats: c.f('stats'), empty: c.f('empty'),
+      lines: AN_NET.lines, labels: AN_NET.labels, fmt: fmtKBs, total: fmtSize });
+  },
+  live: function(c, d) {
+    var online = d.status === 'online';
+    anPill(c.f('pill'), { color: online ? '--green' : '--red' }, online ? 'Connected' : 'Offline');
+    anSet(c, 'down', fmtKBs(d.net_recv_kbs));
+    anSet(c, 'up', fmtKBs(d.net_sent_kbs));
+    if (d.net_recv_pps != null) anSet(c, 'pk-down', Math.round(d.net_recv_pps).toLocaleString());
+    if (d.net_sent_pps != null) anSet(c, 'pk-up', Math.round(d.net_sent_pps).toLocaleString());
+  }
+});
+
+// CPU cores: live bars (click one to chart it) + history of the selected core.
+var AN_CORES_SEED = (function(series) {
+  return (series || []).map(function(a) { return a && a.length ? (+a[a.length - 1] || 0) : 0; });
+})({{ chart_cores | tojson }});
+anCard('core', {
+  unit: '%', y: AN_PCT_Y, color: M.cpu, render: anRenderLevel,
+  params: function(c) { return '&core=' + c.core; },
+  init: function(c) {
+    var seed = AN_CORES_SEED;
+    c.core = seed.length ? seed.indexOf(Math.max.apply(null, seed)) : 0;
+    c.ncores = 0;
+    c.f('select').addEventListener('change', function() { anCoreSelect(c, parseInt(this.value, 10)); });
+    c.bars = RM.chart(c.f('bars'), {
+      type: 'bar',
+      data: { labels: [], datasets: [
+        { label: 'Usage', data: [], borderRadius: 99, borderSkipped: false, maxBarThickness: 22,
+          categoryPercentage: 0.8, barPercentage: 0.9, grouped: false, order: 1,
+          rm: { bg: M.cpu } },
+        { label: 'track', data: [], borderRadius: 99, borderSkipped: false, maxBarThickness: 22,
+          categoryPercentage: 0.8, barPercentage: 0.9, grouped: false, order: 2,
+          rm: { bg: M.track } }
+      ] },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        interaction: { intersect: false, mode: 'index' },
+        onClick: function(e, els) { if (els.length) anCoreSelect(c, els[0].index); },
+        onHover: function(e, els) { if (e.native) e.native.target.style.cursor = els.length ? 'pointer' : ''; },
+        plugins: {
+          legend: { display: false },
+          tooltip: { filter: function(i) { return i.datasetIndex === 0; },
+                     callbacks: { title: function(items) { return 'Core ' + items[0].dataIndex + ' — click for history'; },
+                                  label: function(x) { return ' ' + (+x.raw).toFixed(1) + '%'; } } }
+        },
+        scales: {
+          x: { grid: { display: false }, border: { display: false }, ticks: { autoSkip: true, maxRotation: 0 } },
+          y: { min: 0, max: 100, border: { display: false }, grid: { display: false },
+               ticks: { maxTicksLimit: 3, callback: function(v) { return v + '%'; } } }
+        }
+      }
+    });
+    anCoreBars(c, seed, null);
+  },
+  live: function(c, d) {
+    if (Array.isArray(d.cpu_per_core)) anCoreBars(c, d.cpu_per_core.map(function(v) { return +v || 0; }), d.cpu_freq_mhz);
+  }
+});
+function anCoreBars(c, vals, freqMhz) {
+  if (!vals.length) return;
+  if (vals.length !== c.ncores) {
+    c.ncores = vals.length;
+    if (c.core >= vals.length) c.core = 0;
+    var sel = c.f('select');
+    sel.innerHTML = vals.map(function(_, i) { return '<option value="' + i + '">Core ' + i + '</option>'; }).join('');
+    sel.value = String(c.core);
+  }
+  if (c.bars) {
+    c.bars.$sel = c.core;
+    c.bars.data.labels = vals.map(function(_, i) { return 'C' + i; });
+    c.bars.data.datasets[0].data = vals.slice();
+    c.bars.data.datasets[1].data = vals.map(function() { return 100; });
+    c.bars.update('none');
+  }
+  var avg = vals.reduce(function(a, b) { return a + b; }, 0) / vals.length;
+  var hi = vals.indexOf(Math.max.apply(null, vals)), lo = vals.indexOf(Math.min.apply(null, vals));
+  function col() { return null; }
+  if (freqMhz) c.freq = freqMhz;
+  c.f('livestats').innerHTML = anStatsHtml([
+    { label: 'Logical CPUs', value: String(vals.length) },
+    { label: 'Average', value: avg.toFixed(1) + '%', color: col(avg) },
+    { label: 'Highest', value: vals[hi].toFixed(1) + '%', color: col(vals[hi]), sub: 'Core ' + hi },
+    { label: 'Lowest', value: vals[lo].toFixed(1) + '%', color: col(vals[lo]), sub: 'Core ' + lo },
+    { label: 'Frequency', value: c.freq ? (c.freq / 1000).toFixed(2) + ' GHz' : '—' }
+  ]);
+}
+function anCoreSelect(c, i) {
+  if (isNaN(i) || i === c.core) return;
+  c.core = i;
+  c.f('select').value = String(i);
+  if (c.bars) { c.bars.$sel = i; c.bars.update('none'); }
+  anLoad(c);
+}
+
+// Trends refresh on their own: every 30s on 1H, 1 min up to 24H, 5 min beyond.
+// A custom range is a fixed window, so it isn't refreshed.
+function anRefreshMs(c) { return c.hours <= 1 ? 30000 : c.hours <= 24 ? 60000 : 300000; }
+setInterval(function() {
+  if (document.hidden) return;
+  anAll(function(c) { if (!c.range && Date.now() - c.loadedAt >= anRefreshMs(c)) anLoad(c, true); });
+}, 15000);
+
+function anInit() {
+  anAll(function(c) { anLoad(c); });
+  anSyncMode();
+  pollLive();   // fill the gauges right away instead of waiting for the first 2s tick
+}
+
 renderPm2({{ pm2 | tojson }});
 loadUptime();
+anInit();
 // The live poll runs every 2s; the timeline only needs a minute-level refresh.
 uptimeState.timer = setInterval(function() { if (!document.hidden) loadUptime(); }, 60000);
 </script>

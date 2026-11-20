@@ -1,8 +1,10 @@
+import csv
+import io
 import json
 import os
 import re
-from datetime import datetime
-from flask import Blueprint, render_template, abort, jsonify, request
+from datetime import datetime, timezone
+from flask import Blueprint, Response, render_template, abort, jsonify, request
 from flask_login import login_required, current_user
 from psycopg2 import sql
 from db import get_db
@@ -531,6 +533,8 @@ def detail(table_name):
         proc_status_counts[st] = proc_status_counts.get(st, 0) + 1
 
     return render_template("server_detail.html",
+        analytics_thresholds=ANALYTICS_THRESHOLDS,
+        real_disks=real_disks,
         machine=machine,
         latest=latest,
         disks=disks,
@@ -792,6 +796,241 @@ def uptime(table_name):
         return jsonify({"error": "Could not load uptime history."}), 500
 
 
+# ── Analytics cards (CPU / RAM / Swap / Disk / Temp / Net / Disk I/O / Cores) ──
+# Status zones per metric: [warning, critical(, very high)] — the page colours
+# gauges, trend lines and status pills from these. One place to change them.
+ANALYTICS_THRESHOLDS = {
+    "cpu":  [60, 85],
+    "ram":  [60, 80, 95],
+    "swap": [40, 70, 90],
+    "disk": [70, 85, 95],
+    "temp": [65, 80],
+    "core": [60, 80, 95],
+}
+TREND_POINTS = 120    # buckets per window — a smooth line at any range, small payload
+RATE_MAX_GAP = 600    # counter deltas across a longer gap (outage / reboot) are skipped
+
+_DISK_PCT = (
+    "(SELECT NULLIF(p->>'percent', '')::float FROM jsonb_array_elements("
+    "CASE WHEN jsonb_typeof(disk_partitions) = 'array' THEN disk_partitions ELSE '[]'::jsonb END) p "
+    "WHERE p->>'mountpoint' = %s LIMIT 1)"
+)
+_CORE_PCT = "(CASE WHEN jsonb_typeof(cpu_per_core) = 'array' THEN NULLIF(cpu_per_core->>%s, '')::float END)"
+
+# Level metrics: one value per row, bucketed to avg/min/max.
+GAUGE_METRICS = {
+    "cpu":  "cpu_percent",
+    "ram":  "ram_percent",
+    "swap": "swap_percent",
+    "temp": "NULLIF(cpu_temp, 0)",   # 0 = no sensor
+    "disk": _DISK_PCT,               # needs mount
+    "core": _CORE_PCT,               # needs core index
+}
+# Counter metrics: per-second rate from deltas of two cumulative counters (a, b).
+RATE_METRICS = {
+    "net":    {"a": "net_bytes_recv", "b": "net_bytes_sent", "scale": 1 / 1024,
+               "cols": ("download_kbs", "upload_kbs")},
+    "diskio": {"a": "NULLIF(disk_io->>'read_mb', '')::float",
+               "b": "NULLIF(disk_io->>'write_mb', '')::float", "scale": 1,
+               "cols": ("read_mbs", "write_mbs")},
+}
+
+
+def _metric_history(table_name, metric, start=None, end=None, hours=1, mount=None, core=None):
+    """
+    Trend for one analytics card, averaged into ~TREND_POINTS evenly spaced
+    buckets between start and end (epoch secs; default: the last `hours`).
+    Empty buckets are null so a line breaks over an outage instead of
+    bridging it.
+
+    Level metrics return points [{t, avg, min, max}] and min/max/avg/first/last.
+    Rate metrics return points [{t, a, a_max, b, b_max}] (per-second rates;
+    net in KB/s, disk I/O in MB/s) and peaks, averages and totals transferred.
+    """
+    t = sql.Identifier(table_name)
+    with get_db() as conn:
+        cur = conn.cursor()
+        if start is None:
+            cur.execute("SELECT EXTRACT(EPOCH FROM NOW()) AS now")
+            end = float(cur.fetchone()["now"])
+            start = end - hours * 3600
+        bucket = max(15, int((end - start) // TREND_POINTS))
+
+        if metric in GAUGE_METRICS:
+            extra = [mount or "/"] if metric == "disk" else [int(core or 0)] if metric == "core" else []
+            cur.execute(sql.SQL("""
+                SELECT FLOOR(EXTRACT(EPOCH FROM ts) / %s) AS b,
+                       AVG(v) AS a, MIN(v) AS lo, MAX(v) AS hi, COUNT(v) AS n
+                FROM (SELECT ts, {expr} AS v FROM {t}
+                      WHERE ts > to_timestamp(%s) AND ts <= to_timestamp(%s)) x
+                WHERE v IS NOT NULL
+                GROUP BY 1 ORDER BY 1
+            """).format(expr=sql.SQL(GAUGE_METRICS[metric]), t=t), [bucket, *extra, start, end])
+        else:
+            m = RATE_METRICS[metric]
+            cur.execute(sql.SQL("""
+                SELECT FLOOR(EXTRACT(EPOCH FROM ts) / %s) AS b,
+                       AVG(da / dt) AS aa, MAX(da / dt) AS am, AVG(db / dt) AS ba, MAX(db / dt) AS bm,
+                       SUM(da) AS ta, SUM(db) AS tb, COUNT(*) AS n
+                FROM (
+                    SELECT ts, a - LAG(a) OVER w AS da, b - LAG(b) OVER w AS db,
+                           EXTRACT(EPOCH FROM ts - LAG(ts) OVER w) AS dt
+                    FROM (SELECT ts, {a} AS a, {b} AS b FROM {t}
+                          WHERE ts > to_timestamp(%s) - INTERVAL '10 minutes'
+                            AND ts <= to_timestamp(%s)) r
+                    WINDOW w AS (ORDER BY ts)
+                ) x
+                WHERE ts > to_timestamp(%s) AND dt > 0 AND dt <= %s AND da >= 0 AND db >= 0
+                GROUP BY 1 ORDER BY 1
+            """).format(a=sql.SQL(m["a"]), b=sql.SQL(m["b"]), t=t),
+                [bucket, start, end, start, RATE_MAX_GAP])
+        rows = cur.fetchall()
+
+    by_bucket = {int(r["b"]): r for r in rows}
+    buckets = range(int(start // bucket), int(end // bucket) + 1)
+    out = {"metric": metric, "window_start": start, "window_end": end, "bucket_secs": bucket}
+
+    if metric in GAUGE_METRICS:
+        points, lo, hi, total, count = [], None, None, 0.0, 0
+        for b in buckets:
+            r, ts = by_bucket.get(b), b * bucket
+            if not r:
+                points.append({"t": ts, "avg": None, "min": None, "max": None})
+                continue
+            a, mn, mx, n = float(r["a"]), float(r["lo"]), float(r["hi"]), int(r["n"])
+            points.append({"t": ts, "avg": round(a, 1), "min": round(mn, 1), "max": round(mx, 1)})
+            if lo is None or mn < lo["value"]:
+                lo = {"value": round(mn, 1), "t": ts}
+            if hi is None or mx > hi["value"]:
+                hi = {"value": round(mx, 1), "t": ts}
+            total += a * n
+            count += n
+        filled = [p["avg"] for p in points if p["avg"] is not None]
+        out.update({
+            "points": points, "min": lo, "max": hi,
+            "avg": round(total / count, 1) if count else None,
+            "first": filled[0] if filled else None, "last": filled[-1] if filled else None,
+            "samples": count,
+        })
+        return out
+
+    scale = RATE_METRICS[metric]["scale"]
+    points, peaks = [], {"a": None, "b": None}
+    sums = {"a": 0.0, "b": 0.0}
+    totals = {"a": 0.0, "b": 0.0}
+    count = 0
+    for b in buckets:
+        r, ts = by_bucket.get(b), b * bucket
+        if not r:
+            points.append({"t": ts, "a": None, "a_max": None, "b": None, "b_max": None})
+            continue
+        n = int(r["n"])
+        p = {"t": ts}
+        for k in ("a", "b"):
+            avg, mx = float(r[k + "a"]) * scale, float(r[k + "m"]) * scale
+            p[k], p[k + "_max"] = round(avg, 2), round(mx, 2)
+            if peaks[k] is None or mx > peaks[k]["value"]:
+                peaks[k] = {"value": round(mx, 2), "t": ts}
+            sums[k] += avg * n
+            totals[k] += float(r["t" + k])
+        points.append(p)
+        count += n
+    out.update({
+        "points": points,
+        "a_peak": peaks["a"], "b_peak": peaks["b"],
+        "a_avg": round(sums["a"] / count, 2) if count else None,
+        "b_avg": round(sums["b"] / count, 2) if count else None,
+        # raw counter units: bytes for net, MB for disk I/O
+        "a_total": round(totals["a"], 2), "b_total": round(totals["b"], 2),
+        "samples": count,
+    })
+    return out
+
+
+def _metric_csv(d, table_name):
+    """CSV download of a _metric_history result (one row per bucket, UTC times)."""
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    metric = d["metric"]
+    if metric in RATE_METRICS:
+        a, b = RATE_METRICS[metric]["cols"]
+        w.writerow(["time_utc", a + "_avg", a + "_max", b + "_avg", b + "_max"])
+        keys = ("a", "a_max", "b", "b_max")
+    else:
+        w.writerow(["time_utc", metric + "_avg", metric + "_min", metric + "_max"])
+        keys = ("avg", "min", "max")
+    for p in d["points"]:
+        if all(p[k] is None for k in keys):
+            continue
+        w.writerow([datetime.fromtimestamp(p["t"], timezone.utc).strftime("%Y-%m-%d %H:%M:%S")]
+                   + [p[k] for k in keys])
+    name = f"{table_name.removeprefix('machine_')}_{metric}_{datetime.now():%Y%m%d_%H%M}.csv"
+    return Response(buf.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+def _parse_instant(v):
+    """ISO date/time from the page (toISOString) → epoch secs, or None."""
+    try:
+        dt = datetime.fromisoformat(v.strip().replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.timestamp()
+
+
+@servers_bp.route("/<table_name>/metric-history")
+@login_required
+def metric_history(table_name):
+    """
+    Trend JSON (or CSV with format=csv) for one analytics card.
+    ?metric=cpu|ram|swap|temp|disk|core|net|diskio
+    &hours=N  — or —  &start=ISO&end=ISO   (custom range, max HISTORY_MAX_DAYS)
+    &mount=/  (disk)   &core=N (core)
+    """
+    _check_access(table_name)
+    metric = request.args.get("metric", "")
+    if metric not in GAUGE_METRICS and metric not in RATE_METRICS:
+        return jsonify({"error": "Unknown metric."}), 400
+
+    start = end = None
+    hours = 1
+    if request.args.get("start") or request.args.get("end"):
+        start = _parse_instant(request.args.get("start", ""))
+        end = _parse_instant(request.args.get("end", ""))
+        if start is None or end is None:
+            return jsonify({"error": "Invalid date range."}), 400
+        if end - start < 60 or end - start > HISTORY_MAX_DAYS * 86400:
+            return jsonify({"error": f"Range must be between 1 minute and {HISTORY_MAX_DAYS} days."}), 400
+    else:
+        try:
+            hours = int(request.args.get("hours", "1"))
+        except ValueError:
+            hours = 1
+        hours = max(1, min(hours, UPTIME_MAX_HOURS))
+
+    mount = request.args.get("mount", "/")[:255]
+    try:
+        core = max(0, min(int(request.args.get("core", "0")), 4095))
+    except ValueError:
+        core = 0
+
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM machine_registry WHERE table_name=%s", (table_name,))
+        if not cur.fetchone():
+            return jsonify({"error": "not found"}), 404
+    try:
+        d = _metric_history(table_name, metric, start, end, hours, mount, core)
+    except Exception as e:
+        print(f"[servers] {metric} history failed for {table_name}: {e}")
+        return jsonify({"error": "Could not load history."}), 500
+    if request.args.get("format") == "csv":
+        return _metric_csv(d, table_name)
+    return jsonify(d)
+
+
 @servers_bp.route("/<table_name>/live")
 @login_required
 def live(table_name):
@@ -810,7 +1049,8 @@ def live(table_name):
                    swap_used_gb, swap_total_gb,
                    net_bytes_sent, net_bytes_recv, cpu_temp, cpu_freq_mhz,
                    ram_used_gb, ram_total_gb, uptime_seconds,
-                   disk_partitions, gpu_info, top_processes, cpu_per_core,
+                   net_packets_sent, net_packets_recv,
+                   disk_partitions, gpu_info, top_processes, cpu_per_core, disk_io,
                    to_jsonb(t)->'pm2_processes' AS pm2_processes
             FROM {table_name} t ORDER BY ts DESC LIMIT 2
         """)
@@ -849,6 +1089,27 @@ def live(table_name):
     else:
         latest["net_sent_kbs"] = 0
         latest["net_recv_kbs"] = 0
+
+    # Packets/s and disk read/write MB/s from the two newest rows' counters
+    latest.pop("disk_io", None)
+    latest["disk_read_mbs"] = latest["disk_write_mbs"] = None
+    latest["net_recv_pps"] = latest["net_sent_pps"] = None
+    if len(rows) >= 2:
+        secs = (rows[0]["ts"] - rows[1]["ts"]).total_seconds() if rows[0].get("ts") and rows[1].get("ts") else 0
+        if secs > 0:
+            for field, out_key in (("net_packets_recv", "net_recv_pps"), ("net_packets_sent", "net_sent_pps")):
+                if rows[0].get(field) is not None and rows[1].get(field) is not None:
+                    latest[out_key] = round(max(0, rows[0][field] - rows[1][field]) / secs, 1)
+        def _io(r):
+            v = r.get("disk_io")
+            v = json.loads(v) if isinstance(v, str) else v
+            return v if isinstance(v, dict) else {}
+        cur_io, prev_io = _io(rows[0]), _io(rows[1])
+        secs = (rows[0]["ts"] - rows[1]["ts"]).total_seconds() if rows[0].get("ts") and rows[1].get("ts") else 0
+        if secs > 0 and cur_io and prev_io:
+            for key, out_key in (("read_mb", "disk_read_mbs"), ("write_mb", "disk_write_mbs")):
+                delta = _safe_float(cur_io.get(key)) - _safe_float(prev_io.get(key))
+                latest[out_key] = round(max(0.0, delta) / secs, 2)
 
     latest["status"]    = reg["status"]
     latest["last_seen"] = str(reg["last_seen"])
