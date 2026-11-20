@@ -146,7 +146,10 @@ def index():
     overview["rules_on"] = sum(1 for c in configs if c["enabled"])
     overview["rules_total"] = len(configs)
     overview["muted"] = sum(1 for m in machines if not m["alerts_enabled"])
-    overview["overridden"] = len({o["table_name"] for o in machine_overrides})
+    custom_counts = {}
+    for o in machine_overrides:
+        custom_counts[o["table_name"]] = custom_counts.get(o["table_name"], 0) + 1
+    overview["overridden"] = len(custom_counts)
 
     return render_template("alerts.html",
                            configs=configs,
@@ -154,7 +157,7 @@ def index():
                            overview=overview,
                            dbmon_watches=dbmon_watches,
                            machines=machines,
-                           machine_overrides=machine_overrides,
+                           custom_counts=custom_counts,
                            recipients=list_alert_recipients())
 
 
@@ -191,6 +194,26 @@ def update_config():
     return redirect(url_for("alerts.index") + "#system")
 
 
+MACHINE_ALERT_TYPES = ["offline", "online", "cpu", "ram", "disk", "temp"]
+
+
+def _check_machine_access(table_name):
+    """Checked before any DB work, so a forbidden request never opens a connection."""
+    allowed = current_user.allowed_servers()
+    if allowed is not None and table_name not in allowed:
+        abort(403)
+
+
+def _machine_or_404(cur, table_name):
+    """The machine must exist (access is checked first by _check_machine_access)."""
+    cur.execute("SELECT system_name, location FROM machine_registry WHERE table_name=%s",
+                (table_name,))
+    m = cur.fetchone()
+    if not m:
+        abort(404)
+    return m
+
+
 @alerts_bp.route("/machine/<table_name>/overrides")
 @login_required
 def machine_overrides_json(table_name):
@@ -198,29 +221,35 @@ def machine_overrides_json(table_name):
     Per-machine alert routing for one machine. Only 'enabled' and
     'notify_emails' are configurable per machine — threshold and cooldown
     always come from the fleet-wide System Alerts config (see alert_config),
-    not from here.
+    not from here. Admins edit it; other users with access to the machine
+    get the same list read-only.
     """
-    if not current_user.is_admin:
-        abort(403)
-    types = ["offline", "online", "cpu", "ram", "disk", "temp"]
+    _check_machine_access(table_name)
     with get_db() as conn:
         cur = conn.cursor()
+        _machine_or_404(cur, table_name)
         cur.execute("SELECT alert_type, enabled FROM alert_config")
         global_cfg = {r["alert_type"]: r for r in cur.fetchall()}
         cur.execute("SELECT * FROM machine_alert_overrides WHERE table_name=%s", (table_name,))
         existing = {r["alert_type"]: r for r in cur.fetchall()}
 
     out = []
-    for t in types:
+    for t in MACHINE_ALERT_TYPES:
         o = existing.get(t)
         g = global_cfg.get(t, {})
         out.append({
             "alert_type": t,
             "enabled": bool(o["enabled"]) if o else bool(g.get("enabled", True)),
+            "default_enabled": bool(g.get("enabled", True)),
             "notify_emails": (o["notify_emails"] if o else "") or "",
             "has_override": o is not None,
+            "updated_at": o["updated_at"].isoformat() if o and o.get("updated_at") else None,
         })
     return jsonify(out)
+
+
+def _back_to_machine(table_name):
+    return redirect(url_for("alerts.index", machine=table_name) + "#machine")
 
 
 @alerts_bp.route("/machine/<table_name>/save-all", methods=["POST"])
@@ -230,15 +259,28 @@ def save_machine_alerts_all(table_name):
     Bulk-save the per-machine routing (enabled + recipients) for all six
     alert types in one go. Threshold/cooldown aren't set here — those stay
     fleet-wide, configured once in System Alerts.
+
+    A type left exactly as the system default (same on/off, no recipients of
+    its own) is stored as *no* override, so the machine keeps following the
+    system rule and only real customisations show up as "custom".
     """
     if not current_user.is_admin:
         abort(403)
-    types = ["offline", "online", "cpu", "ram", "disk", "temp"]
+    _check_machine_access(table_name)
     with get_db() as conn:
         cur = conn.cursor()
-        for t in types:
+        _machine_or_404(cur, table_name)
+        cur.execute("SELECT alert_type, enabled FROM alert_config")
+        defaults = {r["alert_type"]: bool(r["enabled"]) for r in cur.fetchall()}
+        custom = 0
+        for t in MACHINE_ALERT_TYPES:
             enabled = request.form.get(f"enabled_{t}") == "1"
             emails  = ", ".join(request.form.getlist(f"emails_{t}"))
+            if enabled == defaults.get(t, True) and not emails:
+                cur.execute("DELETE FROM machine_alert_overrides WHERE table_name=%s AND alert_type=%s",
+                            (table_name, t))
+                continue
+            custom += 1
             cur.execute("""
                 INSERT INTO machine_alert_overrides
                     (table_name, alert_type, enabled, notify_emails, updated_at)
@@ -247,8 +289,24 @@ def save_machine_alerts_all(table_name):
                 SET enabled=EXCLUDED.enabled, notify_emails=EXCLUDED.notify_emails,
                     updated_at=NOW()
             """, (table_name, t, enabled, emails))
-    flash("Machine alert rules saved.", "success")
-    return redirect(url_for("alerts.index") + "#machine")
+    flash("Machine alert routing saved." if custom else
+          "Saved — this machine follows the system rules.", "success")
+    return _back_to_machine(table_name)
+
+
+@alerts_bp.route("/machine/<table_name>/reset", methods=["POST"])
+@login_required
+def reset_machine_alerts(table_name):
+    """Drop every override for one machine so it follows the system rules again."""
+    if not current_user.is_admin:
+        abort(403)
+    _check_machine_access(table_name)
+    with get_db() as conn:
+        cur = conn.cursor()
+        _machine_or_404(cur, table_name)
+        cur.execute("DELETE FROM machine_alert_overrides WHERE table_name=%s", (table_name,))
+    flash("Machine routing reset to the system rules.", "success")
+    return _back_to_machine(table_name)
 
 
 @alerts_bp.route("/machine/add", methods=["POST"])

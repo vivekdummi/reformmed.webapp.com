@@ -1,4 +1,5 @@
 import json
+import os
 import re
 from datetime import datetime
 from flask import Blueprint, render_template, abort, jsonify, request
@@ -20,6 +21,95 @@ def _require_servers_feature():
 # interpolate the table name, so refuse anything else outright.
 _TABLE_RE = re.compile(r"^machine_[a-z0-9_]{1,60}$")
 HISTORY_MAX_DAYS = 93
+
+
+def _num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_pm2(raw):
+    """
+    Normalise the agent's pm2_processes cell into a list of
+    {name, id, status, cpu, memory_mb, restarts, uptime_secs, mode, instances}.
+
+    Accepts raw `pm2 jlist` entries (monit / pm2_env nested) as well as a
+    flat shape ({name, status, cpu, memory, restarts, uptime}), and a dict
+    wrapper like {"processes": [...]}. Anything unparseable is dropped.
+    """
+    if raw is None:
+        return []
+    if isinstance(raw, (str, bytes)):
+        try:
+            raw = json.loads(raw)
+        except (ValueError, TypeError):
+            return []
+    if isinstance(raw, dict):
+        raw = raw.get("processes") or raw.get("apps") or raw.get("list") or []
+    if not isinstance(raw, list):
+        return []
+
+    now = datetime.now().timestamp()
+    out = []
+    for p in raw:
+        if not isinstance(p, dict):
+            continue
+        env = p.get("pm2_env") if isinstance(p.get("pm2_env"), dict) else {}
+        monit = p.get("monit") if isinstance(p.get("monit"), dict) else {}
+
+        status = str(p.get("status") or env.get("status") or "unknown").lower()
+        cpu = _num(p.get("cpu", p.get("cpu_percent", monit.get("cpu"))))
+
+        mem_mb = _num(p.get("memory_mb", p.get("mem_mb")))
+        if mem_mb is None:
+            mem = _num(p.get("memory", monit.get("memory")))
+            if mem is not None:
+                # pm2 reports bytes; small values were already sent in MB.
+                mem_mb = mem / (1024 * 1024) if mem > 100_000 else mem
+
+        # Uptime: an explicit duration, or a start timestamp (pm_uptime, in ms
+        # from pm2 jlist). A bare "uptime" over 1e9 can only be a timestamp —
+        # as a duration that would be 31+ years.
+        uptime = _num(p.get("uptime_secs", p.get("uptime_seconds")))
+        if uptime is None:
+            started = _num(p.get("pm_uptime", env.get("pm_uptime")))
+            bare = _num(p.get("uptime"))
+            if started is None and bare is not None:
+                if bare > 1e9:
+                    started = bare
+                else:
+                    uptime = bare
+            if started is not None:
+                started = started / 1000 if started > 1e11 else started  # ms → s
+                uptime = max(0.0, now - started)
+        if status != "online":
+            uptime = None
+
+        out.append({
+            "name": str(p.get("name") or env.get("name") or "?")[:120],
+            "id": p.get("pm_id", p.get("id")),
+            # Which PM2 daemon it belongs to — a box can run one per user
+            # (e.g. root's /root/.pm2 and adminqa's ~/.pm2), with clashing ids.
+            "user": str(p.get("pm2_user") or p.get("user") or env.get("username") or "")[:64] or None,
+            "status": status,
+            "cpu": round(cpu, 1) if cpu is not None else None,
+            "memory_mb": round(mem_mb, 1) if mem_mb is not None else None,
+            "restarts": int(_num(p.get("restarts", p.get("restart_time", env.get("restart_time")))) or 0),
+            "uptime_secs": round(uptime) if uptime is not None else None,
+            "mode": str(p.get("exec_mode") or env.get("exec_mode") or p.get("mode") or "").replace("_mode", ""),
+            "instances": p.get("instances", env.get("instances")),
+        })
+    out.sort(key=lambda x: (x["status"] == "online", (x["user"] or ""), x["name"].lower()))
+    return out
+
+
+def pm2_summary(procs):
+    """{'online': n, 'total': n} or None when the agent sent no PM2 data."""
+    if not procs:
+        return None
+    return {"online": sum(1 for p in procs if p["status"] == "online"), "total": len(procs)}
 
 
 def _check_access(table_name):
@@ -65,10 +155,13 @@ def index():
         # Latest reading per machine for the CPU / RAM / disk meters. One
         # LIMIT 1 query per machine table; a broken table just shows "—".
         for m in machines:
-            m["cpu"] = m["ram"] = m["disk"] = None
+            m["cpu"] = m["ram"] = m["disk"] = m["pm2"] = None
             try:
+                # to_jsonb(t)->'pm2_processes' is NULL (not an error) on older
+                # tables that don't have the column yet.
                 cur.execute(sql.SQL(
-                    "SELECT cpu_percent, ram_percent, disk_partitions FROM {} ORDER BY ts DESC LIMIT 1"
+                    "SELECT cpu_percent, ram_percent, disk_partitions, "
+                    "to_jsonb(t)->'pm2_processes' AS pm2 FROM {} t ORDER BY ts DESC LIMIT 1"
                 ).format(sql.Identifier(m["table_name"])))
                 row = cur.fetchone()
             except Exception:
@@ -77,6 +170,7 @@ def index():
             if not row:
                 continue
             m["cpu"] = round(float(row["cpu_percent"] or 0), 1)
+            m["pm2"] = pm2_summary(parse_pm2(row.get("pm2")))
             m["ram"] = round(float(row["ram_percent"] or 0), 1)
             disks = row.get("disk_partitions")
             try:
@@ -323,7 +417,9 @@ def detail(table_name):
     disks = []
     gpus  = []
     procs = []
+    pm2 = []
     if latest:
+        pm2 = parse_pm2(latest.get("pm2_processes"))
         raw_disks = latest.get("disk_partitions")
         if raw_disks:
             disks = json.loads(raw_disks) if isinstance(raw_disks, str) else raw_disks
@@ -462,6 +558,8 @@ def detail(table_name):
         disk_primary=disk_primary,
         gpu_history=gpu_history,
         proc_status_counts=proc_status_counts,
+        pm2=pm2,
+        pm2_sum=pm2_summary(pm2),
     )
 
 
@@ -564,6 +662,136 @@ def history(table_name):
     })
 
 
+# A gap between two consecutive reports longer than this counts as offline —
+# the same rule (and env var) the checker uses to flip machine_registry.status.
+OFFLINE_AFTER_SECS = int(os.getenv("OFFLINE_AFTER_SECS", "60"))
+UPTIME_MAX_HOURS = 24 * 31
+UPTIME_MAX_OUTAGES = 2000  # a flapping agent shouldn't ship megabytes of segments
+
+
+def _uptime_timeline(table_name, hours):
+    """
+    Online/offline timeline for the last `hours`, derived from gaps in the
+    machine's own metric rows (so it covers all retained history, not just
+    events since a log table existed).
+
+    Returns {window_start, window_end (epoch secs), segments: [{state, start, end}],
+    online_secs, offline_secs, nodata_secs, uptime_pct, outages, longest_outage_secs}.
+    state is "online", "offline" or "nodata" (before the oldest retained row).
+    """
+    t = sql.Identifier(table_name)
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT EXTRACT(EPOCH FROM NOW()) AS now")
+        now = float(cur.fetchone()["now"])
+        start = now - hours * 3600
+
+        cur.execute(sql.SQL("""
+            SELECT EXTRACT(EPOCH FROM MIN(ts)) AS first, EXTRACT(EPOCH FROM MAX(ts)) AS last
+            FROM {t} WHERE ts > to_timestamp(%s)
+        """).format(t=t), (start,))
+        bounds = cur.fetchone()
+        cur.execute(sql.SQL("""
+            SELECT EXTRACT(EPOCH FROM ts) AS ts FROM {t}
+            WHERE ts <= to_timestamp(%s) ORDER BY ts DESC LIMIT 1
+        """).format(t=t), (start,))
+        before = cur.fetchone()
+        cur.execute(sql.SQL("""
+            SELECT EXTRACT(EPOCH FROM prev_ts) AS s, EXTRACT(EPOCH FROM ts) AS e
+            FROM (
+                SELECT ts, LAG(ts) OVER (ORDER BY ts) AS prev_ts
+                FROM {t} WHERE ts > to_timestamp(%s)
+            ) x
+            WHERE ts - prev_ts > make_interval(secs => %s)
+            ORDER BY ts
+            LIMIT %s
+        """).format(t=t), (start, OFFLINE_AFTER_SECS, UPTIME_MAX_OUTAGES))
+        gaps = [(float(r["s"]), float(r["e"])) for r in cur.fetchall()]
+
+    first = float(bounds["first"]) if bounds and bounds["first"] is not None else None
+    last = float(bounds["last"]) if bounds and bounds["last"] is not None else None
+    prev = float(before["ts"]) if before else None
+
+    segments = []
+
+    def add(state, s, e):
+        s, e = max(s, start), min(e, now)
+        if e <= s:
+            return
+        if segments and segments[-1]["state"] == state and abs(segments[-1]["end"] - s) < 1e-6:
+            segments[-1]["end"] = e
+        else:
+            segments.append({"state": state, "start": s, "end": e})
+
+    if first is None:
+        # No reports at all inside the window.
+        if prev is None:
+            add("nodata", start, now)
+        else:
+            add("offline", start, now)
+    else:
+        # Leading edge: was it already running when the window opened?
+        if prev is None:
+            add("nodata", start, first)
+        elif first - prev > OFFLINE_AFTER_SECS:
+            add("offline", start, first)
+        else:
+            add("online", start, first)
+        cursor = first
+        for s, e in gaps:
+            add("online", cursor, s)
+            add("offline", s, e)
+            cursor = e
+        add("online", cursor, last)
+        # Trailing edge: silent since the last report?
+        if now - last > OFFLINE_AFTER_SECS:
+            add("offline", last, now)
+        else:
+            add("online", last, now)
+
+    totals = {"online": 0.0, "offline": 0.0, "nodata": 0.0}
+    for seg in segments:
+        totals[seg["state"]] += seg["end"] - seg["start"]
+    offline_segs = [s for s in segments if s["state"] == "offline"]
+    observed = totals["online"] + totals["offline"]
+    return {
+        "window_start": start,
+        "window_end": now,
+        "threshold_secs": OFFLINE_AFTER_SECS,
+        "segments": segments,
+        "online_secs": round(totals["online"]),
+        "offline_secs": round(totals["offline"]),
+        "nodata_secs": round(totals["nodata"]),
+        "uptime_pct": round(totals["online"] / observed * 100, 2) if observed else None,
+        "outages": len(offline_segs),
+        "longest_outage_secs": round(max((s["end"] - s["start"] for s in offline_segs), default=0)),
+        "truncated": len(gaps) >= UPTIME_MAX_OUTAGES,
+    }
+
+
+@servers_bp.route("/<table_name>/uptime")
+@login_required
+def uptime(table_name):
+    """Online/offline timeline JSON for the detail page's uptime chart."""
+    _check_access(table_name)
+    try:
+        hours = int(request.args.get("hours", "24"))
+    except ValueError:
+        hours = 24
+    hours = max(1, min(hours, UPTIME_MAX_HOURS))
+
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM machine_registry WHERE table_name=%s", (table_name,))
+        if not cur.fetchone():
+            return jsonify({"error": "not found"}), 404
+    try:
+        return jsonify(_uptime_timeline(table_name, hours))
+    except Exception as e:
+        print(f"[servers] uptime timeline failed for {table_name}: {e}")
+        return jsonify({"error": "Could not load uptime history."}), 500
+
+
 @servers_bp.route("/<table_name>/live")
 @login_required
 def live(table_name):
@@ -582,8 +810,9 @@ def live(table_name):
                    swap_used_gb, swap_total_gb,
                    net_bytes_sent, net_bytes_recv, cpu_temp, cpu_freq_mhz,
                    ram_used_gb, ram_total_gb, uptime_seconds,
-                   disk_partitions, gpu_info, top_processes, cpu_per_core
-            FROM {table_name} ORDER BY ts DESC LIMIT 2
+                   disk_partitions, gpu_info, top_processes, cpu_per_core,
+                   to_jsonb(t)->'pm2_processes' AS pm2_processes
+            FROM {table_name} t ORDER BY ts DESC LIMIT 2
         """)
         rows = cur.fetchall()
 
@@ -604,6 +833,9 @@ def live(table_name):
     raw_procs = latest.pop("top_processes", None)
     if raw_procs:
         latest["top_processes"] = json.loads(raw_procs) if isinstance(raw_procs, str) else raw_procs
+
+    # PM2 apps (None when the agent doesn't report PM2 at all)
+    latest["pm2"] = parse_pm2(latest.pop("pm2_processes", None))
 
     # Per-core CPU
     raw_cores = latest.pop("cpu_per_core", None)

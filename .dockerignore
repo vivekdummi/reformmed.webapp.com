@@ -8,3 +8,6 @@
 __pycache__
 **/__pycache__
 *.pyc
+
+# Runs on the monitored machines, not in the webapp image
+agent/

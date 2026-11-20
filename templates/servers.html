@@ -28,6 +28,8 @@ tr.machine-row:hover .srv-name-txt{color:var(--accent);}
 .st-pill::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;}
 .st-pill.online{background:color-mix(in srgb,var(--green) 14%,transparent);color:var(--green);}
 .st-pill.offline{background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red);}
+.pm2-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;background:color-mix(in srgb,var(--green) 14%,transparent);color:var(--green);}
+.pm2-chip.warn{background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red);}
 .meter{min-width:120px;}
 .meter-top{display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);font-weight:600;margin-bottom:4px;}
 .meter-top b{color:var(--text);font-variant-numeric:tabular-nums;}
@@ -154,6 +156,7 @@ tr.machine-row:hover .srv-name-txt{color:var(--accent);}
           <th>CPU</th>
           <th>RAM</th>
           <th class="hide-mobile">Disk</th>
+          <th>PM2</th>
           <th class="hide-mobile">Public IP</th>
           <th class="hide-mobile">Last seen</th>
           <th>Alerts</th>
@@ -185,6 +188,12 @@ tr.machine-row:hover .srv-name-txt{color:var(--accent);}
           <td>{{ meter(m.cpu, thresholds.cpu or 90, '--g-ocean') }}</td>
           <td>{{ meter(m.ram, thresholds.ram or 90, '--g-violet') }}</td>
           <td class="hide-mobile">{{ meter(m.disk, thresholds.disk or 85, '--g-sunset') }}</td>
+          <td>
+            {% if m.pm2 %}
+            <span class="pm2-chip {{ 'warn' if m.pm2.online < m.pm2.total else '' }}"
+                  title="{{ m.pm2.online }} of {{ m.pm2.total }} PM2 apps online">{{ m.pm2.online }}/{{ m.pm2.total }}</span>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
           <td class="mono text-muted hide-mobile" style="font-size:12px">{{ m.public_ip or '—' }}</td>
           <td class="text-muted hide-mobile" style="font-size:12px;white-space:nowrap;">
             {{ m.last_seen.strftime('%Y-%m-%d %H:%M') if m.last_seen else '—' }}
@@ -202,9 +211,9 @@ tr.machine-row:hover .srv-name-txt{color:var(--accent);}
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="9" class="srv-empty">No machines registered yet.</td></tr>
+        <tr><td colspan="10" class="srv-empty">No machines registered yet.</td></tr>
         {% endfor %}
-        <tr id="no-match" style="display:none;"><td colspan="9" class="srv-empty">No servers match your search.</td></tr>
+        <tr id="no-match" style="display:none;"><td colspan="10" class="srv-empty">No servers match your search.</td></tr>
       </tbody>
     </table>
   </div>

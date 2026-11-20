@@ -110,18 +110,18 @@
 .mini-card{background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:16px 20px;}
 
 /* ── Dashboard grid (new overview widgets) ── */
-.stat-cards-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px;}
+.stat-cards-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:14px;}
 /* stat cards follow the shared .kpi tile look */
-.stat-card{position:relative;background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:16px 18px;min-width:0;overflow:hidden;}
+.stat-card{position:relative;background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:12px 14px;min-width:0;overflow:hidden;}
 .stat-card::after{content:'';position:absolute;right:-30px;top:-30px;width:110px;height:110px;border-radius:50%;background:var(--kpi-g,var(--g-ocean));opacity:.10;filter:blur(2px);pointer-events:none;}
-.stat-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;}
-.stat-icon{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:12px;font-size:15px;flex-shrink:0;background:var(--kpi-g,var(--g-ocean));color:#fff;box-shadow:0 6px 16px -6px rgba(0,0,0,.45);order:2;}
-.stat-icon svg{width:18px;height:18px;}
-.stat-label{font-size:13px;font-weight:600;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.stat-card-val{font-family:var(--font-head);font-size:30px;font-weight:800;letter-spacing:-.8px;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px;margin-bottom:8px;line-height:1.05;}
+.stat-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
+.stat-icon{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:10px;font-size:13px;flex-shrink:0;background:var(--kpi-g,var(--g-ocean));color:#fff;box-shadow:0 6px 16px -6px rgba(0,0,0,.45);order:2;}
+.stat-icon svg{width:15px;height:15px;}
+.stat-label{font-size:12px;font-weight:600;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.stat-card-val{font-family:var(--font-head);font-size:24px;font-weight:800;letter-spacing:-.6px;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px;margin-bottom:6px;line-height:1.05;}
 .stat-trend{font-size:12px;font-weight:500;color:var(--text-muted);}
 .stat-trend.neg{color:var(--text-muted);}
-.stat-progress{height:8px;border-radius:99px;background:var(--chart-track);overflow:hidden;margin-bottom:10px;}
+.stat-progress{height:6px;border-radius:99px;background:var(--chart-track);overflow:hidden;margin-bottom:8px;}
 .stat-progress-fill{height:100%;border-radius:99px;transition:width .4s ease;}
 .stat-progress-fill.cyan{background:var(--g-ocean);} .stat-progress-fill.purple{background:var(--g-violet);}
 .stat-progress-fill.green{background:var(--g-sunset);} .stat-progress-fill.pink{background:var(--g-mint);}
@@ -186,6 +186,50 @@
 .hist-preset-btn:hover{background:var(--bg-hover);}
 .hist-preset-btn.active{background:var(--accent-soft);border-color:transparent;color:var(--text);}
 .history-bar-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+/* ── PM2 ── */
+.pm2-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;}
+.pm2-groups.single{grid-template-columns:1fr;}
+@media(max-width:1100px){.pm2-groups{grid-template-columns:1fr;}}
+.pm2-group{border:1px solid var(--border);border-radius:14px;overflow:hidden;min-width:0;}
+.pm2-group-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;background:var(--bg3);}
+.pm2-group-user{font-family:var(--mono);font-size:13px;font-weight:700;}
+.pm2-group-count{font-size:12px;font-weight:700;white-space:nowrap;}
+.pm2-group-scroll{max-height:520px;overflow:auto;}
+.pm2-group-scroll thead th{position:sticky;top:0;background:var(--bg2);z-index:1;}
+.pm2-table th,.pm2-table td{padding:8px 10px;}
+.pm2-table tbody tr:last-child td{border-bottom:none;}
+.pm2-sno{width:1%;color:var(--text-muted);text-align:right;}
+.pm2-table td{padding:8px 10px;font-size:13px;}
+.pm2-table td.num{font-variant-numeric:tabular-nums;white-space:nowrap;}
+.pm2-name{font-weight:600;overflow-wrap:anywhere;}
+.pm2-id{font-size:11px;color:var(--text-muted);margin-left:6px;}
+.pm2-user{font-family:var(--mono);font-size:12px;color:var(--text-muted);}
+.pm2-st{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;
+  background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red);}
+.pm2-st::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;}
+.pm2-st.online{background:color-mix(in srgb,var(--green) 14%,transparent);color:var(--green);}
+.pm2-st.launching,.pm2-st.stopping{background:color-mix(in srgb,var(--yellow) 14%,transparent);color:var(--yellow);}
+.pm2-restarts.many{color:var(--yellow);font-weight:700;}
+.pm2-sum{font-size:12px;font-weight:700;}
+.pm2-empty{font-size:13px;color:var(--text-muted);margin:0;}
+/* ── Online / Offline timeline ── */
+.uptime-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px;}
+@media(max-width:700px){.uptime-stats{grid-template-columns:repeat(2,minmax(0,1fr));}}
+.uptime-stats>div{padding:10px 14px;border-radius:12px;background:var(--bg3);min-width:0;}
+.uptime-stat-lbl{display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin-bottom:4px;}
+.uptime-stat-val{font-family:var(--font-head);font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;}
+.uptime-bar{position:relative;height:34px;border-radius:10px;background:var(--chart-track);overflow:hidden;}
+.uptime-seg{position:absolute;top:0;bottom:0;}
+.uptime-seg.online{background:var(--green);}
+.uptime-seg.offline{background:var(--red);min-width:3px;z-index:1;}
+.uptime-seg.nodata{background:var(--chart-track);}
+.uptime-seg:hover{filter:brightness(1.15);}
+.uptime-axis{display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-top:6px;font-variant-numeric:tabular-nums;}
+.uptime-legend{display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);margin-top:10px;}
+.uptime-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;}
+.uptime-outage-list{margin-top:12px;max-height:180px;overflow-y:auto;}
+.uptime-outage-row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--border);font-size:12px;}
+.uptime-outage-row .dur{color:var(--red);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;}
 .history-custom-range{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;}
 .history-field{display:flex;flex-direction:column;gap:5px;}
 .history-field label{font-size:12px;color:var(--text-muted);margin:0;}
@@ -399,6 +443,33 @@ function toggleAlerts() {
 
 </div>
 
+<!-- ═══ Online / Offline timeline ═══ -->
+<div class="dash-card" id="uptime-card" style="margin-bottom:14px;">
+  <div class="dash-card-header">
+    <span class="dash-card-title">Online / Offline History</span>
+    <div class="history-presets" id="uptime-presets">
+      <button type="button" class="hist-preset-btn active" data-hours="24">24h</button>
+      <button type="button" class="hist-preset-btn" data-hours="168">7d</button>
+      <button type="button" class="hist-preset-btn" data-hours="720">30d</button>
+    </div>
+  </div>
+  <div class="uptime-stats">
+    <div><span class="uptime-stat-lbl">Uptime</span><span class="uptime-stat-val" id="uptime-pct">—</span></div>
+    <div><span class="uptime-stat-lbl">Outages</span><span class="uptime-stat-val" id="uptime-outages">—</span></div>
+    <div><span class="uptime-stat-lbl">Total downtime</span><span class="uptime-stat-val" id="uptime-down">—</span></div>
+    <div><span class="uptime-stat-lbl">Longest outage</span><span class="uptime-stat-val" id="uptime-longest">—</span></div>
+  </div>
+  <div class="uptime-bar" id="uptime-bar" role="img" aria-label="Online and offline timeline"></div>
+  <div class="uptime-axis"><span id="uptime-axis-start"></span><span id="uptime-axis-mid"></span><span>Now</span></div>
+  <div class="uptime-legend">
+    <span><i style="background:var(--green)"></i>Online</span>
+    <span><i style="background:var(--red)"></i>Offline</span>
+    <span><i style="background:var(--chart-track)"></i>No data</span>
+    <span class="history-status" id="uptime-status"></span>
+  </div>
+  <div class="uptime-outage-list" id="uptime-outage-list"></div>
+</div>
+
 <!-- ═══════════════════════════════════════════════════════════
      ROW 2 — CPU area / RAM donut / Swap donut / Disk donut
      ═══════════════════════════════════════════════════════════ -->
@@ -577,6 +648,19 @@ function toggleAlerts() {
     </div>
   </div>
 
+</div>
+
+<!-- ═══ PM2 apps ═══ -->
+<div class="dash-card" id="pm2-card" style="margin-bottom:14px;">
+  <div class="dash-card-header">
+    <span class="dash-card-title">PM2 Processes</span>
+    <span class="pm2-sum" id="pm2-sum"></span>
+  </div>
+  <!-- One grid per PM2 daemon (user), side by side; filled by renderPm2() -->
+  <div class="pm2-groups" id="pm2-groups" {% if not pm2 %}style="display:none;"{% endif %}></div>
+  <p class="pm2-empty" id="pm2-empty" {% if pm2 %}style="display:none;"{% endif %}>
+    No PM2 data from this server. The agent needs to send <span class="mono">pm2_processes</span> (e.g. the output of <span class="mono">pm2 jlist</span>) with each metrics report.
+  </p>
 </div>
 
 <!-- ═══ GPU LOAD OVERVIEW — supports Intel, Nvidia, multiple GPUs ═══ -->
@@ -1381,6 +1465,9 @@ async function pollLive() {
     updateRing(charts.ringRam,  ram,  'ring-ram-val');
     updateRing(charts.ringSwap, swap, 'ring-swap-val');
 
+    // ── PM2 apps ──
+    if (Array.isArray(d.pm2)) renderPm2(d.pm2);
+
     // ── Process status donut — sampled top_processes only ──
     if (d.top_processes && Array.isArray(d.top_processes) && charts.procDonut) {
       var counts = {};
@@ -1872,5 +1959,175 @@ async function alertHistPage(direction) {
   }
 }
 updateAlertHistControls();
+
+// ─────────────────────────────────────────────
+//  PM2 processes (seeded from the page, refreshed by pollLive)
+// ─────────────────────────────────────────────
+function fmtMem(mb) {
+  if (mb == null) return '—';
+  return mb >= 1024 ? (mb / 1024).toFixed(2) + ' GB' : Math.round(mb) + ' MB';
+}
+function pm2Row(p, i) {
+  var st = String(p.status || 'unknown').replace(/[^a-z_-]/gi, '');
+  var mode = p.mode ? p.mode + (p.instances && p.instances > 1 ? ' ×' + p.instances : '') : '';
+  return '<tr>' +
+    '<td class="num pm2-sno">' + (i + 1) + '</td>' +
+    '<td><span class="pm2-name"' + (mode ? ' title="Mode: ' + escHtml(mode) + '"' : '') + '>' + escHtml(p.name) + '</span>' +
+      (p.id != null ? '<span class="pm2-id">#' + escHtml(p.id) + '</span>' : '') + '</td>' +
+    '<td><span class="pm2-st ' + st + '">' + escHtml(st) + '</span></td>' +
+    '<td class="num">' + (p.cpu == null ? '—' : p.cpu.toFixed(1) + '%') + '</td>' +
+    '<td class="num">' + fmtMem(p.memory_mb) + '</td>' +
+    '<td class="num"><span class="pm2-restarts' + (p.restarts >= 10 ? ' many' : '') + '">' + (p.restarts || 0) + '</span></td>' +
+    '<td class="num">' + (p.uptime_secs == null ? '—' : fmtDur(p.uptime_secs)) + '</td>' +
+  '</tr>';
+}
+
+function renderPm2(list) {
+  if (!Array.isArray(list)) return;
+  var has = list.length > 0;
+  var wrap = document.getElementById('pm2-groups');
+  wrap.style.display = has ? '' : 'none';
+  document.getElementById('pm2-empty').style.display = has ? 'none' : '';
+  var sum = document.getElementById('pm2-sum');
+  if (!has) { sum.textContent = ''; wrap.innerHTML = ''; return; }
+  var online = list.filter(function(p) { return p.status === 'online'; }).length;
+  sum.textContent = online + ' / ' + list.length + ' online';
+  sum.style.color = online === list.length ? 'var(--green)' : 'var(--red)';
+
+  // One grid per PM2 daemon (user). The group boxes are kept between polls and
+  // only their rows are replaced, so a scrolled list doesn't jump back up every 2s.
+  var groups = {}, order = [];
+  list.forEach(function(p) {
+    var u = p.user || 'pm2';
+    if (!groups[u]) { groups[u] = []; order.push(u); }
+    groups[u].push(p);
+  });
+  order.sort();
+  var existing = {};
+  Array.prototype.forEach.call(wrap.children, function(el) { existing[el.dataset.user] = el; });
+  Object.keys(existing).forEach(function(u) {
+    if (!groups[u]) { existing[u].remove(); delete existing[u]; }
+  });
+  order.forEach(function(u, idx) {
+    var el = existing[u];
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'pm2-group';
+      el.dataset.user = u;
+      el.innerHTML =
+        '<div class="pm2-group-head"><span class="pm2-group-user"></span><span class="pm2-group-count"></span></div>' +
+        '<div class="pm2-group-scroll"><table class="pm2-table"><thead><tr>' +
+          '<th class="pm2-sno">S.No</th><th>App</th><th>Status</th><th>CPU</th><th>Memory</th><th>Restarts</th><th>Uptime</th>' +
+        '</tr></thead><tbody></tbody></table></div>';
+      el.querySelector('.pm2-group-user').textContent = u;
+    }
+    // Only move a box when it's out of place: re-inserting an element resets
+    // its scroll position, which made the list jump to the top every poll.
+    if (wrap.children[idx] !== el) wrap.insertBefore(el, wrap.children[idx] || null);
+    var g = groups[u];
+    var up = g.filter(function(p) { return p.status === 'online'; }).length;
+    var cnt = el.querySelector('.pm2-group-count');
+    cnt.textContent = up + ' / ' + g.length + ' online';
+    cnt.style.color = up === g.length ? 'var(--green)' : 'var(--red)';
+    var sc = el.querySelector('.pm2-group-scroll');
+    var top = sc.scrollTop;
+    el.querySelector('tbody').innerHTML = g.map(pm2Row).join('');
+    if (sc.scrollTop !== top) sc.scrollTop = top;
+  });
+  wrap.classList.toggle('single', order.length === 1);
+}
+
+// ─────────────────────────────────────────────
+//  Online / Offline timeline
+// ─────────────────────────────────────────────
+var uptimeState = { hours: 24, timer: null };
+
+function fmtDur(secs) {
+  secs = Math.max(0, Math.round(secs));
+  if (secs < 60) return secs + 's';
+  var d = Math.floor(secs / 86400), h = Math.floor(secs % 86400 / 3600), m = Math.floor(secs % 3600 / 60);
+  if (d) return d + 'd ' + h + 'h';
+  if (h) return h + 'h ' + m + 'm';
+  return m + 'm';
+}
+function fmtTs(epoch, withDate) {
+  var dt = new Date(epoch * 1000);
+  var opts = withDate ? { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+                      : { hour: '2-digit', minute: '2-digit' };
+  return dt.toLocaleString([], opts);
+}
+function escHtml(s) {
+  return String(s).replace(/[&<>"']/g, function(c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function renderUptime(d) {
+  var span = d.window_end - d.window_start;
+  var multiDay = uptimeState.hours > 24;
+  var bar = document.getElementById('uptime-bar');
+  var labelFor = { online: 'Online', offline: 'Offline', nodata: 'No data' };
+  bar.innerHTML = d.segments.map(function(s) {
+    var left = (s.start - d.window_start) / span * 100;
+    var width = (s.end - s.start) / span * 100;
+    var tip = labelFor[s.state] + ' · ' + fmtTs(s.start, true) + ' → ' + fmtTs(s.end, true) +
+              ' (' + fmtDur(s.end - s.start) + ')';
+    return '<div class="uptime-seg ' + s.state + '" style="left:' + left.toFixed(4) + '%;width:' +
+           width.toFixed(4) + '%" title="' + escHtml(tip) + '"></div>';
+  }).join('');
+
+  document.getElementById('uptime-pct').textContent = d.uptime_pct == null ? '—' : d.uptime_pct.toFixed(2) + '%';
+  document.getElementById('uptime-pct').style.color =
+    d.uptime_pct == null ? '' : (d.uptime_pct >= 99 ? 'var(--green)' : d.uptime_pct >= 95 ? 'var(--yellow)' : 'var(--red)');
+  document.getElementById('uptime-outages').textContent = d.outages + (d.truncated ? '+' : '');
+  document.getElementById('uptime-down').textContent = fmtDur(d.offline_secs);
+  document.getElementById('uptime-longest').textContent = d.outages ? fmtDur(d.longest_outage_secs) : '—';
+  document.getElementById('uptime-axis-start').textContent = fmtTs(d.window_start, multiDay);
+  document.getElementById('uptime-axis-mid').textContent = fmtTs(d.window_start + span / 2, multiDay);
+
+  var status = [];
+  if (d.nodata_secs > 0) status.push(fmtDur(d.nodata_secs) + ' before retained data');
+  if (d.truncated) status.push('showing first ' + d.outages + ' outages only');
+  document.getElementById('uptime-status').textContent = status.join(' · ');
+
+  var outages = d.segments.filter(function(s) { return s.state === 'offline'; }).reverse();
+  document.getElementById('uptime-outage-list').innerHTML = outages.length
+    ? outages.map(function(s) {
+        var ongoing = d.window_end - s.end < 1;
+        return '<div class="uptime-outage-row"><span>' + fmtTs(s.start, true) + ' → ' +
+               (ongoing ? '<strong>still offline</strong>' : fmtTs(s.end, true)) +
+               '</span><span class="dur">' + fmtDur(s.end - s.start) + '</span></div>';
+      }).join('')
+    : '<p style="font-size:13px;color:var(--text-muted);margin-top:4px;">No outages in this period (gaps over ' +
+      d.threshold_secs + 's between reports count as offline).</p>';
+}
+
+async function loadUptime() {
+  var st = document.getElementById('uptime-status');
+  try {
+    var r = await fetch('/servers/' + TABLE + '/uptime?hours=' + uptimeState.hours);
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || ('HTTP ' + r.status));
+    st.classList.remove('err');
+    renderUptime(d);
+  } catch (e) {
+    st.classList.add('err');
+    st.textContent = 'Could not load uptime history.';
+    console.error('uptime fetch failed', e);
+  }
+}
+
+document.querySelectorAll('#uptime-presets .hist-preset-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('#uptime-presets .hist-preset-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    uptimeState.hours = parseInt(btn.dataset.hours, 10);
+    loadUptime();
+  });
+});
+renderPm2({{ pm2 | tojson }});
+loadUptime();
+// The live poll runs every 2s; the timeline only needs a minute-level refresh.
+uptimeState.timer = setInterval(function() { if (!document.hidden) loadUptime(); }, 60000);
 </script>
 {% endblock %}

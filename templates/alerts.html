@@ -39,6 +39,10 @@
 .ma-head .form-group{margin:0;min-width:280px;flex:0 1 380px;}
 .ma-rows{display:flex;flex-direction:column;gap:10px;margin-top:16px;}
 .ma-row{display:grid;grid-template-columns:240px 70px 1fr;gap:14px;align-items:center;padding:12px 14px;border-radius:14px;background:var(--bg3);}
+.ma-summary{font-size:13px;color:var(--text-muted);padding-bottom:10px;}
+.ma-empty{margin-top:16px;padding:28px 16px;border-radius:14px;background:var(--bg3);text-align:center;font-size:13px;color:var(--text-muted);}
+.ma-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px;}
+.ma-ro-emails{font-size:13px;color:var(--text-muted);overflow-wrap:anywhere;}
 @media(max-width:760px){.ma-row{grid-template-columns:1fr;}}
 .ma-type{display:flex;align-items:center;gap:10px;font-weight:700;}
 .ma-type .kpi-icon{width:32px;height:32px;border-radius:10px;}
@@ -254,11 +258,10 @@
 
 <!-- ── MACHINE ROUTING ─────────────────────────────────────────────── -->
 <div class="tab-panel" data-tabpanel="alerts" data-panelid="machine">
-  {% if current_user.is_admin %}
-  <div class="panel mb-2">
+  <div class="panel">
     <div class="panel-head"><div>
-      <div class="panel-title">Routing for one machine</div>
-      <div class="panel-sub">Turn each alert type on or off for a single machine and choose who is emailed. Threshold and cooldown always come from the system rules.</div>
+      <div class="panel-title">Machine routing</div>
+      <div class="panel-sub">Pick a machine to see its alert rules{% if current_user.is_admin %}: turn each alert type on or off and choose who is emailed{% endif %}. Threshold and cooldown always come from the system rules.</div>
     </div></div>
     <div class="ma-head">
       <div class="form-group">
@@ -266,89 +269,35 @@
         <select id="ma-machine-select" onchange="loadMachineAlertRules(this.value)">
           <option value="">— Select a machine —</option>
           {% for m in machines %}
-          <option value="{{ m.table_name }}">{{ m.system_name }} — {{ m.location }}{{ ' (alerts muted)' if not m.alerts_enabled else '' }}</option>
+          {% set n = custom_counts.get(m.table_name, 0) %}
+          <option value="{{ m.table_name }}">{{ m.system_name }} — {{ m.location }}{{ ' · ' ~ n ~ ' custom' if n else '' }}{{ ' (alerts muted)' if not m.alerts_enabled else '' }}</option>
           {% endfor %}
         </select>
       </div>
+      <span class="ma-summary" id="ma-summary"></span>
     </div>
+
+    <div class="ma-empty" id="ma-empty">
+      {% if machines %}Select a machine above to see its alert rules.{% else %}No machines available.{% endif %}
+    </div>
+    <div class="ma-empty" id="ma-error" style="display:none;color:var(--red);">Could not load this machine's rules. Try again.</div>
+
     <div id="ma-rules-panel" style="display:none;">
+      {% if current_user.is_admin %}
       <form id="ma-rules-form" method="POST">
         <div class="ma-rows" id="ma-rules-tbody"><!-- filled by loadMachineAlertRules() --></div>
-        <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+        <div class="ma-actions">
+          <button type="submit" form="ma-reset-form" class="btn btn-ghost" id="ma-reset-btn"
+                  onclick="return confirm('Reset this machine to the system rules? Its own on/off settings and recipients are removed.')">Reset to system rules</button>
           <button type="submit" class="btn btn-primary">Save machine routing</button>
         </div>
       </form>
+      <form id="ma-reset-form" method="POST" style="display:none"></form>
+      {% else %}
+      <div class="ma-rows" id="ma-rules-tbody"></div>
+      {% endif %}
     </div>
   </div>
-  {% endif %}
-
-  <div class="panel">
-    <div class="panel-head"><div>
-      <div class="panel-title">All machine rules</div>
-      <div class="panel-sub">Every machine-specific setting, across the fleet</div>
-    </div></div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Machine</th>
-            <th>Alert</th>
-            <th>Enabled</th>
-            <th>Notify</th>
-            <th class="hide-mobile">Updated</th>
-            {% if current_user.is_admin %}<th></th>{% endif %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for o in machine_overrides %}
-          <tr>
-            <td>
-              <span class="mono" style="font-size:13px;font-weight:600;">{{ o.system_name or o.table_name }}</span>
-              {% if o.location %}<div class="text-muted" style="font-size:12px;">{{ o.location }}</div>{% endif %}
-            </td>
-            <td><span class="cell-type {{ type_grad(o.alert_type) }}"><span class="mini-icon">{{ type_icon(o.alert_type) }}</span>{{ TYPE_LABELS.get(o.alert_type, o.alert_type) }}</span></td>
-            {% if current_user.is_admin %}
-            <td>
-              <label class="toggle toggle-sm" style="margin:0;">
-                <input form="ma-row-{{ o.id }}" type="checkbox" name="enabled" value="1" {% if o.enabled %}checked{% endif %} aria-label="Enabled">
-                <span class="toggle-slider"></span>
-              </label>
-              <input form="ma-row-{{ o.id }}" type="hidden" name="alert_type" value="{{ o.alert_type }}">
-              <input form="ma-row-{{ o.id }}" type="hidden" name="table_name" value="{{ o.table_name }}">
-            </td>
-            <td style="min-width:240px;">
-              {{ macros.recipient_picker('recipient_emails', recipients, o.notify_emails, form_id='ma-row-' ~ o.id) }}
-            </td>
-            <td class="text-muted hide-mobile" style="font-size:12px;white-space:nowrap;">
-              {{ o.updated_at.strftime('%d %b %H:%M') if o.updated_at else '—' }}
-            </td>
-            <td>
-              <div style="display:flex;gap:6px;">
-                <button type="submit" form="ma-row-{{ o.id }}" class="btn btn-ghost btn-sm">Save</button>
-                <button type="submit" form="ma-del-{{ o.id }}" class="btn btn-danger btn-sm"
-                        onclick="return confirm('Remove this machine alert rule?')">Delete</button>
-              </div>
-            </td>
-            {% else %}
-            <td><span class="badge badge-{{ 'online' if o.enabled else 'offline' }}">{{ 'On' if o.enabled else 'Off' }}</span></td>
-            <td style="font-size:12px;">{{ o.notify_emails or '—' }}</td>
-            <td class="hide-mobile text-muted" style="font-size:12px">{{ o.updated_at.strftime('%d %b %H:%M') if o.updated_at else '—' }}</td>
-            {% endif %}
-          </tr>
-          {% else %}
-          <tr class="empty-row"><td colspan="6">No machine-specific routing yet — pick a machine above to choose who is notified for it.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  {% if current_user.is_admin %}
-  {% for o in machine_overrides %}
-  <form id="ma-row-{{ o.id }}" method="POST" action="{{ url_for('alerts.add_machine_alert') }}" style="display:none"></form>
-  <form id="ma-del-{{ o.id }}" method="POST" action="{{ url_for('alerts.delete_machine_alert', override_id=o.id) }}" style="display:none"></form>
-  {% endfor %}
-  {% endif %}
 </div>
 
 <!-- ── DB MONITOR ALERTS ──────────────────────────────────────────── -->
@@ -591,15 +540,28 @@ const MA_ICON_SVG = {
   temp:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z"/></svg>'
 };
 
+const MA_CAN_EDIT = {{ 'true' if current_user.is_admin else 'false' }};
+
 // Bumped on every call so a slow response for a previously selected machine
 // can't overwrite the rules of the one selected now.
 var _maRulesSeq = 0;
+function _maShow(which){
+  document.getElementById('ma-empty').style.display     = which === 'empty' ? '' : 'none';
+  document.getElementById('ma-error').style.display     = which === 'error' ? '' : 'none';
+  document.getElementById('ma-rules-panel').style.display = which === 'rules' ? '' : 'none';
+  if (which !== 'rules') document.getElementById('ma-summary').textContent = '';
+}
+
 async function loadMachineAlertRules(tableName){
-  var panel = document.getElementById('ma-rules-panel');
   var tbody = document.getElementById('ma-rules-tbody');
-  var form  = document.getElementById('ma-rules-form');
   var my = ++_maRulesSeq;
-  if (!tableName){ panel.style.display = 'none'; return; }
+  // Keep the choice in the URL so a reload / save comes back to this machine.
+  try {
+    var u = new URL(window.location.href);
+    if (tableName) u.searchParams.set('machine', tableName); else u.searchParams.delete('machine');
+    history.replaceState(null, '', u.pathname + u.search + u.hash);
+  } catch(e){}
+  if (!tableName){ _maShow('empty'); return; }
 
   var rows;
   try {
@@ -610,7 +572,7 @@ async function loadMachineAlertRules(tableName){
   } catch(e){
     if (my !== _maRulesSeq) return;
     console.error('failed to load machine alert rules', e);
-    panel.style.display = 'none';   // never leave another machine's rules on screen
+    _maShow('error');   // never leave another machine's rules on screen
     return;
   }
   if (my !== _maRulesSeq) return;  // a newer selection is in flight / done
@@ -619,8 +581,27 @@ async function loadMachineAlertRules(tableName){
     var t = String(row.alert_type).replace(/[^a-z_]/gi, '');
     var selected = (row.notify_emails || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
 
-    var recipientHtml = MA_RECIPIENTS.length
-      ? MA_RECIPIENTS.map(function(rc){
+    var badge = row.has_override
+      ? '<span class="badge badge-info" style="font-size:10px;margin-left:6px;">custom</span>'
+      : '<span class="text-muted" style="font-size:11px;font-weight:500;margin-left:6px;">default</span>';
+    var typeCell = '<div class="ma-type ' + (MA_GRAD[t] || 'k-ocean') + '"><span class="kpi-icon">' + (MA_ICON_SVG[t] || '') + '</span>' +
+      '<span>' + _alEsc(alName(t)) + badge + '</span></div>';
+
+    if (!MA_CAN_EDIT){
+      return '<div class="ma-row">' + typeCell +
+        '<span class="badge badge-' + (row.enabled ? 'online' : 'offline') + '">' + (row.enabled ? 'On' : 'Off') + '</span>' +
+        '<div class="ma-ro-emails">' + (selected.length ? _alEsc(selected.join(', ')) : 'Default recipients') + '</div>' +
+      '</div>';
+    }
+
+    // Recipients saved on this machine that are no longer in the address book
+    // stay listed (checked) so saving doesn't silently drop them.
+    var book = MA_RECIPIENTS.slice();
+    selected.forEach(function(e){
+      if (!book.some(function(rc){ return rc.email === e; })) book.push({ email: e, label: e });
+    });
+    var recipientHtml = book.length
+      ? book.map(function(rc){
           var checked = selected.indexOf(rc.email) !== -1;
           return '<label class="recipient-chip' + (checked ? ' checked' : '') + '">' +
             '<input type="checkbox" name="emails_' + t + '" value="' + _alEsc(rc.email) + '"' + (checked ? ' checked' : '') + '>' +
@@ -628,13 +609,7 @@ async function loadMachineAlertRules(tableName){
         }).join('')
       : '<span class="recipient-picker-empty">No recipients yet — add some in Settings → Alert Recipients.</span>';
 
-    var badge = row.has_override
-      ? '<span class="badge badge-info" style="font-size:10px;margin-left:6px;">custom</span>'
-      : '<span class="text-muted" style="font-size:11px;font-weight:500;margin-left:6px;">default</span>';
-
-    return '<div class="ma-row">' +
-      '<div class="ma-type ' + (MA_GRAD[t] || 'k-ocean') + '"><span class="kpi-icon">' + (MA_ICON_SVG[t] || '') + '</span>' +
-        '<span>' + _alEsc(alName(t)) + badge + '</span></div>' +
+    return '<div class="ma-row">' + typeCell +
       '<label class="toggle" style="margin:0;" title="Enabled for this machine">' +
         '<input type="checkbox" name="enabled_' + t + '" value="1"' + (row.enabled ? ' checked' : '') + ' aria-label="Enabled">' +
         '<span class="toggle-slider"></span></label>' +
@@ -642,18 +617,38 @@ async function loadMachineAlertRules(tableName){
     '</div>';
   }).join('');
 
-  // Wire chip highlight state for the freshly-inserted checkboxes (mirrors
-  // base.html's global recipient-chip handler, which only binds on page load)
-  tbody.querySelectorAll('.recipient-chip input[type="checkbox"]').forEach(function(cb){
-    cb.addEventListener('change', function(){
-      var chip = cb.closest('.recipient-chip');
-      if (chip) chip.classList.toggle('checked', cb.checked);
+  if (MA_CAN_EDIT){
+    // Wire chip highlight state for the freshly-inserted checkboxes (mirrors
+    // base.html's global recipient-chip handler, which only binds on page load)
+    tbody.querySelectorAll('.recipient-chip input[type="checkbox"]').forEach(function(cb){
+      cb.addEventListener('change', function(){
+        var chip = cb.closest('.recipient-chip');
+        if (chip) chip.classList.toggle('checked', cb.checked);
+      });
     });
-  });
+    // Point the forms at this machine only once its rules are on screen.
+    var base = '/alerts/machine/' + encodeURIComponent(tableName);
+    document.getElementById('ma-rules-form').action = base + '/save-all';
+    document.getElementById('ma-reset-form').action = base + '/reset';
+  }
 
-  // Point the form at this machine only once its rules are on screen.
-  form.action = '/alerts/machine/' + encodeURIComponent(tableName) + '/save-all';
-  panel.style.display = '';
+  var custom = rows.filter(function(r){ return r.has_override; }).length;
+  var on = rows.filter(function(r){ return r.enabled; }).length;
+  document.getElementById('ma-summary').textContent =
+    on + ' of ' + rows.length + ' alerts on · ' + (custom ? custom + ' custom' : 'follows system rules');
+  var resetBtn = document.getElementById('ma-reset-btn');
+  if (resetBtn) resetBtn.disabled = !custom;
+  _maShow('rules');
 }
+
+// Re-open the machine that was selected before a save / reload.
+(function(){
+  var sel = document.getElementById('ma-machine-select');
+  var want = new URLSearchParams(window.location.search).get('machine');
+  if (sel && want && Array.prototype.some.call(sel.options, function(o){ return o.value === want; })){
+    sel.value = want;
+    loadMachineAlertRules(want);
+  }
+})();
 </script>
 {% endblock %}
